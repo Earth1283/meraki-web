@@ -65,7 +65,7 @@ export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {})
       rows.push({ type: 'collapsible-header', section: 'todo', label: 'To Be Done', count: todo.length, collapsed: todoCollapsed });
       if (!todoCollapsed) {
         if (todo.length === 0) {
-          rows.push({ type: 'placeholder', text: "Nothing due in the next 7 days — you're caught up." });
+          rows.push({ type: 'placeholder', tone: 'good', text: "Nothing due in the next 7 days — you're caught up." });
         } else {
           todo.forEach((t) => rows.push({ type: 'item', target: { kind: t.kind, index: t.index } }));
         }

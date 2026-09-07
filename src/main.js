@@ -219,7 +219,17 @@ function renderBody() {
       }
       list.appendChild(activeGroup);
     } else if (kind.type === 'placeholder') {
-      (activeGroup ?? list).appendChild(el('div', { class: 'row-placeholder', text: kind.text }));
+      // Grey placeholder text on grey background is easy to skim right
+      // past — the "you're caught up" case is good news worth actually
+      // noticing, so it gets the same green check badge as a done item
+      // instead of blending into every other empty-state message.
+      const isGood = kind.tone === 'good';
+      (activeGroup ?? list).appendChild(
+        el('div', { class: `row-placeholder ${isGood ? 'row-placeholder-good' : ''}` }, [
+          isGood ? el('span', { class: 'row-done-check' }, [svgIcon(iconPaths('check'))]) : null,
+          el('span', { text: kind.text }),
+        ]),
+      );
     } else if (kind.type === 'info') {
       (activeGroup ?? list).appendChild(renderInfoRow(state.data));
     } else if (kind.type === 'item') {

@@ -535,6 +535,7 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 }
 
 .row-placeholder { padding: 10px 4px; color: var(--text-muted); font-size: 0.9rem; }
+.row-placeholder-good { display: flex; align-items: center; gap: 10px; }
 
 .row-item {
   display: block;
