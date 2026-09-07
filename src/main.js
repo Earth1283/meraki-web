@@ -1,6 +1,6 @@
 import { el, clear, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
-import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode } from './state.js';
+import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection } from './state.js';
 import { tabTitle, rowKinds, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs } from './rows.js';
 import { iconPaths } from './icons.js';
 import { privacyParagraphs } from './privacy.js';
@@ -156,7 +156,7 @@ function renderBody() {
     body.appendChild(renderOverviewStats(overviewSummary(state.data), setTab));
   }
 
-  const kinds = rowKinds(state.tab, state.data);
+  const kinds = rowKinds(state.tab, state.data, new Date(), state.overviewCollapse);
   if (kinds.length === 0) {
     body.appendChild(el('div', { class: 'empty-state' }, [el('div', { class: 'empty-icon', text: '·' }), el('p', { text: 'Nothing here yet.' })]));
     return;
@@ -167,6 +167,22 @@ function renderBody() {
   for (const kind of kinds) {
     if (kind.type === 'header') {
       list.appendChild(el('div', { class: 'row-section', text: kind.label }));
+    } else if (kind.type === 'collapsible-header') {
+      list.appendChild(
+        el(
+          'button',
+          {
+            class: 'row-section row-section-toggle',
+            type: 'button',
+            onclick: () => toggleOverviewSection(kind.section),
+            'aria-expanded': !kind.collapsed,
+          },
+          [
+            el('span', { class: 'row-section-chevron' }, [svgIcon(iconPaths(kind.collapsed ? 'chevronDown' : 'chevronUp'))]),
+            el('span', { text: `${kind.label} (${kind.count})` }),
+          ],
+        ),
+      );
     } else if (kind.type === 'placeholder') {
       list.appendChild(el('div', { class: 'row-placeholder', text: kind.text }));
     } else if (kind.type === 'info') {
@@ -178,7 +194,7 @@ function renderBody() {
       const rowBtn = el(
         'button',
         {
-          class: `row-item ${isSelected ? 'selected' : ''}`,
+          class: `row-item ${isSelected ? 'selected' : ''} ${kind.done ? 'row-item-done' : ''}`,
           type: 'button',
           onclick: () => openDetailFor(target),
           oncontextmenu: (e) => {
@@ -186,7 +202,10 @@ function renderBody() {
             openContextMenu(e.clientX, e.clientY, menuItemsFor(target));
           },
         },
-        [renderItemBody(target, state.data, state.ownUserId)],
+        [
+          kind.done ? el('span', { class: 'row-done-check' }, [svgIcon(iconPaths('check'))]) : null,
+          renderItemBody(target, state.data, state.ownUserId),
+        ],
       );
       list.appendChild(rowBtn);
     }

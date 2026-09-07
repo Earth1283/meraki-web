@@ -103,6 +103,10 @@ export const state = {
   // Messages-tab-only cosmetic toggle. Remembered per browser, just for fun.
   chatMode: loadChatMode(),
   activeThreadPartnerId: null,
+  // Overview's "Due this week" split. Not persisted — resets to the
+  // intended default (todo open, done tucked away) on every load rather
+  // than remembering a stale collapse state across days.
+  overviewCollapse: { todo: false, done: true },
 };
 
 function emptyData() {
@@ -250,7 +254,13 @@ export async function optimisticInsert(field, row, table, apiBody) {
 }
 
 function rowKindsForCurrentTab() {
-  return rowKinds(state.tab, state.data);
+  return rowKinds(state.tab, state.data, new Date(), state.overviewCollapse);
+}
+
+export function toggleOverviewSection(section) {
+  state.overviewCollapse[section] = !state.overviewCollapse[section];
+  clampSelection();
+  notify();
 }
 
 export function currentItemTargets() {

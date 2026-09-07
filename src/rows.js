@@ -53,16 +53,31 @@ export function filterLabels(labels, query) {
   return labels.filter((l) => l.toLowerCase().includes(q));
 }
 
-export function rowKinds(tabId, data, today = new Date()) {
+export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {}) {
   const rows = [];
   switch (tabId) {
     case 'overview': {
-      const { dueThisWeek } = overviewSummary(data, today);
-      rows.push({ type: 'header', label: 'Due this week' });
-      if (dueThisWeek.length === 0) {
-        rows.push({ type: 'placeholder', text: "Nothing due in the next 7 days — you're caught up." });
-      } else {
-        dueThisWeek.forEach((i) => rows.push({ type: 'item', target: { kind: 'assignment', index: i } }));
+      const { todo: todoCollapsed = false, done: doneCollapsed = true } = overviewCollapse;
+      const { dueThisWeekTasks } = overviewSummary(data, today);
+      const todo = dueThisWeekTasks.filter((t) => !t.done);
+      const done = dueThisWeekTasks.filter((t) => t.done);
+
+      rows.push({ type: 'collapsible-header', section: 'todo', label: 'To Be Done', count: todo.length, collapsed: todoCollapsed });
+      if (!todoCollapsed) {
+        if (todo.length === 0) {
+          rows.push({ type: 'placeholder', text: "Nothing due in the next 7 days — you're caught up." });
+        } else {
+          todo.forEach((t) => rows.push({ type: 'item', target: { kind: t.kind, index: t.index } }));
+        }
+      }
+      // Only shown once something's actually done — an empty "Done" section
+      // collapsed by default would just be a header that never earns its
+      // place on screen.
+      if (done.length > 0) {
+        rows.push({ type: 'collapsible-header', section: 'done', label: 'Done', count: done.length, collapsed: doneCollapsed });
+        if (!doneCollapsed) {
+          done.forEach((t) => rows.push({ type: 'item', target: { kind: t.kind, index: t.index }, done: true }));
+        }
       }
       rows.push({ type: 'header', label: 'Recent announcements' });
       const recent = data.announcements.slice(0, 5);
@@ -176,13 +191,27 @@ export function overviewSummary(data, today = new Date()) {
   const gradedAssignmentIds = new Set(data.grades.map((g) => g.assignment_id).filter(Boolean));
 
   const dueThisWeek = [];
+  // Assignments and assessments both belong in "what's due" — dueThisWeek
+  // (assignments-only indices) stays as-is for the overview stat tile, but
+  // the Overview list itself needs both kinds together with a completion
+  // flag, hence this separate combined list.
+  const dueThisWeekTasks = [];
   const overdueUngraded = [];
   data.assignments.forEach((a, i) => {
     const delta = daysUntil(a.due_date, today);
     if (delta == null) return;
-    if (delta >= 0 && delta <= 6) dueThisWeek.push(i);
-    else if (delta < 0 && !gradedAssignmentIds.has(a.id)) overdueUngraded.push(i);
+    if (delta >= 0 && delta <= 6) {
+      dueThisWeek.push(i);
+      dueThisWeekTasks.push({ kind: 'assignment', index: i, dueDate: a.due_date, done: !!submissionForAssignment(data, a.id) });
+    } else if (delta < 0 && !gradedAssignmentIds.has(a.id)) overdueUngraded.push(i);
   });
+  data.assessments.forEach((a, i) => {
+    // due_at is a full timestamp; daysUntil wants a bare date.
+    const delta = daysUntil(a.due_at ? a.due_at.slice(0, 10) : null, today);
+    if (delta == null || delta < 0 || delta > 6) return;
+    dueThisWeekTasks.push({ kind: 'assessment', index: i, dueDate: a.due_at, done: !!submissionForAssessment(data, a) });
+  });
+  dueThisWeekTasks.sort((x, y) => (x.dueDate ?? '').localeCompare(y.dueDate ?? ''));
 
   const unreadCount = data.messages.filter((m) => m.read === false).length;
   const attendanceToday = data.attendance.find((r) => r.date === todayStr) ?? null;
@@ -195,7 +224,7 @@ export function overviewSummary(data, today = new Date()) {
     .filter((p) => p != null);
   const avgGradePct = gradedPcts.length ? gradedPcts.reduce((sum, p) => sum + p, 0) / gradedPcts.length : null;
 
-  return { dueThisWeek, overdueUngraded, unreadCount, attendanceToday, avgGradePct };
+  return { dueThisWeek, dueThisWeekTasks, overdueUngraded, unreadCount, attendanceToday, avgGradePct };
 }
 
 /** Index lists of everything scoped to one class, for the class detail

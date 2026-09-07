@@ -44,6 +44,31 @@ test('overviewSummary buckets assignments into this-week vs overdue-and-ungraded
   assert.deepEqual(summary.overdueUngraded, [3]);
 });
 
+test('overviewSummary.dueThisWeekTasks combines assignments and assessments due this week, each tagged with completion', () => {
+  const data = emptyData({
+    assignments: [
+      { id: 'a1', due_date: '2026-09-10' }, // today, no submission -> todo
+      { id: 'a2', due_date: '2026-10-01' }, // outside window -> excluded
+    ],
+    assessments: [
+      { id: 'q1', due_at: '2026-09-12T15:00:00+00:00' }, // this week, submitted -> done
+      { id: 'q2', due_at: '2026-09-20T15:00:00+00:00' }, // outside window -> excluded
+    ],
+    assignmentSubmissions: [],
+    assessmentSubmissions: [{ id: 's1', assessments: { class_id: undefined, title: undefined } }],
+  });
+  // submissionForAssessment matches on (class_id, title) pairs, both undefined here on
+  // both sides, which is enough to exercise "a submission exists" without real assessments data.
+  const summary = overviewSummary(data, FIXED_TODAY);
+  assert.deepEqual(
+    summary.dueThisWeekTasks.map((t) => [t.kind, t.index, t.done]),
+    [
+      ['assignment', 0, false],
+      ['assessment', 0, true],
+    ],
+  );
+});
+
 test('overviewSummary reports unread messages and no grades/attendance as explicit nulls', () => {
   const data = emptyData({
     messages: [{ id: 'm1', read: false }, { id: 'm2', read: true }, { id: 'm3', read: false }],
@@ -90,6 +115,41 @@ test('overview rowKinds lists only assignments due within the next 7 days', () =
   const items = kinds.filter((k) => k.type === 'item' && k.target.kind === 'assignment');
   assert.equal(items.length, 1);
   assert.equal(items[0].target.index, 0);
+});
+
+test('overview rowKinds defaults To Be Done open and Done collapsed, and hides an empty Done section entirely', () => {
+  const data = emptyData({
+    assignments: [
+      { id: 'a1', title: 'Not done', due_date: '2026-09-12' },
+      { id: 'a2', title: 'Done', due_date: '2026-09-13' },
+    ],
+    assignmentSubmissions: [{ id: 'sub1', assignment_id: 'a2', submitted_at: '2026-09-11T00:00:00Z', status: 'submitted' }],
+  });
+  const kinds = rowKinds('overview', data, FIXED_TODAY);
+  const headers = kinds.filter((k) => k.type === 'collapsible-header');
+  assert.deepEqual(headers.map((h) => [h.section, h.count, h.collapsed]), [
+    ['todo', 1, false],
+    ['done', 1, true],
+  ]);
+  // Done is collapsed by default, so no done item row should be present yet.
+  assert.equal(kinds.some((k) => k.type === 'item' && k.done), false);
+  assert.equal(kinds.some((k) => k.type === 'item' && k.target.index === 0 && !k.done), true);
+});
+
+test('overview rowKinds omits the Done header entirely when nothing is done yet', () => {
+  const data = emptyData({ assignments: [{ id: 'a1', title: 'Pending', due_date: '2026-09-12' }] });
+  const kinds = rowKinds('overview', data, FIXED_TODAY);
+  assert.equal(kinds.some((k) => k.type === 'collapsible-header' && k.section === 'done'), false);
+});
+
+test('overview rowKinds respects an explicit collapse override, e.g. expanding Done', () => {
+  const data = emptyData({
+    assignments: [{ id: 'a1', title: 'Done', due_date: '2026-09-12' }],
+    assignmentSubmissions: [{ id: 'sub1', assignment_id: 'a1', submitted_at: '2026-09-11T00:00:00Z', status: 'submitted' }],
+  });
+  const kinds = rowKinds('overview', data, FIXED_TODAY, { done: false });
+  const doneItems = kinds.filter((k) => k.type === 'item' && k.done);
+  assert.equal(doneItems.length, 1);
 });
 
 test('fieldDisplay renders "No data" for null, undefined, and empty string only', () => {

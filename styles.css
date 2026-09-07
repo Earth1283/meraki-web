@@ -552,6 +552,32 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 .row-item:hover { transform: translateY(-2px); box-shadow: var(--shadow-card-hover); }
 .row-item.selected { border-color: var(--accent); background: var(--accent-soft); }
 
+.row-item-done { display: flex; align-items: center; gap: 10px; opacity: 0.72; }
+.row-item-done .row-item-inner { flex: 1; min-width: 0; }
+.row-done-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--good-soft);
+  color: var(--good);
+}
+.row-done-check .icon { width: 13px; height: 13px; stroke-width: 2.5; }
+
+.row-section-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  font: inherit;
+}
+.row-section-toggle:hover { color: var(--text-secondary); }
+.row-section-chevron { display: inline-flex; flex: none; }
+.row-section-chevron .icon { width: 13px; height: 13px; stroke-width: 2.5; }
+
 .row-top { display: flex; align-items: center; gap: 8px; }
 .row-top > .pill:last-child { margin-left: auto; }
 
