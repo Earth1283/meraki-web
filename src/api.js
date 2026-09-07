@@ -152,6 +152,15 @@ export async function getSignedFileUrl(storagePath, { bucket = 'school-files', e
   return `${SUPABASE_URL}/storage/v1${v.signedURL}`;
 }
 
+// assessment_questions is unreadable for students (RLS returns it empty
+// unconditionally — the prompt/options/rubric only ever reach the client
+// through Meraki's own app), so this is the only per-question detail
+// meraki-web can show: your own past answers, scoped to your own
+// submissions the same way the rest of this app's tables are.
+export async function getAssessmentAnswers(submissionId) {
+  return getTable('assessment_answers', `select=id,question_id,response,is_correct,points_awarded,feedback,created_at&submission_id=eq.${submissionId}&order=created_at.asc`);
+}
+
 export function friendlyLoadError(label, err) {
   const msg = String(err?.message ?? err ?? '');
   if (msg.includes('token refresh failed') || msg.includes('not logged in')) {

@@ -1,8 +1,8 @@
 import { el, clear, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
-import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig } from './state.js';
-import { TABS, MOOD_LABELS, detailFields, commandLabels, filterLabels, fieldDisplay, classSections, renderItemBody, orderedTabIds } from './rows.js';
+import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, notify } from './state.js';
+import { TABS, MOOD_LABELS, detailFields, commandLabels, filterLabels, fieldDisplay, classSections, renderItemBody, orderedTabIds, submissionForAssessment } from './rows.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 
 const overlayRoot = document.getElementById('overlay-root');
@@ -41,6 +41,60 @@ export async function downloadFileUpload(f, triggerBtn) {
       triggerBtn.textContent = original;
     }
   }
+}
+
+// Per-question answers are fetched lazily (one submission at a time, on
+// first view) rather than bulk-loaded into state.data like everything
+// else — there's no list of them anywhere else in the UI to justify
+// preloading, and re-fetching on every refresh() would be wasted requests
+// for a detail panel that's usually closed.
+const assessmentAnswersCache = new Map();
+const assessmentAnswersLoading = new Set();
+
+function loadAssessmentAnswers(submissionId) {
+  if (assessmentAnswersCache.has(submissionId) || assessmentAnswersLoading.has(submissionId)) return;
+  assessmentAnswersLoading.add(submissionId);
+  api
+    .getAssessmentAnswers(submissionId)
+    .then((rows) => assessmentAnswersCache.set(submissionId, rows))
+    .catch((err) => assessmentAnswersCache.set(submissionId, { error: err.message }))
+    .finally(() => {
+      assessmentAnswersLoading.delete(submissionId);
+      notify();
+    });
+}
+
+function buildAssessmentAnswers(submissionId) {
+  loadAssessmentAnswers(submissionId);
+  const cached = assessmentAnswersCache.get(submissionId);
+  const section = el('div', { class: 'detail-section' }, [el('div', { class: 'row-section' }, 'Your answers')]);
+
+  if (!cached) {
+    section.appendChild(el('div', { class: 'row-placeholder', text: 'Loading…' }));
+  } else if (cached.error) {
+    section.appendChild(el('div', { class: 'row-placeholder', text: `Couldn't load answers: ${cached.error}` }));
+  } else if (cached.length === 0) {
+    section.appendChild(el('div', { class: 'row-placeholder', text: 'No per-question answers on file for this submission.' }));
+  } else {
+    // Question text/options aren't shown because they aren't readable —
+    // meraki-web only ever sees its own past responses, never the bank of
+    // questions, so this is a scored answer log, not a quiz review.
+    const rows = cached.map((a, i) => {
+      const choice = a.response?.choice;
+      const status = a.is_correct === true ? 'good' : a.is_correct === false ? 'bad' : 'dim';
+      const statusText = a.is_correct === true ? 'Correct' : a.is_correct === false ? 'Incorrect' : 'Not graded';
+      const meta = [choice != null ? `Chose option ${choice + 1}` : null, a.points_awarded != null ? `${a.points_awarded} pt${a.points_awarded === 1 ? '' : 's'}` : null]
+        .filter(Boolean)
+        .join(' · ');
+      return el('div', { class: 'roster-row' }, [
+        el('span', { class: 'roster-name', text: `Question ${i + 1}` }),
+        el('span', { class: `pill ${status}`, text: statusText }),
+        el('span', { class: 'roster-meta', text: meta }),
+      ]);
+    });
+    section.appendChild(el('div', { class: 'roster-list' }, rows));
+  }
+  return section;
 }
 
 function backdrop(onClose) {
@@ -174,6 +228,11 @@ export function renderDetailPanel() {
     detailPanel.appendChild(el('div', { class: 'panel-actions' }, [downloadBtn]));
   }
   if (target.kind === 'class') detailPanel.appendChild(buildClassSections(target.index));
+  if (target.kind === 'assessment') {
+    const a = state.data.assessments[target.index];
+    const sub = submissionForAssessment(state.data, a);
+    if (sub) detailPanel.appendChild(buildAssessmentAnswers(sub.id));
+  }
 
   if (!detailMobileBackdrop) {
     detailMobileBackdrop = el('div', { class: 'detail-backdrop', onclick: closeOverlay });
