@@ -1,0 +1,6 @@
+services:
+  meraki-web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "9090:80"

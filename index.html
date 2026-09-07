@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Meraki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="login-screen"></div>
+    <div id="shell" hidden>
+      <nav id="tabbar"></nav>
+      <div id="content-col">
+        <header id="toolbar"></header>
+        <main id="body"></main>
+      </div>
+      <aside id="detail-panel" hidden></aside>
+    </div>
+  </div>
+  <div id="overlay-root"></div>
+  <div id="contextmenu-root"></div>
+  <div id="toast-root"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
