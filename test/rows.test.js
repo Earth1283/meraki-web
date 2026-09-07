@@ -69,6 +69,29 @@ test('overviewSummary.dueThisWeekTasks combines assignments and assessments due 
   );
 });
 
+test('overviewSummary.dueThisWeekTasks drops the assignment duplicate when an assessment backs it (same quiz, two rows)', () => {
+  const data = emptyData({
+    assignments: [
+      { id: 'a1', due_date: '2026-09-10' }, // backs q1 -> should not appear on its own
+      { id: 'a2', due_date: '2026-09-11' }, // plain assignment, no assessment -> appears
+    ],
+    assessments: [{ id: 'q1', assignment_id: 'a1', due_at: '2026-09-10T15:00:00+00:00' }],
+    assignmentSubmissions: [],
+    assessmentSubmissions: [],
+  });
+  const summary = overviewSummary(data, FIXED_TODAY);
+  assert.deepEqual(
+    summary.dueThisWeekTasks.map((t) => [t.kind, t.index]),
+    [
+      ['assessment', 0],
+      ['assignment', 1],
+    ],
+  );
+  // The stat tile's plain assignment count is intentionally untouched by
+  // the dedup — it still counts every assignment due, backing or not.
+  assert.deepEqual(summary.dueThisWeek, [0, 1]);
+});
+
 test('overviewSummary reports unread messages and no grades/attendance as explicit nulls', () => {
   const data = emptyData({
     messages: [{ id: 'm1', read: false }, { id: 'm2', read: true }, { id: 'm3', read: false }],

@@ -15,6 +15,16 @@ const tabbar = document.getElementById('tabbar');
 const toolbar = document.getElementById('toolbar');
 const body = document.getElementById('body');
 
+// renderBody() tears down and rebuilds the whole row list on every render
+// (no vdom diffing here), so a plain CSS transition on a class toggle has
+// no "before" frame to animate from — the old node is just gone. This
+// remembers each overview section's collapse state from the previous
+// render so a toggle can be told apart from a steady-state refresh, and
+// the reveal/rotation is done the same way showToast() does its fade-in:
+// mount in the "before" state, then flip to the "after" state on the next
+// frame so the browser has something to interpolate.
+let prevOverviewCollapse = { ...state.overviewCollapse };
+
 function render() {
   if (!isLoggedIn()) {
     shell.hidden = true;
@@ -164,10 +174,31 @@ function renderBody() {
 
   let itemCounter = -1;
   const list = el('div', { class: 'row-list' });
+  // Rows belonging to the current collapsible section (between a
+  // collapsible-header and the next header of any kind) land in this
+  // group container instead of directly in `list`, so the reveal
+  // animation below has one node per section to animate.
+  let activeGroup = null;
+  const chevronsToRotate = [];
+  const groupsToReveal = [];
+
   for (const kind of kinds) {
     if (kind.type === 'header') {
+      activeGroup = null;
       list.appendChild(el('div', { class: 'row-section', text: kind.label }));
     } else if (kind.type === 'collapsible-header') {
+      const wasCollapsed = prevOverviewCollapse[kind.section];
+      const justToggled = wasCollapsed !== undefined && wasCollapsed !== kind.collapsed;
+
+      // Disclosure triangle: points right while collapsed, rotates down
+      // when expanded — one icon, rotated, rather than swapping between
+      // two different chevron glyphs (which read as two unrelated icons
+      // rather than one thing turning).
+      const chevron = svgIcon(iconPaths('chevronDown'));
+      chevron.classList.add('row-section-chevron-icon');
+      chevron.classList.toggle('collapsed', justToggled ? wasCollapsed : kind.collapsed);
+      if (justToggled) chevronsToRotate.push({ chevron, collapsed: kind.collapsed });
+
       list.appendChild(
         el(
           'button',
@@ -177,16 +208,20 @@ function renderBody() {
             onclick: () => toggleOverviewSection(kind.section),
             'aria-expanded': !kind.collapsed,
           },
-          [
-            el('span', { class: 'row-section-chevron' }, [svgIcon(iconPaths(kind.collapsed ? 'chevronDown' : 'chevronUp'))]),
-            el('span', { text: `${kind.label} (${kind.count})` }),
-          ],
+          [el('span', { class: 'row-section-chevron' }, [chevron]), el('span', { text: `${kind.label} (${kind.count})` })],
         ),
       );
+
+      activeGroup = el('div', { class: 'row-list section-items' });
+      if (justToggled && !kind.collapsed) {
+        activeGroup.classList.add('reveal-pending');
+        groupsToReveal.push(activeGroup);
+      }
+      list.appendChild(activeGroup);
     } else if (kind.type === 'placeholder') {
-      list.appendChild(el('div', { class: 'row-placeholder', text: kind.text }));
+      (activeGroup ?? list).appendChild(el('div', { class: 'row-placeholder', text: kind.text }));
     } else if (kind.type === 'info') {
-      list.appendChild(renderInfoRow(state.data));
+      (activeGroup ?? list).appendChild(renderInfoRow(state.data));
     } else if (kind.type === 'item') {
       itemCounter += 1;
       const isSelected = itemCounter === state.selectedIndex;
@@ -196,7 +231,7 @@ function renderBody() {
         {
           class: `row-item ${isSelected ? 'selected' : ''} ${kind.done ? 'row-item-done' : ''}`,
           type: 'button',
-          onclick: () => openDetailFor(target),
+          onclick: () => openDetailFor(target, itemCounter),
           oncontextmenu: (e) => {
             e.preventDefault();
             openContextMenu(e.clientX, e.clientY, menuItemsFor(target));
@@ -207,10 +242,18 @@ function renderBody() {
           renderItemBody(target, state.data, state.ownUserId),
         ],
       );
-      list.appendChild(rowBtn);
+      (activeGroup ?? list).appendChild(rowBtn);
     }
   }
   body.appendChild(list);
+
+  if (chevronsToRotate.length || groupsToReveal.length) {
+    requestAnimationFrame(() => {
+      chevronsToRotate.forEach(({ chevron, collapsed }) => chevron.classList.toggle('collapsed', collapsed));
+      groupsToReveal.forEach((node) => node.classList.add('reveal-in'));
+    });
+  }
+  prevOverviewCollapse = { ...state.overviewCollapse };
 }
 
 function renderPrivacy() {

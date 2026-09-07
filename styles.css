@@ -578,6 +578,19 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 .row-section-chevron { display: inline-flex; flex: none; }
 .row-section-chevron .icon { width: 13px; height: 13px; stroke-width: 2.5; }
 
+/* Disclosure triangle: right when collapsed, rotates down when expanded.
+   The base .icon points down, so "collapsed" rotates it back to pointing
+   right — expanding is what turns it, matching how folder/tree disclosure
+   triangles read everywhere else. */
+.row-section-chevron-icon { transition: transform 0.18s ease; transform: rotate(0deg); }
+.row-section-chevron-icon.collapsed { transform: rotate(-90deg); }
+
+/* Freshly-expanded section content fades/slides in — see the comment on
+   prevOverviewCollapse in main.js for why this needs the mount-then-flip
+   two-step instead of a plain class-toggle transition. */
+.section-items.reveal-pending { opacity: 0; transform: translateY(-6px); transition: opacity 0.2s ease, transform 0.2s ease; }
+.section-items.reveal-pending.reveal-in { opacity: 1; transform: translateY(0); }
+
 .row-top { display: flex; align-items: center; gap: 8px; }
 .row-top > .pill:last-child { margin-left: auto; }
 

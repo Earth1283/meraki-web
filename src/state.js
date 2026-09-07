@@ -332,7 +332,14 @@ export function openDetailForSelection() {
   openDetailFor(t);
 }
 
-export function openDetailFor(target) {
+// index is the row's position in the current tab's flat item list (as
+// rendered — see rows.js's rowKinds). Passed by a click on a specific row
+// so the "selected" highlight follows whatever's actually open in the
+// detail panel, instead of staying wherever the keyboard cursor last was.
+// Keyboard-driven opens (openDetailForSelection) omit it since
+// selectedIndex is already the thing being opened.
+export function openDetailFor(target, index = null) {
+  if (index !== null) state.selectedIndex = index;
   state.detailTarget = target;
   state.detailBack = null;
   state.activeOverlay = 'detail';

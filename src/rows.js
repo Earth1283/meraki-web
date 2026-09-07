@@ -196,13 +196,21 @@ export function overviewSummary(data, today = new Date()) {
   // the Overview list itself needs both kinds together with a completion
   // flag, hence this separate combined list.
   const dueThisWeekTasks = [];
+  // A quiz/test's assessment row and its backing gradebook assignment row
+  // describe the same real-world task — without this, both show up as
+  // separate "due this week" entries. The assessment row wins (it carries
+  // the quiz-specific completion status and the per-question breakdown),
+  // so its backing assignment is skipped here.
+  const backingAssignmentIds = new Set(data.assessments.map((a) => a.assignment_id).filter(Boolean));
   const overdueUngraded = [];
   data.assignments.forEach((a, i) => {
     const delta = daysUntil(a.due_date, today);
     if (delta == null) return;
     if (delta >= 0 && delta <= 6) {
       dueThisWeek.push(i);
-      dueThisWeekTasks.push({ kind: 'assignment', index: i, dueDate: a.due_date, done: !!submissionForAssignment(data, a.id) });
+      if (!backingAssignmentIds.has(a.id)) {
+        dueThisWeekTasks.push({ kind: 'assignment', index: i, dueDate: a.due_date, done: !!submissionForAssignment(data, a.id) });
+      }
     } else if (delta < 0 && !gradedAssignmentIds.has(a.id)) overdueUngraded.push(i);
   });
   data.assessments.forEach((a, i) => {
