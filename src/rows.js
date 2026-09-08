@@ -7,7 +7,7 @@ export function moodLabels() {
   return [t('mood.1'), t('mood.2'), t('mood.3'), t('mood.4'), t('mood.5')];
 }
 
-export const TAB_IDS = ['overview', 'classes', 'grades', 'assignments', 'attendance', 'calendar', 'announcements', 'messages', 'me', 'myrecord', 'privacy'];
+export const TAB_IDS = ['overview', 'classes', 'grades', 'analytics', 'assignments', 'attendance', 'calendar', 'announcements', 'messages', 'me', 'myrecord', 'privacy'];
 
 export function tabs() {
   return TAB_IDS.map((id) => ({ id, title: t(`tab.${id}`) }));
@@ -129,6 +129,10 @@ export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {})
       break;
     }
     case 'privacy':
+      break;
+    // Analytics has no flat item list — it's rendered as class cards by
+    // analytics.js, wired in specially by main.js the same way 'privacy' is.
+    case 'analytics':
       break;
   }
   return rows;
@@ -339,11 +343,11 @@ export function initials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function pill(text, cls = '') {
+export function pill(text, cls = '') {
   return text ? el('span', { class: `pill ${cls}`, text }) : null;
 }
 
-function dot(cls) {
+export function dot(cls) {
   return el('span', { class: `dot ${cls}` });
 }
 

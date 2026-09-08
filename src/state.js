@@ -21,6 +21,19 @@ function loadChatMode() {
   }
 }
 
+// Per-class target grades set on the Analytics tab. Keyed by class id, kept
+// separate from config (which is one flat settings object meant to be
+// reset/exported as a whole) since this grows one entry per class.
+const GRADE_TARGETS_KEY = 'meraki-web.gradeTargets';
+function loadGradeTargets() {
+  try {
+    const raw = localStorage.getItem(GRADE_TARGETS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 // All UI configurability lives in one persisted object rather than scattered
 // localStorage keys (like the two above, kept as-is so existing browsers
 // don't lose their saved state) — one place to default, reset, and export.
@@ -34,6 +47,7 @@ export const DEFAULT_CONFIG = {
   hiddenTabs: [],
   tabOrder: [],
   defaultTab: 'overview',
+  chartMode: 'simple', // 'simple' (hand-rolled inline SVG) | 'echarts' (lazy-loaded ECharts)
 };
 
 function loadConfig() {
@@ -107,6 +121,8 @@ export const state = {
   sidebarCollapsed: loadSidebarCollapsed(),
   // Messages-tab-only cosmetic toggle. Remembered per browser, just for fun.
   chatMode: loadChatMode(),
+  // { [classId]: targetPct } for the Analytics tab's grade-goal calculator.
+  gradeTargets: loadGradeTargets(),
   activeThreadPartnerId: null,
   // Overview's "Due this week" split. Not persisted — resets to the
   // intended default (todo open, done tucked away) on every load rather
@@ -314,6 +330,16 @@ export function toggleChatMode() {
     localStorage.setItem(CHAT_MODE_KEY, state.chatMode ? '1' : '0');
   } catch {
     // best-effort; falls back to defaulting off next load
+  }
+  notify();
+}
+
+export function setGradeTarget(classId, pct) {
+  state.gradeTargets = { ...state.gradeTargets, [classId]: pct };
+  try {
+    localStorage.setItem(GRADE_TARGETS_KEY, JSON.stringify(state.gradeTargets));
+  } catch {
+    // best-effort; falls back to the default target next load
   }
   notify();
 }

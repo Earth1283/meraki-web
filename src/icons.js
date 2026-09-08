@@ -2,6 +2,7 @@ const ICONS = {
   overview: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
   classes: ['M12 3 2 8l10 5 10-5-10-5z', 'M6 10.5V15c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5', 'M22 8v6'],
   grades: ['M4 20v-6', 'M12 20V4', 'M20 20v-10', 'M2 20h20'],
+  analytics: ['M3 17l6-6 4 4 8-8', 'M15 7h6v6'],
   assignments: ['M8 6h12', 'M8 12h12', 'M8 18h12', 'M3 6h.01', 'M3 12h.01', 'M3 18h.01'],
   attendance: ['M4 5h16v15H4z', 'M4 9h16', 'M8 3v4', 'M16 3v4', 'M9 14l2 2 4-4'],
   calendar: ['M4 5h16v15H4z', 'M4 9h16', 'M8 3v4', 'M16 3v4'],

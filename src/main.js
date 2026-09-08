@@ -1,7 +1,8 @@
 import { el, clear, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
-import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection } from './state.js';
+import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget } from './state.js';
 import { tabTitle, rowKinds, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs } from './rows.js';
+import { renderAnalyticsTab, chartModeToggle, mountAnalyticsCharts, disposeAnalyticsCharts } from './analytics.js';
 import { iconPaths } from './icons.js';
 import { privacyParagraphs } from './privacy.js';
 import { mountLogin, renderOverlay, renderDetailPanel, showToast, buildLanguageSwitcher } from './overlays.js';
@@ -118,6 +119,9 @@ function renderToolbar() {
   if (state.tab === 'me') {
     actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openOverlay('checkin'), text: t('toolbar.checkIn') }));
   }
+  if (state.tab === 'analytics') {
+    actions.push(chartModeToggle(state.config, (chartMode) => setConfig({ chartMode })));
+  }
   actions.push(
     el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.refresh'), title: t('toolbar.refresh'), onclick: () => refresh(), text: '⟳' }),
     el(
@@ -151,6 +155,7 @@ function renderBody() {
   const focusWasInBody = body.contains(document.activeElement) && document.activeElement !== body;
   const focusedSelectedIndex = focusWasInBody ? state.selectedIndex : null;
 
+  disposeAnalyticsCharts();
   clear(body);
   body.classList.toggle('chat-mode', state.tab === 'messages' && state.chatMode);
 
@@ -175,6 +180,13 @@ function renderBody() {
 
   if (state.tab === 'privacy') {
     body.appendChild(renderPrivacy());
+    return;
+  }
+
+  if (state.tab === 'analytics') {
+    const node = renderAnalyticsTab(state.data, state.config, state.gradeTargets, setGradeTarget);
+    body.appendChild(node);
+    if (state.config.chartMode === 'echarts') mountAnalyticsCharts(node, { dark: isDarkTheme() });
     return;
   }
 
@@ -285,6 +297,12 @@ function renderBody() {
     });
   }
   prevOverviewCollapse = { ...state.overviewCollapse };
+}
+
+function isDarkTheme() {
+  const explicit = document.documentElement.dataset.theme;
+  if (explicit) return explicit === 'dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 function renderPrivacy() {
