@@ -8,6 +8,10 @@ only in each visitor's own browser `localStorage`, exactly as they would
 using the official site. See the app's own "Data & Privacy" tab for the
 full breakdown of what's read and written.
 
+## Check it out
+
+This is already hosted on [GitHub Pages](https://earth1283.github.io/meraki-web/) and on [Cloudflare Pages](https://meraki-web.josephcui921.workers.dev).
+
 ## Run it
 
 ```
