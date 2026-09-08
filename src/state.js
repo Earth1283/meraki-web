@@ -96,7 +96,12 @@ export const state = {
   // message from the context menu); consumed once by buildCompose().
   composePrefill: null,
   detailTarget: null,
-  detailBack: null,
+  // Stack of targets to return to, most-recent last — lets openSubDetail
+  // nest arbitrarily deep (e.g. class -> assignment -> further drill-down)
+  // instead of capping "back" at one level. Compose/check-in/settings never
+  // push onto this: they're terminal action forms with nothing to drill
+  // into, so they never show a back button — only the detail panel does.
+  detailBackStack: [],
   mobileNavOpen: false,
   // Desktop-only, remembered per browser — mobile always uses the full drawer.
   sidebarCollapsed: loadSidebarCollapsed(),
@@ -145,7 +150,7 @@ export function doLogout() {
   Object.assign(state, {
     tab: 'overview', data: emptyData(), ownUserId: '', ownStudentId: null,
     loading: true, hasLoadedOnce: false, status: 'Loading…', error: null, selectedIndex: 0,
-    activeOverlay: null, detailTarget: null, detailBack: null,
+    activeOverlay: null, detailTarget: null, detailBackStack: [],
   });
   notify();
 }
@@ -341,29 +346,29 @@ export function openDetailForSelection() {
 export function openDetailFor(target, index = null) {
   if (index !== null) state.selectedIndex = index;
   state.detailTarget = target;
-  state.detailBack = null;
+  state.detailBackStack = [];
   state.activeOverlay = 'detail';
   notify();
 }
 
-/** Drill into a sub-item (e.g. an assignment listed inside a class panel)
- * while keeping one level of "back" to return to the panel that opened it. */
+/** Drill into a sub-item (e.g. an assignment listed inside a class panel),
+ * pushing the current target onto the back stack so any number of nested
+ * drill-downs can be unwound one at a time. */
 export function openSubDetail(target) {
-  state.detailBack = state.detailTarget;
+  state.detailBackStack.push(state.detailTarget);
   state.detailTarget = target;
   notify();
 }
 
 export function detailGoBack() {
-  if (!state.detailBack) return;
-  state.detailTarget = state.detailBack;
-  state.detailBack = null;
+  if (state.detailBackStack.length === 0) return;
+  state.detailTarget = state.detailBackStack.pop();
   notify();
 }
 
 export function closeOverlay() {
   state.activeOverlay = null;
-  state.detailBack = null;
+  state.detailBackStack = [];
   state.composePrefill = null;
   notify();
 }

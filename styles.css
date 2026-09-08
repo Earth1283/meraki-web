@@ -732,6 +732,10 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .banner-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 10px 14px;
   margin-bottom: 10px;
   border-radius: var(--radius-btn);
@@ -740,6 +744,8 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
   font-size: 0.88rem;
   border: 1px solid rgba(220, 38, 38, 0.2);
 }
+
+.btn-sm { padding: 4px 12px; font-size: 0.82rem; flex-shrink: 0; }
 
 /* --- Login --- */
 

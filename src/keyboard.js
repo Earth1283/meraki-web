@@ -1,10 +1,21 @@
 import { state, moveSelection, openDetailForSelection, setTab, openOverlay, openCompose, closeOverlay, refresh } from './state.js';
 import { visibleTabs } from './rows.js';
+import { trapTabKey } from './dom.js';
+
+const overlayRoot = document.getElementById('overlay-root');
 
 export function installGlobalKeyboard() {
   window.addEventListener('keydown', (e) => {
     if (state.activeOverlay) {
-      if (e.key === 'Escape') closeOverlay();
+      if (e.key === 'Escape') {
+        closeOverlay();
+        return;
+      }
+      // The detail panel is a real master-detail column on desktop (see the
+      // comment on renderDetailPanel in overlays.js) — not a modal, so it
+      // never traps Tab. Every other overlay dims the whole app behind a
+      // backdrop and is trapped like a proper dialog.
+      if (state.activeOverlay !== 'detail') trapTabKey(e, overlayRoot);
       return;
     }
     if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;

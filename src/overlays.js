@@ -1,4 +1,4 @@
-import { el, clear, mount, svgIcon } from './dom.js';
+import { el, clear, mount, svgIcon, focusFirstIn } from './dom.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
 import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, notify } from './state.js';
@@ -104,7 +104,7 @@ function backdrop(onClose) {
 export function mountLogin(root, onLoggedIn) {
   const emailInput = el('input', { type: 'text', name: 'email', autocomplete: 'username', required: true, placeholder: 'you@meraki.local, or just "you"' });
   const passwordInput = el('input', { type: 'password', name: 'password', autocomplete: 'current-password', required: true, placeholder: '••••••••' });
-  const errorLine = el('p', { class: 'form-error', hidden: true });
+  const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: true });
   const submitBtn = el('button', { class: 'btn btn-primary btn-block', type: 'submit', text: 'Log in' });
 
   const form = el(
@@ -152,9 +152,24 @@ export function mountLogin(root, onLoggedIn) {
   emailInput.focus();
 }
 
+// Tracks the last modal overlay type ('detail' doesn't count — it's a real
+// panel, not a dialog, see renderDetailPanel below) so a genuine open/close
+// transition can be told apart from a same-overlay re-render (e.g. a
+// background auto-refresh firing while compose is open). That distinction
+// is what lets focus move into a freshly-opened dialog and back to whatever
+// triggered it on close, without re-stealing focus out of a field the user
+// is mid-typing in.
+let lastModalOverlay = null;
+let modalReturnFocus = null;
+
 export function renderOverlay() {
+  const current = state.activeOverlay;
+  const isModal = current && current !== 'detail';
+  const justOpened = isModal && lastModalOverlay !== current;
+  if (justOpened) modalReturnFocus = document.activeElement;
+
   clear(overlayRoot);
-  switch (state.activeOverlay) {
+  switch (current) {
     case 'palette':
       overlayRoot.appendChild(buildPalette());
       break;
@@ -173,6 +188,22 @@ export function renderOverlay() {
     default:
       break;
   }
+
+  // palette/compose already move focus to a specific field of their own on
+  // every build (see their own queueMicrotask calls) — checkin/help/settings
+  // didn't have any, so they fall back to "first focusable" here. Gated on
+  // justOpened so a settings change (which re-renders the same 'settings'
+  // overlay via setConfig -> notify()) doesn't yank focus back to the top
+  // every time.
+  if (justOpened && ['checkin', 'help', 'settings'].includes(current)) {
+    queueMicrotask(() => focusFirstIn(overlayRoot));
+  }
+
+  if (!isModal && lastModalOverlay) {
+    if (modalReturnFocus && document.contains(modalReturnFocus) && modalReturnFocus !== document.body) modalReturnFocus.focus();
+    modalReturnFocus = null;
+  }
+  lastModalOverlay = isModal ? current : null;
 }
 
 /** Unlike the other overlays, the detail view is opened on every row click —
@@ -181,13 +212,20 @@ export function renderOverlay() {
  * modal dimming the whole app. Only on narrow screens, where there's no room
  * for a third column, does it fall back to a full-screen sheet (see the
  * mobile media query in styles.css) with its own small backdrop. */
+// Same target -> same JSON key: lets a re-render triggered by a background
+// refresh (target unchanged) be told apart from an actual navigation to a
+// different item (new target), so scroll position only resets on the latter
+// and focus only jumps in on the latter too.
+let lastDetailTargetKey = null;
+
 export function renderDetailPanel() {
   const isOpen = state.activeOverlay === 'detail';
   shellEl.classList.toggle('detail-open', isOpen);
   detailPanel.hidden = !isOpen;
-  clear(detailPanel);
 
   if (!isOpen) {
+    clear(detailPanel);
+    lastDetailTargetKey = null;
     if (detailMobileBackdrop) {
       detailMobileBackdrop.remove();
       detailMobileBackdrop = null;
@@ -196,6 +234,11 @@ export function renderDetailPanel() {
   }
 
   const target = state.detailTarget;
+  const targetKey = JSON.stringify(target);
+  const isNewTarget = targetKey !== lastDetailTargetKey;
+  const savedScrollTop = isNewTarget ? 0 : detailPanel.scrollTop;
+  lastDetailTargetKey = targetKey;
+  clear(detailPanel);
   const { title, fields, body } = detailFields(target, state.data);
   const fieldNodes = fields.map(([label, value]) => {
     const display = fieldDisplay(value);
@@ -213,7 +256,7 @@ export function renderDetailPanel() {
   }
 
   const headerLeft = [];
-  if (state.detailBack) {
+  if (state.detailBackStack.length > 0) {
     headerLeft.push(el('button', { class: 'btn-icon', type: 'button', 'aria-label': 'Back', onclick: detailGoBack, text: '←' }));
   }
   headerLeft.push(el('h2', { text: fieldDisplay(title) }));
@@ -238,6 +281,9 @@ export function renderDetailPanel() {
     detailMobileBackdrop = el('div', { class: 'detail-backdrop', onclick: closeOverlay });
     document.body.appendChild(detailMobileBackdrop);
   }
+
+  detailPanel.scrollTop = savedScrollTop;
+  if (isNewTarget) queueMicrotask(() => focusFirstIn(detailPanel));
 }
 
 function commands() {
@@ -298,7 +344,7 @@ function buildPalette() {
   });
 
   draw();
-  const panel = el('div', { class: 'palette-panel' }, [input, list]);
+  const panel = el('div', { class: 'palette-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Command palette' }, [input, list]);
   const wrap = el('div', { class: 'overlay-center' }, [backdrop(closeOverlay), panel]);
   queueMicrotask(() => input.focus());
   return wrap;
@@ -368,7 +414,7 @@ function buildCompose() {
     ],
   );
 
-  const panel = el('div', { class: 'side-panel' }, [
+  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'New message' }, [
     el('div', { class: 'panel-header' }, [el('h2', { text: 'New message' }), closeButton()]),
     recipients.length === 0
       ? el('p', { class: 'form-error', text: 'You have no teachers to message yet — enroll in a class first.' })
@@ -383,7 +429,7 @@ function buildCheckin() {
   let mood = 3;
   const moodRow = el('div', { class: 'mood-row' });
   const note = el('textarea', { class: 'field-input textarea', rows: 4, placeholder: 'Anything you want to add? (optional)' });
-  const errorLine = el('p', { class: 'form-error', hidden: true });
+  const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: true });
   const submitBtn = el('button', { class: 'btn btn-primary', type: 'submit', text: 'Check in' });
 
   function drawMood() {
@@ -443,7 +489,10 @@ function buildCheckin() {
     ],
   );
 
-  const panel = el('div', { class: 'side-panel' }, [el('div', { class: 'panel-header' }, [el('h2', { text: 'Check in' }), closeButton()]), form]);
+  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Check in' }, [
+    el('div', { class: 'panel-header' }, [el('h2', { text: 'Check in' }), closeButton()]),
+    form,
+  ]);
   const wrap = el('div', { class: 'overlay-right' }, [backdrop(closeOverlay), panel]);
   return wrap;
 }
@@ -522,9 +571,20 @@ const AUTO_REFRESH_OPTIONS = [
 function segmented(options, value, onPick) {
   return el(
     'div',
-    { class: 'segmented' },
+    { class: 'segmented', role: 'radiogroup' },
     options.map(([val, label]) =>
-      el('button', { type: 'button', class: `segmented-item ${value === val ? 'active' : ''}`, onclick: () => onPick(val) }, label),
+      el(
+        'button',
+        {
+          type: 'button',
+          role: 'radio',
+          class: `segmented-item ${value === val ? 'active' : ''}`,
+          'aria-pressed': value === val,
+          'aria-checked': value === val,
+          onclick: () => onPick(val),
+        },
+        label,
+      ),
     ),
   );
 }
@@ -612,7 +672,7 @@ function buildSettings() {
   const order = orderedTabIds(state.config);
   const cfg = state.config;
 
-  const panel = el('div', { class: 'side-panel settings-panel' }, [
+  const panel = el('div', { class: 'side-panel settings-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Settings' }, [
     el('div', { class: 'panel-header' }, [el('h2', { text: 'Settings' }), closeButton()]),
     settingsSection('Appearance', null, [
       el('label', { class: 'field-label', text: 'Theme' }),
@@ -681,7 +741,7 @@ function buildHelp() {
     [',', 'Settings'],
     ['?', 'This help'],
   ];
-  const panel = el('div', { class: 'side-panel' }, [
+  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Keyboard shortcuts' }, [
     el('div', { class: 'panel-header' }, [el('h2', { text: 'Keyboard shortcuts' }), closeButton()]),
     el(
       'div',

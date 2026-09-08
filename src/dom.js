@@ -39,3 +39,40 @@ export function mount(root, node) {
   clear(root);
   root.appendChild(node);
 }
+
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function focusableIn(container) {
+  return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter((n) => n.offsetParent !== null);
+}
+
+/** Moves focus to the first focusable element inside `container` (falling
+ * back to the container itself). Used when a modal overlay opens so keyboard
+ * and screen-reader users land inside it instead of on whatever was focused
+ * behind it. */
+export function focusFirstIn(container) {
+  if (!container) return;
+  const [first] = focusableIn(container);
+  (first || container).focus();
+}
+
+/** Keeps Tab/Shift+Tab cycling within `container` instead of leaking focus
+ * out to the dimmed page behind a modal overlay. Call from a keydown
+ * listener with the Tab KeyboardEvent; no-ops for any other key. */
+export function trapTabKey(e, container) {
+  if (e.key !== 'Tab' || !container) return;
+  const items = focusableIn(container);
+  if (items.length === 0) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (!items.includes(document.activeElement)) {
+    e.preventDefault();
+    first.focus();
+  } else if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}

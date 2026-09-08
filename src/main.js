@@ -140,6 +140,15 @@ function renderToolbar() {
 }
 
 function renderBody() {
+  // renderBody() tears the whole row list down and rebuilds it from scratch
+  // (see the note above render()), which would otherwise silently reset
+  // scroll position and drop keyboard focus on every refresh — including
+  // background auto-refreshes the user didn't ask for. Save both before the
+  // teardown and restore them after the rebuild below.
+  const savedScrollTop = body.scrollTop;
+  const focusWasInBody = body.contains(document.activeElement) && document.activeElement !== body;
+  const focusedSelectedIndex = focusWasInBody ? state.selectedIndex : null;
+
   clear(body);
   body.classList.toggle('chat-mode', state.tab === 'messages' && state.chatMode);
 
@@ -154,7 +163,12 @@ function renderBody() {
   }
 
   if (state.error) {
-    body.appendChild(el('div', { class: 'banner-error', text: state.error }));
+    body.appendChild(
+      el('div', { class: 'banner-error', role: 'alert' }, [
+        el('span', { text: state.error }),
+        el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => refresh(), text: 'Retry' }),
+      ]),
+    );
   }
 
   if (state.tab === 'privacy') {
@@ -256,6 +270,11 @@ function renderBody() {
     }
   }
   body.appendChild(list);
+  body.scrollTop = savedScrollTop;
+  if (focusedSelectedIndex !== null) {
+    const rows = list.querySelectorAll('.row-item');
+    rows[focusedSelectedIndex]?.focus();
+  }
 
   if (chevronsToRotate.length || groupsToReveal.length) {
     requestAnimationFrame(() => {
