@@ -3,6 +3,7 @@ import { state, setActiveThread, nextTempId, optimisticInsert } from './state.js
 import { messageThreads, partnerName, initials, dayKey, formatDaySeparator, formatTime12 } from './rows.js';
 import { iconPaths } from './icons.js';
 import { showToast } from './overlays.js';
+import { t } from './i18n.js';
 
 // Module-level, not per-call: lets us tell "new message arrived" apart from
 // "something unrelated re-rendered the page" across separate renderChat()
@@ -23,7 +24,7 @@ export function renderChat(container) {
     'div',
     { class: 'chat-thread-list' },
     threads.length === 0
-      ? [el('div', { class: 'row-placeholder', text: 'No conversations yet.' })]
+      ? [el('div', { class: 'row-placeholder', text: t('chat.noConversations') })]
       : threads.map((t) => {
           const name = partnerName(state.data, state.ownUserId, t.partnerId);
           return el(
@@ -46,7 +47,7 @@ export function renderChat(container) {
   const threadView = el(
     'div',
     { class: 'chat-thread-view' },
-    thread ? buildThreadView(thread) : [el('div', { class: 'chat-empty', text: 'Pick a conversation.' })],
+    thread ? buildThreadView(thread) : [el('div', { class: 'chat-empty', text: t('chat.pickConversation') })],
   );
 
   container.appendChild(el('div', { class: 'chat-shell' }, [threadList, threadView]));
@@ -80,7 +81,7 @@ function buildThreadView(thread) {
   for (const idx of thread.indices) {
     const m = state.data.messages[idx];
     const isOwn = m.sender_id === state.ownUserId;
-    const author = isOwn ? 'You' : name;
+    const author = isOwn ? t('chat.you') : name;
 
     const dk = dayKey(m.created_at);
     if (dk !== lastDayKey) {
@@ -93,7 +94,7 @@ function buildThreadView(thread) {
 
     const bodyLines = [];
     if (m.subject) bodyLines.push(el('div', { class: 'chat-msg-subject', text: m.subject }));
-    bodyLines.push(el('div', { class: 'chat-msg-text', text: m.body || '(no message)' }));
+    bodyLines.push(el('div', { class: 'chat-msg-text', text: m.body || t('chat.noMessage') }));
 
     const gutter = grouped
       ? el('div', { class: 'chat-msg-gutter' }, [el('span', { class: 'chat-msg-hover-time', text: formatTime12(m.created_at, state.config.timeFormat === '24h') })])
@@ -114,17 +115,17 @@ function buildThreadView(thread) {
     );
   }
 
-  const input = el('textarea', { class: 'chat-input', rows: 1, placeholder: `Message ${name}…` });
-  const subjectInput = el('input', { class: 'chat-subject-input', type: 'text', maxlength: 200, placeholder: 'Subject (optional)', hidden: true });
-  const sendBtn = el('button', { class: 'btn btn-primary chat-send-btn', type: 'submit', text: 'Send' });
+  const input = el('textarea', { class: 'chat-input', rows: 1, placeholder: t('chat.messagePlaceholder', { name }) });
+  const subjectInput = el('input', { class: 'chat-subject-input', type: 'text', maxlength: 200, placeholder: t('chat.subjectPlaceholder'), hidden: true });
+  const sendBtn = el('button', { class: 'btn btn-primary chat-send-btn', type: 'submit', text: t('chat.send') });
 
   const subjectToggle = el(
     'button',
     {
       class: 'chat-plus-btn',
       type: 'button',
-      'aria-label': 'Add a subject line',
-      title: 'Add a subject line',
+      'aria-label': t('chat.addSubject'),
+      title: t('chat.addSubject'),
       onclick: () => {
         const opening = subjectInput.hidden;
         subjectInput.hidden = !opening;
@@ -160,7 +161,7 @@ function buildThreadView(thread) {
           recipient_id: recipientId,
         };
         optimisticInsert('messages', row, 'messages', { sender_id: state.ownUserId, recipient_id: recipientId, subject, body }).catch(
-          (err) => showToast(`Couldn't send: ${err.message}`, 'bad'),
+          (err) => showToast(t('compose.sendFailed', { msg: err.message }), 'bad'),
         );
         queueMicrotask(() => document.querySelector('.chat-input')?.focus());
       },

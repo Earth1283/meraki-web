@@ -1,11 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  rowKinds, detailFields, commandLabels, filterLabels, MOOD_LABELS, TABS, daysUntil, overviewSummary, fieldDisplay,
+  rowKinds, detailFields, commandLabels, filterLabels, moodLabels, tabs, TAB_IDS, daysUntil, overviewSummary, fieldDisplay,
   classSections, submissionForAssignment, submissionForAssessment, formatBytes, formatDateTime,
   messageThreads, partnerName, initials, dayKey, formatDaySeparator, formatTime12,
   orderedTabIds, visibleTabs,
 } from '../src/rows.js';
+import { i18nReady } from '../src/i18n.js';
+
+// rows.js's labels/titles now go through i18n's t(), which loads its
+// dictionaries asynchronously (fetch in the browser, fs in plain Node —
+// see i18n.js) — wait for that once so every test below sees real English
+// strings instead of raw translation keys.
+await i18nReady;
 
 const FIXED_TODAY = new Date('2026-09-10T12:00:00');
 
@@ -242,14 +249,15 @@ test('detailFields falls back to class lookup when an assignment has no joined c
   assert.deepEqual(fields.find(([label]) => label === 'Class'), ['Class', 'Algebra II']);
 });
 
-test('MOOD_LABELS is ordered worst to best and 1-indexed by mood value', () => {
-  assert.equal(MOOD_LABELS[0], 'Rough');
-  assert.equal(MOOD_LABELS[MOOD_LABELS.length - 1], 'Great');
+test('moodLabels() is ordered worst to best and 1-indexed by mood value', () => {
+  const labels = moodLabels();
+  assert.equal(labels[0], 'Rough');
+  assert.equal(labels[labels.length - 1], 'Great');
 });
 
 test('commandLabels has one entry per tab plus refresh, settings, and logout', () => {
   const labels = commandLabels();
-  assert.equal(labels.length, TABS.length + 3);
+  assert.equal(labels.length, TAB_IDS.length + 3);
   assert.ok(labels.includes('Log out'));
   assert.ok(labels.includes('Refresh data'));
   assert.ok(labels.includes('Open settings'));
@@ -419,7 +427,7 @@ test('formatTime12 switches to 24-hour time when asked', () => {
 });
 
 test('orderedTabIds appends tabs missing from a stored order instead of dropping them', () => {
-  const knownIds = TABS.map((t) => t.id);
+  const knownIds = TAB_IDS;
   const partial = knownIds.slice(0, 3);
   const result = orderedTabIds({ tabOrder: partial });
   assert.deepEqual(result.slice(0, 3), partial);
@@ -428,13 +436,13 @@ test('orderedTabIds appends tabs missing from a stored order instead of dropping
 });
 
 test('orderedTabIds ignores unknown ids left over from a removed tab', () => {
-  const result = orderedTabIds({ tabOrder: ['ghost-tab', ...TABS.map((t) => t.id)] });
+  const result = orderedTabIds({ tabOrder: ['ghost-tab', ...TAB_IDS] });
   assert.ok(!result.includes('ghost-tab'));
-  assert.equal(result.length, TABS.length);
+  assert.equal(result.length, TAB_IDS.length);
 });
 
 test('visibleTabs filters out hidden tabs but preserves the configured order', () => {
-  const ids = TABS.map((t) => t.id);
+  const ids = TAB_IDS;
   const [first, second, third] = ids;
   const rest = ids.slice(3);
   const result = visibleTabs({ tabOrder: [third, first, second, ...rest], hiddenTabs: [second] });

@@ -225,6 +225,22 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 .sidebar-toggle:hover { background: var(--border); color: var(--text-primary); }
 .sidebar-toggle .icon { width: 15px; height: 15px; }
 
+.lang-switcher {
+  margin: 0 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  max-width: calc(100% - 20px);
+  cursor: pointer;
+}
+.lang-switcher:hover { border-color: var(--accent); color: var(--text-primary); }
+.lang-switcher:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+#tabbar.collapsed .lang-switcher { display: none; }
+
 .nav-list {
   display: flex;
   flex-direction: column;
@@ -750,12 +766,19 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 /* --- Login --- */
 
 .login-screen {
+  position: relative;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
   background: var(--bg-subtle);
+}
+
+.login-lang-switcher {
+  position: absolute;
+  top: 20px;
+  right: 20px;
 }
 
 .login-card {

@@ -1,7 +1,7 @@
 // Overlays (login, palette, compose, check-in, detail) are not redrawn by
 // the shell's notify() loop — see overlays.js for why.
 import * as api from './api.js';
-import { rowKinds, TABS } from './rows.js';
+import { rowKinds, TAB_IDS } from './rows.js';
 
 const SIDEBAR_KEY = 'meraki-web.sidebarCollapsed';
 function loadSidebarCollapsed() {
@@ -76,7 +76,7 @@ const initialConfig = loadConfig();
 applyConfigEffects(initialConfig);
 
 export const state = {
-  tab: TABS.some((t) => t.id === initialConfig.defaultTab) ? initialConfig.defaultTab : 'overview',
+  tab: TAB_IDS.includes(initialConfig.defaultTab) ? initialConfig.defaultTab : 'overview',
   config: initialConfig,
   data: emptyData(),
   ownUserId: '',

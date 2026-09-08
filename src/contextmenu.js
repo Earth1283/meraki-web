@@ -8,6 +8,7 @@ import { iconPaths } from './icons.js';
 import { state, openDetailFor, setTab, openCompose } from './state.js';
 import { detailFields } from './rows.js';
 import { showToast, downloadFileUpload } from './overlays.js';
+import { t } from './i18n.js';
 
 const root = document.getElementById('contextmenu-root');
 let cleanup = null;
@@ -34,12 +35,12 @@ function copyDetails(target) {
   if (body) lines.push('', body);
   const text = lines.filter((l) => l != null).join('\n');
   if (!navigator.clipboard?.writeText) {
-    showToast("Copying isn't supported in this browser", 'bad');
+    showToast(t('menu.copyUnsupported'), 'bad');
     return;
   }
   navigator.clipboard.writeText(text).then(
-    () => showToast('Copied to clipboard'),
-    () => showToast("Couldn't copy to clipboard", 'bad'),
+    () => showToast(t('menu.copied')),
+    () => showToast(t('menu.copyFailed'), 'bad'),
   );
 }
 
@@ -57,7 +58,7 @@ function replySubject(subject) {
  * context menu, tailored to what that specific item is. */
 export function menuItemsFor(target) {
   const data = state.data;
-  const items = [{ icon: 'open', label: 'Open', action: () => openDetailFor(target) }];
+  const items = [{ icon: 'open', label: t('menu.open'), action: () => openDetailFor(target) }];
 
   switch (target.kind) {
     case 'message': {
@@ -66,7 +67,7 @@ export function menuItemsFor(target) {
       if (replyToId) {
         items.push({
           icon: 'reply',
-          label: 'Reply',
+          label: t('menu.reply'),
           action: () => openCompose({ recipientId: replyToId, subject: replySubject(m.subject) }),
         });
       }
@@ -77,7 +78,7 @@ export function menuItemsFor(target) {
       if (c.teacher_id) {
         items.push({
           icon: 'messages',
-          label: c.teacher_name ? `Message ${c.teacher_name}` : 'Message teacher',
+          label: c.teacher_name ? t('menu.messageName', { name: c.teacher_name }) : t('menu.messageTeacher'),
           action: () => openCompose({ recipientId: c.teacher_id }),
         });
       }
@@ -87,7 +88,7 @@ export function menuItemsFor(target) {
       const g = data.grades[target.index];
       const idx = data.assignments.findIndex((a) => a.id === g.assignment_id);
       if (idx !== -1) {
-        items.push({ icon: 'assignments', label: 'View assignment', action: () => openDetailFor({ kind: 'assignment', index: idx }) });
+        items.push({ icon: 'assignments', label: t('menu.viewAssignment'), action: () => openDetailFor({ kind: 'assignment', index: idx }) });
       }
       break;
     }
@@ -97,22 +98,22 @@ export function menuItemsFor(target) {
     case 'fileUpload': {
       const item = data[CLASS_SCOPED[target.kind]][target.index];
       const classIndex = classIndexForItem(item);
-      if (classIndex !== -1) items.push({ icon: 'classes', label: 'View class', action: () => goToClass(classIndex) });
+      if (classIndex !== -1) items.push({ icon: 'classes', label: t('menu.viewClass'), action: () => goToClass(classIndex) });
       if (target.kind === 'fileUpload') {
-        items.push({ icon: 'download', label: 'Download', action: () => downloadFileUpload(item) });
+        items.push({ icon: 'download', label: t('menu.download'), action: () => downloadFileUpload(item) });
       }
       break;
     }
     case 'portfolio': {
       const p = data.portfolio[target.index];
-      if (p.link) items.push({ icon: 'link', label: 'Open link', action: () => window.open(p.link, '_blank', 'noopener') });
+      if (p.link) items.push({ icon: 'link', label: t('menu.openLink'), action: () => window.open(p.link, '_blank', 'noopener') });
       break;
     }
     default:
       break;
   }
 
-  items.push({ separator: true }, { icon: 'copy', label: 'Copy details', action: () => copyDetails(target) });
+  items.push({ separator: true }, { icon: 'copy', label: t('menu.copyDetails'), action: () => copyDetails(target) });
   return items;
 }
 

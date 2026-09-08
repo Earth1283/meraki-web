@@ -4,10 +4,11 @@ import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, op
 import { tabTitle, rowKinds, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs } from './rows.js';
 import { iconPaths } from './icons.js';
 import { privacyParagraphs } from './privacy.js';
-import { mountLogin, renderOverlay, renderDetailPanel, showToast } from './overlays.js';
+import { mountLogin, renderOverlay, renderDetailPanel, showToast, buildLanguageSwitcher } from './overlays.js';
 import { renderChat } from './chat.js';
 import { installGlobalKeyboard } from './keyboard.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
+import { i18nReady, t, onChange as onLocaleChange } from './i18n.js';
 
 const loginScreen = document.getElementById('login-screen');
 const shell = document.getElementById('shell');
@@ -53,32 +54,33 @@ function renderTabbar() {
     tabbar,
     el('div', { class: 'tabbar-inner' }, [
       el('div', { class: 'tabbar-top' }, [
-        el('div', { class: 'brand-mark', text: 'Meraki' }),
+        el('div', { class: 'brand-mark', text: t('brand') }),
         el(
           'button',
           {
             class: 'sidebar-toggle',
             type: 'button',
-            'aria-label': state.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
-            title: state.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+            'aria-label': state.sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse'),
+            title: state.sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse'),
             onclick: () => toggleSidebar(),
           },
           [svgIcon(iconPaths(state.sidebarCollapsed ? 'expand' : 'collapse'))],
         ),
       ]),
+      buildLanguageSwitcher('tabbar-lang-switcher'),
       el(
         'div',
         { class: 'nav-list' },
-        visibleTabs(state.config).map((t) =>
+        visibleTabs(state.config).map((tb) =>
           el(
             'button',
             {
-              class: `nav-item ${state.tab === t.id ? 'active' : ''}`,
+              class: `nav-item ${state.tab === tb.id ? 'active' : ''}`,
               type: 'button',
-              title: t.title,
-              onclick: () => setTab(t.id),
+              title: tb.title,
+              onclick: () => setTab(tb.id),
             },
-            [el('span', { class: 'nav-icon' }, [svgIcon(iconPaths(t.id))]), el('span', { class: 'nav-label', text: t.title })],
+            [el('span', { class: 'nav-icon' }, [svgIcon(iconPaths(tb.id))]), el('span', { class: 'nav-label', text: tb.title })],
           ),
         ),
       ),
@@ -104,34 +106,34 @@ function renderToolbar() {
         {
           class: `btn-icon ${state.chatMode ? 'active-toggle' : ''}`,
           type: 'button',
-          'aria-label': state.chatMode ? 'Switch to list view' : 'Switch to chat view',
-          title: state.chatMode ? 'Switch to list view' : 'Switch to chat view (just for fun)',
+          'aria-label': state.chatMode ? t('toolbar.listView') : t('toolbar.chatView'),
+          title: state.chatMode ? t('toolbar.listView') : t('toolbar.chatView'),
           onclick: () => toggleChatMode(),
         },
         [svgIcon(iconPaths('chat'))],
       ),
     );
-    actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openCompose(), text: 'New message' }));
+    actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openCompose(), text: t('toolbar.newMessage') }));
   }
   if (state.tab === 'me') {
-    actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openOverlay('checkin'), text: 'Check in' }));
+    actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openOverlay('checkin'), text: t('toolbar.checkIn') }));
   }
   actions.push(
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': 'Refresh', title: 'Refresh', onclick: () => refresh(), text: '⟳' }),
+    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.refresh'), title: t('toolbar.refresh'), onclick: () => refresh(), text: '⟳' }),
     el(
       'button',
-      { class: 'btn-icon', type: 'button', 'aria-label': 'Settings', title: 'Settings', onclick: () => openOverlay('settings') },
+      { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.settings'), title: t('toolbar.settings'), onclick: () => openOverlay('settings') },
       [svgIcon(iconPaths('settings'))],
     ),
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': 'Keyboard shortcuts', title: 'Keyboard shortcuts', onclick: () => openOverlay('help'), text: '?' }),
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': 'Log out', title: 'Log out', onclick: () => doLogout(), text: '⏻' }),
+    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.help'), title: t('toolbar.help'), onclick: () => openOverlay('help'), text: '?' }),
+    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.logout'), title: t('toolbar.logout'), onclick: () => doLogout(), text: '⏻' }),
   );
 
   mount(
     toolbar,
     el('div', { class: 'toolbar-inner' }, [
       el('div', { class: 'toolbar-left' }, [
-        el('button', { class: 'hamburger-btn', type: 'button', 'aria-label': 'Open menu', onclick: () => toggleMobileNav(), text: '☰' }),
+        el('button', { class: 'hamburger-btn', type: 'button', 'aria-label': t('toolbar.openMenu'), onclick: () => toggleMobileNav(), text: '☰' }),
         el('h1', { class: 'toolbar-title', text: tabTitle(state.tab) }),
       ]),
       el('div', { class: 'toolbar-actions' }, actions),
@@ -153,7 +155,7 @@ function renderBody() {
   body.classList.toggle('chat-mode', state.tab === 'messages' && state.chatMode);
 
   if (state.loading && !state.hasLoadedOnce) {
-    body.appendChild(el('div', { class: 'loading-state' }, [el('div', { class: 'spinner' }), el('p', { text: 'Loading your data…' })]));
+    body.appendChild(el('div', { class: 'loading-state' }, [el('div', { class: 'spinner' }), el('p', { text: t('state.loading') })]));
     return;
   }
 
@@ -166,7 +168,7 @@ function renderBody() {
     body.appendChild(
       el('div', { class: 'banner-error', role: 'alert' }, [
         el('span', { text: state.error }),
-        el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => refresh(), text: 'Retry' }),
+        el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => refresh(), text: t('state.retry') }),
       ]),
     );
   }
@@ -182,7 +184,7 @@ function renderBody() {
 
   const kinds = rowKinds(state.tab, state.data, new Date(), state.overviewCollapse);
   if (kinds.length === 0) {
-    body.appendChild(el('div', { class: 'empty-state' }, [el('div', { class: 'empty-icon', text: '·' }), el('p', { text: 'Nothing here yet.' })]));
+    body.appendChild(el('div', { class: 'empty-state' }, [el('div', { class: 'empty-icon', text: '·' }), el('p', { text: t('state.nothingHere') })]));
     return;
   }
 
@@ -303,9 +305,13 @@ function renderPrivacy() {
 }
 
 subscribe(render);
+onLocaleChange(render);
 installGlobalKeyboard();
 
 if (isLoggedIn()) {
   afterLogin().catch((err) => showToast(err.message, 'bad'));
 }
-render();
+// Wait for the active locale's strings before the first paint so the login
+// screen never flashes raw translation keys; subsequent locale switches are
+// instant since every locale's fetch already kicked off in i18n.js.
+i18nReady.then(render);

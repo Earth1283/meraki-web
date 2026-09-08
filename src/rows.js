@@ -1,27 +1,24 @@
 import { el } from './dom.js';
+import { t } from './i18n.js';
 
-export const MOOD_LABELS = ['Rough', 'Meh', 'OK', 'Good', 'Great'];
+// Mood/tab labels are looked up live (functions, not module-eval constants)
+// so every call site re-reads them under the current locale on each render.
+export function moodLabels() {
+  return [t('mood.1'), t('mood.2'), t('mood.3'), t('mood.4'), t('mood.5')];
+}
 
-export const TABS = [
-  { id: 'overview', title: 'Overview' },
-  { id: 'classes', title: 'Classes' },
-  { id: 'grades', title: 'Grades' },
-  { id: 'assignments', title: 'Assignments' },
-  { id: 'attendance', title: 'Attendance' },
-  { id: 'calendar', title: 'Calendar' },
-  { id: 'announcements', title: 'Announcements' },
-  { id: 'messages', title: 'Messages' },
-  { id: 'me', title: 'Me' },
-  { id: 'myrecord', title: 'My Record' },
-  { id: 'privacy', title: 'Data & Privacy' },
-];
+export const TAB_IDS = ['overview', 'classes', 'grades', 'assignments', 'attendance', 'calendar', 'announcements', 'messages', 'me', 'myrecord', 'privacy'];
+
+export function tabs() {
+  return TAB_IDS.map((id) => ({ id, title: t(`tab.${id}`) }));
+}
 
 export function tabTitle(id) {
-  return TABS.find((t) => t.id === id)?.title ?? id;
+  return t(`tab.${id}`) ?? id;
 }
 
 export function commandLabels() {
-  return [...TABS.map((t) => `Go to ${t.title}`), 'Refresh data', 'Open settings', 'Log out'];
+  return [...tabs().map((tb) => t('palette.goto', { name: tb.title })), t('palette.refresh'), t('palette.settings'), t('palette.logout')];
 }
 
 /** All known tab ids, arranged per config.tabOrder — any id missing from a
@@ -29,15 +26,15 @@ export function commandLabels() {
  * the end, so a saved order never silently hides a tab that didn't exist
  * yet when it was written. */
 export function orderedTabIds(config) {
-  const knownIds = TABS.map((t) => t.id);
-  const known = new Set(knownIds);
+  const known = new Set(TAB_IDS);
   const stored = (config.tabOrder || []).filter((id) => known.has(id));
-  const missing = knownIds.filter((id) => !stored.includes(id));
+  const missing = TAB_IDS.filter((id) => !stored.includes(id));
   return [...stored, ...missing];
 }
 
 export function orderedTabs(config) {
-  return orderedTabIds(config).map((id) => TABS.find((t) => t.id === id));
+  const all = tabs();
+  return orderedTabIds(config).map((id) => all.find((tb) => tb.id === id));
 }
 
 /** The sidebar's nav list: ordered tabs with the hidden ones filtered out.
@@ -62,10 +59,10 @@ export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {})
       const todo = dueThisWeekTasks.filter((t) => !t.done);
       const done = dueThisWeekTasks.filter((t) => t.done);
 
-      rows.push({ type: 'collapsible-header', section: 'todo', label: 'To Be Done', count: todo.length, collapsed: todoCollapsed });
+      rows.push({ type: 'collapsible-header', section: 'todo', label: t('overview.todo'), count: todo.length, collapsed: todoCollapsed });
       if (!todoCollapsed) {
         if (todo.length === 0) {
-          rows.push({ type: 'placeholder', tone: 'good', text: "Nothing due in the next 7 days — you're caught up." });
+          rows.push({ type: 'placeholder', tone: 'good', text: t('overview.caughtUp') });
         } else {
           todo.forEach((t) => rows.push({ type: 'item', target: { kind: t.kind, index: t.index } }));
         }
@@ -74,15 +71,15 @@ export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {})
       // collapsed by default would just be a header that never earns its
       // place on screen.
       if (done.length > 0) {
-        rows.push({ type: 'collapsible-header', section: 'done', label: 'Done', count: done.length, collapsed: doneCollapsed });
+        rows.push({ type: 'collapsible-header', section: 'done', label: t('overview.done'), count: done.length, collapsed: doneCollapsed });
         if (!doneCollapsed) {
           done.forEach((t) => rows.push({ type: 'item', target: { kind: t.kind, index: t.index }, done: true }));
         }
       }
-      rows.push({ type: 'header', label: 'Recent announcements' });
+      rows.push({ type: 'header', label: t('overview.recentAnnouncements') });
       const recent = data.announcements.slice(0, 5);
       if (recent.length === 0) {
-        rows.push({ type: 'placeholder', text: 'No announcements yet.' });
+        rows.push({ type: 'placeholder', text: t('overview.noAnnouncements') });
       } else {
         recent.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'announcement', index: i } }));
       }
@@ -111,23 +108,23 @@ export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {})
       break;
     case 'me': {
       if (data.hero) rows.push({ type: 'info' });
-      rows.push({ type: 'header', label: 'Portfolio' });
-      if (data.portfolio.length === 0) rows.push({ type: 'placeholder', text: '(none yet)' });
+      rows.push({ type: 'header', label: t('me.portfolio') });
+      if (data.portfolio.length === 0) rows.push({ type: 'placeholder', text: t('none.yet') });
       else data.portfolio.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'portfolio', index: i } }));
-      rows.push({ type: 'header', label: 'Check-ins' });
-      if (data.checkins.length === 0) rows.push({ type: 'placeholder', text: '(none yet)' });
+      rows.push({ type: 'header', label: t('me.checkins') });
+      if (data.checkins.length === 0) rows.push({ type: 'placeholder', text: t('none.yet') });
       else data.checkins.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'checkin', index: i } }));
       break;
     }
     case 'myrecord': {
-      rows.push({ type: 'header', label: 'Behavior notes' });
-      if (data.behaviorNotes.length === 0) rows.push({ type: 'placeholder', text: '(none on file)' });
+      rows.push({ type: 'header', label: t('record.behaviorNotes') });
+      if (data.behaviorNotes.length === 0) rows.push({ type: 'placeholder', text: t('none.onFile') });
       else data.behaviorNotes.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'behaviorNote', index: i } }));
-      rows.push({ type: 'header', label: 'Detentions' });
-      if (data.detentions.length === 0) rows.push({ type: 'placeholder', text: '(none on file)' });
+      rows.push({ type: 'header', label: t('record.detentions') });
+      if (data.detentions.length === 0) rows.push({ type: 'placeholder', text: t('none.onFile') });
       else data.detentions.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'detention', index: i } }));
-      rows.push({ type: 'header', label: 'Report cards' });
-      if (data.reportCards.length === 0) rows.push({ type: 'placeholder', text: '(none published)' });
+      rows.push({ type: 'header', label: t('record.reportCards') });
+      if (data.reportCards.length === 0) rows.push({ type: 'placeholder', text: t('none.published') });
       else data.reportCards.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'reportCard', index: i } }));
       break;
     }
@@ -277,8 +274,8 @@ export function dayKey(iso) {
 
 export function formatDaySeparator(iso, today = new Date()) {
   const diffDays = Math.round((startOfDay(iso) - startOfDay(today)) / 86400000);
-  if (diffDays === 0) return 'Today';
-  if (diffDays === -1) return 'Yesterday';
+  if (diffDays === 0) return t('chat.today');
+  if (diffDays === -1) return t('chat.yesterday');
   return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
@@ -330,9 +327,9 @@ export function messageThreads(data, ownUserId) {
 }
 
 export function partnerName(data, ownUserId, partnerId) {
-  if (partnerId === ownUserId) return 'Myself';
+  if (partnerId === ownUserId) return t('field.myself');
   const cls = data.classes.find((c) => c.teacher_id === partnerId);
-  return cls?.teacher_name || 'Unknown';
+  return cls?.teacher_name || t('field.unknown');
 }
 
 export function initials(name) {
@@ -377,7 +374,7 @@ export function renderItemBody(target, data, ownUserId) {
       return itemRow({
         leading: pill(`P${c.period ?? '-'}`, 'accent'),
         title: c.name,
-        meta: [c.subject, c.teacher_name, c.room ? `Room ${c.room}` : null].filter(Boolean).join(' · '),
+        meta: [c.subject, c.teacher_name, c.room ? t('field.room', { room: c.room }) : null].filter(Boolean).join(' · '),
       });
     }
     case 'grade': {
@@ -386,9 +383,9 @@ export function renderItemBody(target, data, ownUserId) {
       const possible = a?.points_possible;
       const pct = g.points_earned != null && possible ? (g.points_earned / possible) * 100 : null;
       return itemRow({
-        title: a?.title ?? '(assignment)',
+        title: a?.title ?? t('field.noAssignment'),
         pillNode: pct != null ? pill(`${pct.toFixed(0)}%`, pctClass(pct)) : null,
-        meta: `${g.points_earned ?? '-'}/${possible ?? '-'} pts`,
+        meta: `${g.points_earned ?? '-'}/${possible ?? '-'} ${t('unit.pts')}`,
       });
     }
     case 'assignment': {
@@ -396,8 +393,8 @@ export function renderItemBody(target, data, ownUserId) {
       const cls = a.classes?.name ?? data.classes.find((c) => c.id === a.class_id)?.name ?? '';
       return itemRow({
         title: a.title,
-        pillNode: pill(a.due_date ? `Due ${a.due_date}` : null, 'accent'),
-        meta: [cls, a.category, a.points_possible != null ? `${a.points_possible} pts` : null].filter(Boolean).join(' · '),
+        pillNode: pill(a.due_date ? t('field.due', { date: a.due_date }) : null, 'accent'),
+        meta: [cls, a.category, a.points_possible != null ? t('field.pts', { n: a.points_possible }) : null].filter(Boolean).join(' · '),
       });
     }
     case 'attendance': {
@@ -433,10 +430,10 @@ export function renderItemBody(target, data, ownUserId) {
       const unread = m.read === false;
       return itemRow({
         leading: el('span', { class: `glyph ${outgoing ? 'accent' : 'accent2'}`, text: outgoing ? '↗' : '↙' }),
-        title: m.subject ?? '(no subject)',
+        title: m.subject ?? t('field.noSubject'),
         titleClass: unread ? 'strong' : 'dim',
         pillNode: unread ? dot('warn') : null,
-        meta: `${outgoing ? 'Sent' : 'Received'} · ${m.created_at}`,
+        meta: `${outgoing ? t('field.sent') : t('field.received')} · ${m.created_at}`,
         preview: truncate(m.body, 120),
       });
     }
@@ -445,13 +442,13 @@ export function renderItemBody(target, data, ownUserId) {
       return itemRow({
         title: p.title,
         pillNode: pill(p.kind, 'accent2'),
-        meta: `Added ${p.created_at}`,
+        meta: t('field.added', { date: p.created_at }),
         preview: truncate(p.description, 120),
       });
     }
     case 'checkin': {
       const c = data.checkins[target.index];
-      const label = c.mood ? MOOD_LABELS[c.mood - 1] ?? '-' : '-';
+      const label = c.mood ? moodLabels()[c.mood - 1] ?? '-' : '-';
       return itemRow({
         title: c.date,
         pillNode: pill(label, moodClass(c.mood)),
@@ -487,16 +484,16 @@ export function renderItemBody(target, data, ownUserId) {
       const a = data.assessments[target.index];
       return itemRow({
         title: a.title,
-        pillNode: pill(a.due_at ? `Due ${formatDateTime(a.due_at)}` : null, 'accent'),
-        meta: [a.kind, a.time_limit_minutes != null ? `${a.time_limit_minutes} min` : null].filter(Boolean).join(' · '),
+        pillNode: pill(a.due_at ? t('field.due', { date: formatDateTime(a.due_at) }) : null, 'accent'),
+        meta: [a.kind, a.time_limit_minutes != null ? t('field.min', { n: a.time_limit_minutes }) : null].filter(Boolean).join(' · '),
       });
     }
     case 'discussion': {
       const d = data.discussions[target.index];
       return itemRow({
         title: d.title,
-        pillNode: d.closed ? pill('Closed', 'dim') : pill(d.due_date ? `Due ${d.due_date}` : null, 'accent'),
-        meta: [d.graded ? `${d.points_possible ?? '-'} pts` : null, d.required_replies ? `${d.required_replies} replies required` : null]
+        pillNode: d.closed ? pill(t('field.closed'), 'dim') : pill(d.due_date ? t('field.due', { date: d.due_date }) : null, 'accent'),
+        meta: [d.graded ? `${d.points_possible ?? '-'} ${t('unit.pts')}` : null, d.required_replies ? t('field.repliesRequired', { n: d.required_replies }) : null]
           .filter(Boolean)
           .join(' · '),
         preview: truncate(d.prompt, 120),
@@ -530,32 +527,32 @@ export function renderOverviewStats(summary, onNavigate) {
   const { dueThisWeek, overdueUngraded, unreadCount, attendanceToday, avgGradePct } = summary;
   return el('div', { class: 'stat-grid' }, [
     statTile({
-      label: 'Due this week',
+      label: t('stat.dueThisWeek'),
       value: String(dueThisWeek.length),
       cls: dueThisWeek.length > 0 ? 'accent' : 'good',
       onClick: () => onNavigate('assignments'),
     }),
     statTile({
-      label: 'Overdue, ungraded',
+      label: t('stat.overdueUngraded'),
       value: String(overdueUngraded.length),
       cls: overdueUngraded.length > 0 ? 'bad' : 'good',
       onClick: () => onNavigate('assignments'),
     }),
     statTile({
-      label: 'Unread messages',
+      label: t('stat.unreadMessages'),
       value: String(unreadCount),
       cls: unreadCount > 0 ? 'accent' : 'good',
       onClick: () => onNavigate('messages'),
     }),
     statTile({
-      label: 'Attendance today',
-      value: attendanceToday ? attendanceToday.status : 'No record',
+      label: t('stat.attendanceToday'),
+      value: attendanceToday ? attendanceToday.status : t('stat.noRecord'),
       cls: attendanceToday ? statusClass(attendanceToday.status) : 'dim',
       onClick: () => onNavigate('attendance'),
     }),
     statTile({
-      label: 'Overall grade',
-      value: avgGradePct != null ? `${avgGradePct.toFixed(0)}%` : 'No grades',
+      label: t('stat.overallGrade'),
+      value: avgGradePct != null ? `${avgGradePct.toFixed(0)}%` : t('stat.noGrades'),
       cls: avgGradePct != null ? pctClass(avgGradePct) : 'dim',
       onClick: () => onNavigate('grades'),
     }),
@@ -563,15 +560,15 @@ export function renderOverviewStats(summary, onNavigate) {
 }
 
 export function fieldDisplay(value) {
-  return value === '' || value == null ? 'No data' : String(value);
+  return value === '' || value == null ? t('field.noData') : String(value);
 }
 
 export function renderInfoRow(data) {
   const hero = data.hero;
   return el('div', { class: 'hero-card' }, [
-    el('span', { class: 'hero-label', text: 'Hero class' }),
+    el('span', { class: 'hero-label', text: t('hero.class') }),
     el('span', { class: 'hero-value', text: hero?.hero_class ?? '—' }),
-    el('span', { class: 'hero-meta', text: hero?.quest_started_at ? `Started ${hero.quest_started_at}` : '' }),
+    el('span', { class: 'hero-meta', text: hero?.quest_started_at ? t('hero.started', { date: hero.quest_started_at }) : '' }),
   ]);
 }
 
@@ -579,12 +576,12 @@ export function detailFields(target, data) {
   switch (target.kind) {
     case 'class': {
       const c = data.classes[target.index];
-      return { title: c.name, fields: [['Subject', c.subject], ['Period', c.period], ['Room', c.room], ['Term', c.term], ['Teacher', c.teacher_name]] };
+      return { title: c.name, fields: [[t('label.subject'), c.subject], [t('label.period'), c.period], [t('label.room'), c.room], [t('label.term'), c.term], [t('label.teacher'), c.teacher_name]] };
     }
     case 'grade': {
       const g = data.grades[target.index];
       const a = g.assignments;
-      return { title: a?.title ?? '(assignment)', fields: [['Score', `${g.points_earned ?? '-'}/${a?.points_possible ?? '-'}`], ['Due', a?.due_date], ['Updated', g.updated_at]] };
+      return { title: a?.title ?? t('field.noAssignment'), fields: [[t('label.score'), `${g.points_earned ?? '-'}/${a?.points_possible ?? '-'}`], [t('label.due'), a?.due_date], [t('label.updated'), g.updated_at]] };
     }
     case 'assignment': {
       const a = data.assignments[target.index];
@@ -593,55 +590,55 @@ export function detailFields(target, data) {
       return {
         title: a.title,
         fields: [
-          ['Class', cls],
-          ['Due', a.due_date],
-          ['Points', a.points_possible],
-          ['Category', a.category],
-          ['Submission mode', a.submission_mode],
-          ['Submitted', sub?.submitted_at ? formatDateTime(sub.submitted_at) : null],
-          ['Submission status', sub?.status],
+          [t('label.class'), cls],
+          [t('label.due'), a.due_date],
+          [t('label.points'), a.points_possible],
+          [t('label.category'), a.category],
+          [t('label.submissionMode'), a.submission_mode],
+          [t('label.submitted'), sub?.submitted_at ? formatDateTime(sub.submitted_at) : null],
+          [t('label.submissionStatus'), sub?.status],
         ],
         body: a.description ?? null,
       };
     }
     case 'attendance': {
       const r = data.attendance[target.index];
-      return { title: r.date, fields: [['Status', r.status], ['Note', r.note]] };
+      return { title: r.date, fields: [[t('label.status'), r.status], [t('label.note'), r.note]] };
     }
     case 'calendarEvent': {
       const e = data.calendar[target.index];
       const time = e.start_time || e.end_time ? `${e.start_time ?? '?'}–${e.end_time ?? '?'}` : null;
-      return { title: e.title, fields: [['Date', e.event_date], ['Time', time], ['Location', e.location]], body: e.description ?? null };
+      return { title: e.title, fields: [[t('label.date'), e.event_date], [t('label.time'), time], [t('label.location'), e.location]], body: e.description ?? null };
     }
     case 'announcement': {
       const a = data.announcements[target.index];
-      return { title: a.title, fields: [['Posted', a.created_at]], body: a.body ?? null };
+      return { title: a.title, fields: [[t('label.posted'), a.created_at]], body: a.body ?? null };
     }
     case 'message': {
       const m = data.messages[target.index];
-      return { title: m.subject ?? '(no subject)', fields: [['Date', m.created_at]], body: m.body ?? null };
+      return { title: m.subject ?? t('field.noSubject'), fields: [[t('label.date'), m.created_at]], body: m.body ?? null };
     }
     case 'portfolio': {
       const p = data.portfolio[target.index];
-      return { title: p.title, fields: [['Kind', p.kind], ['Added', p.created_at], ['Link', p.link]], body: p.description ?? null };
+      return { title: p.title, fields: [[t('label.kind'), p.kind], [t('label.added'), p.created_at], [t('label.link'), p.link]], body: p.description ?? null };
     }
     case 'checkin': {
       const c = data.checkins[target.index];
-      return { title: c.date, fields: [['Mood', c.mood ? MOOD_LABELS[c.mood - 1] : null]], body: c.note ?? null };
+      return { title: c.date, fields: [[t('label.mood'), c.mood ? moodLabels()[c.mood - 1] : null]], body: c.note ?? null };
     }
     case 'behaviorNote': {
       const b = data.behaviorNotes[target.index];
-      return { title: b.date, fields: [['Kind', b.kind]], body: b.notes ?? null };
+      return { title: b.date, fields: [[t('label.kind'), b.kind]], body: b.notes ?? null };
     }
     case 'detention': {
       const d = data.detentions[target.index];
-      return { title: d.scheduled_date, fields: [['Status', d.status], ['Strike count', d.strike_count], ['Reason', d.reason]], body: d.notes ?? null };
+      return { title: d.scheduled_date, fields: [[t('label.status'), d.status], [t('label.strikeCount'), d.strike_count], [t('label.reason'), d.reason]], body: d.notes ?? null };
     }
     case 'reportCard': {
       const r = data.reportCards[target.index];
       const pct = r.grade_pct != null ? r.grade_pct.toFixed(0) : null;
       const grade = r.letter || pct != null ? `${r.letter ?? ''}${pct != null ? ` (${pct}%)` : ''}`.trim() : null;
-      return { title: r.term, fields: [['Grade', grade], ['Updated', r.updated_at]], body: r.comment ?? null };
+      return { title: r.term, fields: [[t('label.grade'), grade], [t('label.updated'), r.updated_at]], body: r.comment ?? null };
     }
     case 'assessment': {
       const a = data.assessments[target.index];
@@ -651,12 +648,12 @@ export function detailFields(target, data) {
       return {
         title: a.title,
         fields: [
-          ['Class', cls],
-          ['Kind', a.kind],
-          ['Due', a.due_at ? formatDateTime(a.due_at) : null],
-          ['Time limit', a.time_limit_minutes != null ? `${a.time_limit_minutes} min` : null],
-          ['Your score', score],
-          ['Submitted', sub?.submitted_at ? formatDateTime(sub.submitted_at) : null],
+          [t('label.class'), cls],
+          [t('label.kind'), a.kind],
+          [t('label.due'), a.due_at ? formatDateTime(a.due_at) : null],
+          [t('label.timeLimit'), a.time_limit_minutes != null ? t('field.min', { n: a.time_limit_minutes }) : null],
+          [t('label.yourScore'), score],
+          [t('label.submitted'), sub?.submitted_at ? formatDateTime(sub.submitted_at) : null],
         ],
         body: a.instructions ?? null,
       };
@@ -667,11 +664,11 @@ export function detailFields(target, data) {
       return {
         title: d.title,
         fields: [
-          ['Class', cls],
-          ['Due', d.due_date],
-          ['Status', d.closed ? 'Closed' : 'Open'],
-          ['Required replies', d.required_replies],
-          ['Points', d.graded ? d.points_possible : null],
+          [t('label.class'), cls],
+          [t('label.due'), d.due_date],
+          [t('label.status'), d.closed ? t('field.closed') : t('label.open')],
+          [t('label.requiredReplies'), d.required_replies],
+          [t('label.points'), d.graded ? d.points_possible : null],
         ],
         body: d.prompt ?? null,
       };
@@ -682,11 +679,11 @@ export function detailFields(target, data) {
       return {
         title: f.title || f.file_name,
         fields: [
-          ['Class', cls],
-          ['File name', f.file_name],
-          ['Type', f.mime_type],
-          ['Size', formatBytes(f.size_bytes)],
-          ['Uploaded', f.created_at],
+          [t('label.class'), cls],
+          [t('label.fileName'), f.file_name],
+          [t('label.type'), f.mime_type],
+          [t('label.size'), formatBytes(f.size_bytes)],
+          [t('label.uploaded'), f.created_at],
         ],
       };
     }

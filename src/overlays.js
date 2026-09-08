@@ -2,8 +2,9 @@ import { el, clear, mount, svgIcon, focusFirstIn } from './dom.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
 import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, notify } from './state.js';
-import { TABS, MOOD_LABELS, detailFields, commandLabels, filterLabels, fieldDisplay, classSections, renderItemBody, orderedTabIds, submissionForAssessment } from './rows.js';
+import { tabs, TAB_IDS, moodLabels, detailFields, commandLabels, filterLabels, fieldDisplay, classSections, renderItemBody, orderedTabIds, submissionForAssessment } from './rows.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
+import { t, LOCALES, getLocale, setLocale } from './i18n.js';
 
 const overlayRoot = document.getElementById('overlay-root');
 const toastRoot = document.getElementById('toast-root');
@@ -28,13 +29,13 @@ export async function downloadFileUpload(f, triggerBtn) {
   const original = triggerBtn?.textContent;
   if (triggerBtn) {
     triggerBtn.disabled = true;
-    triggerBtn.textContent = 'Preparing…';
+    triggerBtn.textContent = t('detail.downloadPreparing');
   }
   try {
     const url = await api.getSignedFileUrl(f.storage_path);
     window.open(url, '_blank', 'noopener');
   } catch (err) {
-    showToast(`Couldn't download: ${err.message}`, 'bad');
+    showToast(t('detail.downloadFailed', { msg: err.message }), 'bad');
   } finally {
     if (triggerBtn) {
       triggerBtn.disabled = false;
@@ -67,14 +68,14 @@ function loadAssessmentAnswers(submissionId) {
 function buildAssessmentAnswers(submissionId) {
   loadAssessmentAnswers(submissionId);
   const cached = assessmentAnswersCache.get(submissionId);
-  const section = el('div', { class: 'detail-section' }, [el('div', { class: 'row-section' }, 'Your answers')]);
+  const section = el('div', { class: 'detail-section' }, [el('div', { class: 'row-section' }, t('detail.yourAnswers'))]);
 
   if (!cached) {
-    section.appendChild(el('div', { class: 'row-placeholder', text: 'Loading…' }));
+    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.loading') }));
   } else if (cached.error) {
-    section.appendChild(el('div', { class: 'row-placeholder', text: `Couldn't load answers: ${cached.error}` }));
+    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.answersFailed', { msg: cached.error }) }));
   } else if (cached.length === 0) {
-    section.appendChild(el('div', { class: 'row-placeholder', text: 'No per-question answers on file for this submission.' }));
+    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.noAnswers') }));
   } else {
     // Question text/options aren't shown because they aren't readable —
     // meraki-web only ever sees its own past responses, never the bank of
@@ -82,12 +83,12 @@ function buildAssessmentAnswers(submissionId) {
     const rows = cached.map((a, i) => {
       const choice = a.response?.choice;
       const status = a.is_correct === true ? 'good' : a.is_correct === false ? 'bad' : 'dim';
-      const statusText = a.is_correct === true ? 'Correct' : a.is_correct === false ? 'Incorrect' : 'Not graded';
-      const meta = [choice != null ? `Chose option ${choice + 1}` : null, a.points_awarded != null ? `${a.points_awarded} pt${a.points_awarded === 1 ? '' : 's'}` : null]
+      const statusText = a.is_correct === true ? t('detail.correct') : a.is_correct === false ? t('detail.incorrect') : t('detail.notGraded');
+      const meta = [choice != null ? t('detail.chose', { n: choice + 1 }) : null, a.points_awarded != null ? `${a.points_awarded} ${t('unit.pts')}` : null]
         .filter(Boolean)
         .join(' · ');
       return el('div', { class: 'roster-row' }, [
-        el('span', { class: 'roster-name', text: `Question ${i + 1}` }),
+        el('span', { class: 'roster-name', text: t('detail.question', { n: i + 1 }) }),
         el('span', { class: `pill ${status}`, text: statusText }),
         el('span', { class: 'roster-meta', text: meta }),
       ]);
@@ -101,11 +102,28 @@ function backdrop(onClose) {
   return el('div', { class: 'overlay-backdrop', onclick: onClose });
 }
 
+/** Shared language <select> — used on the (pre-auth) login screen and in
+ * the toolbar once signed in, so the language picker itself never needs a
+ * user to be logged in to be reachable. */
+export function buildLanguageSwitcher(extraClass = '') {
+  const select = el(
+    'select',
+    {
+      class: `lang-switcher ${extraClass}`,
+      'aria-label': t('toolbar.language'),
+      title: t('toolbar.language'),
+      onchange: (e) => setLocale(e.target.value),
+    },
+    LOCALES.map((l) => el('option', { value: l.code, selected: l.code === getLocale() || undefined }, l.label)),
+  );
+  return select;
+}
+
 export function mountLogin(root, onLoggedIn) {
-  const emailInput = el('input', { type: 'text', name: 'email', autocomplete: 'username', required: true, placeholder: 'you@meraki.local, or just "you"' });
+  const emailInput = el('input', { type: 'text', name: 'email', autocomplete: 'username', required: true, placeholder: t('login.emailPlaceholder') });
   const passwordInput = el('input', { type: 'password', name: 'password', autocomplete: 'current-password', required: true, placeholder: '••••••••' });
   const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: true });
-  const submitBtn = el('button', { class: 'btn btn-primary btn-block', type: 'submit', text: 'Log in' });
+  const submitBtn = el('button', { class: 'btn btn-primary btn-block', type: 'submit', text: t('login.submit') });
 
   const form = el(
     'form',
@@ -115,24 +133,24 @@ export function mountLogin(root, onLoggedIn) {
         e.preventDefault();
         errorLine.hidden = true;
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Logging in…';
+        submitBtn.textContent = t('login.loggingIn');
         try {
           await api.login(emailInput.value.trim(), passwordInput.value);
           onLoggedIn();
         } catch (err) {
           errorLine.textContent = /login failed/i.test(err.message)
-            ? 'Wrong email or password.'
-            : "Couldn't reach Meraki. Check your connection and try again.";
+            ? t('login.wrongCreds')
+            : t('login.unreachable');
           errorLine.hidden = false;
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Log in';
+          submitBtn.textContent = t('login.submit');
         }
       },
     },
     [
-      el('label', { class: 'field-label', text: 'Email' }),
+      el('label', { class: 'field-label', text: t('login.email') }),
       emailInput,
-      el('label', { class: 'field-label', text: 'Password' }),
+      el('label', { class: 'field-label', text: t('login.password') }),
       passwordInput,
       errorLine,
       submitBtn,
@@ -142,9 +160,10 @@ export function mountLogin(root, onLoggedIn) {
   mount(
     root,
     el('div', { class: 'login-screen' }, [
+      buildLanguageSwitcher('login-lang-switcher'),
       el('div', { class: 'login-card' }, [
-        el('h1', { class: 'brand', text: 'Meraki' }),
-        el('p', { class: 'login-sub', text: 'Sign in with your school account.' }),
+        el('h1', { class: 'brand', text: t('brand') }),
+        el('p', { class: 'login-sub', text: t('login.subtitle') }),
         form,
       ]),
     ]),
@@ -257,7 +276,7 @@ export function renderDetailPanel() {
 
   const headerLeft = [];
   if (state.detailBackStack.length > 0) {
-    headerLeft.push(el('button', { class: 'btn-icon', type: 'button', 'aria-label': 'Back', onclick: detailGoBack, text: '←' }));
+    headerLeft.push(el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('detail.back'), onclick: detailGoBack, text: '←' }));
   }
   headerLeft.push(el('h2', { text: fieldDisplay(title) }));
 
@@ -266,7 +285,7 @@ export function renderDetailPanel() {
   if (bodyNode) detailPanel.appendChild(bodyNode);
   if (target.kind === 'fileUpload') {
     const f = state.data.fileUploads[target.index];
-    const downloadBtn = el('button', { class: 'btn btn-primary', type: 'button', text: 'Download' });
+    const downloadBtn = el('button', { class: 'btn btn-primary', type: 'button', text: t('detail.download') });
     downloadBtn.addEventListener('click', () => downloadFileUpload(f, downloadBtn));
     detailPanel.appendChild(el('div', { class: 'panel-actions' }, [downloadBtn]));
   }
@@ -287,7 +306,7 @@ export function renderDetailPanel() {
 }
 
 function commands() {
-  const runs = [...TABS.map((t) => () => setTab(t.id)), () => refresh(), () => openOverlay('settings'), () => doLogout()];
+  const runs = [...tabs().map((tb) => () => setTab(tb.id)), () => refresh(), () => openOverlay('settings'), () => doLogout()];
   return commandLabels().map((label, i) => ({ label, run: runs[i] }));
 }
 
@@ -297,7 +316,7 @@ function buildPalette() {
   const all = commands();
 
   const list = el('div', { class: 'palette-list' });
-  const input = el('input', { class: 'palette-input', type: 'text', placeholder: 'Type a command…' });
+  const input = el('input', { class: 'palette-input', type: 'text', placeholder: t('palette.placeholder') });
 
   function matches() {
     const wanted = new Set(filterLabels(all.map((c) => c.label), query));
@@ -317,7 +336,7 @@ function buildPalette() {
         el('button', { class: `palette-item ${i === selected ? 'active' : ''}`, type: 'button', onclick: () => run(cmd) }, cmd.label),
       );
     });
-    if (items.length === 0) list.appendChild(el('div', { class: 'palette-empty', text: 'No matching commands' }));
+    if (items.length === 0) list.appendChild(el('div', { class: 'palette-empty', text: t('palette.empty') }));
   }
 
   input.addEventListener('input', () => {
@@ -344,7 +363,7 @@ function buildPalette() {
   });
 
   draw();
-  const panel = el('div', { class: 'palette-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Command palette' }, [input, list]);
+  const panel = el('div', { class: 'palette-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('palette.label') }, [input, list]);
   const wrap = el('div', { class: 'overlay-center' }, [backdrop(closeOverlay), panel]);
   queueMicrotask(() => input.focus());
   return wrap;
@@ -352,11 +371,11 @@ function buildPalette() {
 
 function recipientOptions() {
   const seen = new Set([state.ownUserId]);
-  const recipients = [{ id: state.ownUserId, name: 'Myself' }];
+  const recipients = [{ id: state.ownUserId, name: t('field.myself') }];
   for (const c of state.data.classes) {
     if (c.teacher_id && !seen.has(c.teacher_id)) {
       seen.add(c.teacher_id);
-      recipients.push({ id: c.teacher_id, name: c.teacher_name || '(unknown teacher)' });
+      recipients.push({ id: c.teacher_id, name: c.teacher_name || t('field.unknown') });
     }
   }
   return recipients;
@@ -370,9 +389,9 @@ function buildCompose() {
     { class: 'field-input' },
     recipients.map((r) => el('option', { value: r.id, selected: prefill?.recipientId === r.id || undefined }, r.name)),
   );
-  const subject = el('input', { class: 'field-input', type: 'text', maxlength: 200, placeholder: 'Subject', value: prefill?.subject || undefined });
-  const body = el('textarea', { class: 'field-input textarea', rows: 6, placeholder: 'Write your message…' });
-  const sendBtn = el('button', { class: 'btn btn-primary', type: 'submit', text: 'Send message' });
+  const subject = el('input', { class: 'field-input', type: 'text', maxlength: 200, placeholder: t('compose.subject'), value: prefill?.subject || undefined });
+  const body = el('textarea', { class: 'field-input textarea', rows: 6, placeholder: t('compose.messagePlaceholder') });
+  const sendBtn = el('button', { class: 'btn btn-primary', type: 'submit', text: t('compose.send') });
 
   const form = el(
     'form',
@@ -388,7 +407,7 @@ function buildCompose() {
         // Optimistic: close and confirm immediately, reconcile in the
         // background — see optimisticInsert in state.js.
         closeOverlay();
-        showToast('Message sent');
+        showToast(t('compose.sent'));
         const row = {
           id: nextTempId(),
           subject: subjectVal,
@@ -399,25 +418,25 @@ function buildCompose() {
           recipient_id: recipientId,
         };
         optimisticInsert('messages', row, 'messages', { sender_id: state.ownUserId, recipient_id: recipientId, subject: subjectVal, body: bodyVal }).catch(
-          (err) => showToast(`Couldn't send: ${err.message}`, 'bad'),
+          (err) => showToast(t('compose.sendFailed', { msg: err.message }), 'bad'),
         );
       },
     },
     [
-      el('label', { class: 'field-label', text: 'To' }),
+      el('label', { class: 'field-label', text: t('compose.to') }),
       select,
-      el('label', { class: 'field-label', text: 'Subject' }),
+      el('label', { class: 'field-label', text: t('compose.subject') }),
       subject,
-      el('label', { class: 'field-label', text: 'Message' }),
+      el('label', { class: 'field-label', text: t('compose.message') }),
       body,
-      el('div', { class: 'panel-actions' }, [el('button', { class: 'btn btn-ghost', type: 'button', onclick: closeOverlay, text: 'Cancel' }), sendBtn]),
+      el('div', { class: 'panel-actions' }, [el('button', { class: 'btn btn-ghost', type: 'button', onclick: closeOverlay, text: t('compose.cancel') }), sendBtn]),
     ],
   );
 
-  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'New message' }, [
-    el('div', { class: 'panel-header' }, [el('h2', { text: 'New message' }), closeButton()]),
+  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('compose.title') }, [
+    el('div', { class: 'panel-header' }, [el('h2', { text: t('compose.title') }), closeButton()]),
     recipients.length === 0
-      ? el('p', { class: 'form-error', text: 'You have no teachers to message yet — enroll in a class first.' })
+      ? el('p', { class: 'form-error', text: t('compose.noTeachers') })
       : form,
   ]);
   const wrap = el('div', { class: 'overlay-right' }, [backdrop(closeOverlay), panel]);
@@ -428,13 +447,13 @@ function buildCompose() {
 function buildCheckin() {
   let mood = 3;
   const moodRow = el('div', { class: 'mood-row' });
-  const note = el('textarea', { class: 'field-input textarea', rows: 4, placeholder: 'Anything you want to add? (optional)' });
+  const note = el('textarea', { class: 'field-input textarea', rows: 4, placeholder: t('checkin.notePlaceholder') });
   const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: true });
-  const submitBtn = el('button', { class: 'btn btn-primary', type: 'submit', text: 'Check in' });
+  const submitBtn = el('button', { class: 'btn btn-primary', type: 'submit', text: t('checkin.submit') });
 
   function drawMood() {
     clear(moodRow);
-    MOOD_LABELS.forEach((label, i) => {
+    moodLabels().forEach((label, i) => {
       const value = i + 1;
       moodRow.appendChild(
         el(
@@ -461,7 +480,7 @@ function buildCheckin() {
       onsubmit: (e) => {
         e.preventDefault();
         if (!state.ownStudentId) {
-          errorLine.textContent = 'No student record found for this account.';
+          errorLine.textContent = t('checkin.noStudentRecord');
           errorLine.hidden = false;
           return;
         }
@@ -472,25 +491,25 @@ function buildCheckin() {
         // Optimistic: close and confirm immediately, reconcile in the
         // background — see optimisticInsert in state.js.
         closeOverlay();
-        showToast('Checked in');
+        showToast(t('checkin.checkedIn'));
         const row = { id: nextTempId(), mood: moodVal, note: noteVal, date: dateVal };
         optimisticInsert('checkins', row, 'checkins', { student_id: state.ownStudentId, mood: moodVal, note: noteVal, date: dateVal }).catch(
-          (err) => showToast(`Couldn't check in: ${err.message}`, 'bad'),
+          (err) => showToast(t('checkin.failed', { msg: err.message }), 'bad'),
         );
       },
     },
     [
-      el('label', { class: 'field-label', text: 'How are you doing?' }),
+      el('label', { class: 'field-label', text: t('checkin.howAreYou') }),
       moodRow,
-      el('label', { class: 'field-label', text: 'Note' }),
+      el('label', { class: 'field-label', text: t('checkin.note') }),
       note,
       errorLine,
-      el('div', { class: 'panel-actions' }, [el('button', { class: 'btn btn-ghost', type: 'button', onclick: closeOverlay, text: 'Cancel' }), submitBtn]),
+      el('div', { class: 'panel-actions' }, [el('button', { class: 'btn btn-ghost', type: 'button', onclick: closeOverlay, text: t('checkin.cancel') }), submitBtn]),
     ],
   );
 
-  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Check in' }, [
-    el('div', { class: 'panel-header' }, [el('h2', { text: 'Check in' }), closeButton()]),
+  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('checkin.title') }, [
+    el('div', { class: 'panel-header' }, [el('h2', { text: t('checkin.title') }), closeButton()]),
     form,
   ]);
   const wrap = el('div', { class: 'overlay-right' }, [backdrop(closeOverlay), panel]);
@@ -498,7 +517,7 @@ function buildCheckin() {
 }
 
 function closeButton() {
-  return el('button', { class: 'btn-icon', type: 'button', 'aria-label': 'Close', onclick: closeOverlay, text: '✕' });
+  return el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('detail.close'), onclick: closeOverlay, text: '✕' });
 }
 
 function classSubSection(label, indices, kind, emptyText) {
@@ -530,24 +549,24 @@ function buildClassSections(classIndex) {
   const roster = s.roster.map((i) => state.data.enrollments[i]);
 
   return el('div', { class: 'class-sections' }, [
-    classSubSection('Assignments', s.assignments, 'assignment', 'No assignments posted yet.'),
-    classSubSection('Assessments', s.assessments, 'assessment', 'No quizzes or tests posted yet.'),
-    classSubSection('Discussions', s.discussions, 'discussion', 'No discussions posted yet.'),
-    classSubSection('Files', s.files, 'fileUpload', 'No files uploaded yet.'),
+    classSubSection(t('class.assignments'), s.assignments, 'assignment', t('class.noAssignments')),
+    classSubSection(t('class.assessments'), s.assessments, 'assessment', t('class.noAssessments')),
+    classSubSection(t('class.discussions'), s.discussions, 'discussion', t('class.noDiscussions')),
+    classSubSection(t('class.files'), s.files, 'fileUpload', t('class.noFiles')),
     el('div', { class: 'detail-section' }, [
-      el('div', { class: 'row-section' }, 'Roster'),
+      el('div', { class: 'row-section' }, t('class.roster')),
       roster.length
         ? el(
             'div',
             { class: 'roster-list' },
             roster.map((e) =>
               el('div', { class: 'roster-row' }, [
-                el('span', { class: 'roster-name', text: `${e.students?.first_name ?? ''} ${e.students?.last_name ?? ''}`.trim() || 'No data' }),
-                el('span', { class: 'roster-meta', text: e.students?.grade_level != null ? `Grade ${e.students.grade_level}` : '' }),
+                el('span', { class: 'roster-name', text: `${e.students?.first_name ?? ''} ${e.students?.last_name ?? ''}`.trim() || t('field.noData') }),
+                el('span', { class: 'roster-meta', text: e.students?.grade_level != null ? t('class.gradeLevel', { n: e.students.grade_level }) : '' }),
               ]),
             ),
           )
-        : el('div', { class: 'row-placeholder', text: 'No roster on file.' }),
+        : el('div', { class: 'row-placeholder', text: t('class.noRoster') }),
     ]),
   ]);
 }
@@ -561,12 +580,14 @@ const ACCENTS = [
   ['pink', '#db2777'],
 ];
 
-const AUTO_REFRESH_OPTIONS = [
-  [0, 'Off'],
-  [30000, '30s'],
-  [60000, '1m'],
-  [300000, '5m'],
-];
+function autoRefreshOptions() {
+  return [
+    [0, t('settings.autoRefresh.off')],
+    [30000, '30s'],
+    [60000, '1m'],
+    [300000, '5m'],
+  ];
+}
 
 function segmented(options, value, onPick) {
   return el(
@@ -628,8 +649,8 @@ function toggleTabVisible(id) {
   if (hidden.has(id)) {
     hidden.delete(id);
   } else {
-    if (TABS.length - hidden.size <= 1) {
-      showToast('At least one tab has to stay visible', 'bad');
+    if (TAB_IDS.length - hidden.size <= 1) {
+      showToast(t('settings.atLeastOneTab'), 'bad');
       return;
     }
     hidden.add(id);
@@ -638,19 +659,19 @@ function toggleTabVisible(id) {
 }
 
 function tabRow(id, index, total) {
-  const t = TABS.find((x) => x.id === id);
+  const tb = tabs().find((x) => x.id === id);
   const hidden = state.config.hiddenTabs.includes(id);
   return el('div', { class: 'settings-tab-row' }, [
-    el('span', { class: `settings-tab-name ${hidden ? 'dim' : ''}`, text: t.title }),
+    el('span', { class: `settings-tab-name ${hidden ? 'dim' : ''}`, text: tb.title }),
     el('div', { class: 'settings-tab-actions' }, [
       el(
         'button',
-        { type: 'button', class: 'btn-icon', disabled: index === 0, 'aria-label': `Move ${t.title} up`, onclick: () => moveTab(id, -1) },
+        { type: 'button', class: 'btn-icon', disabled: index === 0, 'aria-label': t('settings.moveUp', { name: tb.title }), onclick: () => moveTab(id, -1) },
         [svgIcon(iconPaths('chevronUp'))],
       ),
       el(
         'button',
-        { type: 'button', class: 'btn-icon', disabled: index === total - 1, 'aria-label': `Move ${t.title} down`, onclick: () => moveTab(id, 1) },
+        { type: 'button', class: 'btn-icon', disabled: index === total - 1, 'aria-label': t('settings.moveDown', { name: tb.title }), onclick: () => moveTab(id, 1) },
         [svgIcon(iconPaths('chevronDown'))],
       ),
       el(
@@ -658,8 +679,8 @@ function tabRow(id, index, total) {
         {
           type: 'button',
           class: 'btn-icon',
-          'aria-label': hidden ? `Show ${t.title} in sidebar` : `Hide ${t.title} from sidebar`,
-          title: hidden ? 'Hidden — click to show' : 'Visible — click to hide',
+          'aria-label': hidden ? t('settings.show', { name: tb.title }) : t('settings.hide', { name: tb.title }),
+          title: hidden ? t('settings.hiddenTitle') : t('settings.visibleTitle'),
           onclick: () => toggleTabVisible(id),
         },
         [svgIcon(iconPaths(hidden ? 'eyeOff' : 'eye'))],
@@ -672,51 +693,52 @@ function buildSettings() {
   const order = orderedTabIds(state.config);
   const cfg = state.config;
 
-  const panel = el('div', { class: 'side-panel settings-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Settings' }, [
-    el('div', { class: 'panel-header' }, [el('h2', { text: 'Settings' }), closeButton()]),
-    settingsSection('Appearance', null, [
-      el('label', { class: 'field-label', text: 'Theme' }),
+  const panel = el('div', { class: 'side-panel settings-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('settings.title') }, [
+    el('div', { class: 'panel-header' }, [el('h2', { text: t('settings.title') }), closeButton()]),
+    settingsSection(t('settings.language'), t('settings.language.hint'), [buildLanguageSwitcher()]),
+    settingsSection(t('settings.appearance'), null, [
+      el('label', { class: 'field-label', text: t('settings.theme') }),
       segmented(
         [
-          ['system', 'System'],
-          ['light', 'Light'],
-          ['dark', 'Dark'],
+          ['system', t('settings.theme.system')],
+          ['light', t('settings.theme.light')],
+          ['dark', t('settings.theme.dark')],
         ],
         cfg.theme,
         (v) => setConfig({ theme: v }),
       ),
-      el('label', { class: 'field-label', text: 'Accent color' }),
+      el('label', { class: 'field-label', text: t('settings.accent') }),
       accentPicker(),
-      el('label', { class: 'field-label', text: 'Density' }),
+      el('label', { class: 'field-label', text: t('settings.density') }),
       segmented(
         [
-          ['comfortable', 'Comfortable'],
-          ['compact', 'Compact'],
+          ['comfortable', t('settings.density.comfortable')],
+          ['compact', t('settings.density.compact')],
         ],
         cfg.density,
         (v) => setConfig({ density: v }),
       ),
     ]),
-    settingsSection('Time & data', null, [
-      el('label', { class: 'field-label', text: 'Clock' }),
+    settingsSection(t('settings.timeAndData'), null, [
+      el('label', { class: 'field-label', text: t('settings.clock') }),
       segmented(
         [
-          ['12h', '12-hour'],
-          ['24h', '24-hour'],
+          ['12h', t('settings.clock.12h')],
+          ['24h', t('settings.clock.24h')],
         ],
         cfg.timeFormat,
         (v) => setConfig({ timeFormat: v }),
       ),
-      el('label', { class: 'field-label', text: 'Auto-refresh' }),
-      segmented(AUTO_REFRESH_OPTIONS, cfg.autoRefreshMs, (v) => setConfig({ autoRefreshMs: v })),
+      el('label', { class: 'field-label', text: t('settings.autoRefresh') }),
+      segmented(autoRefreshOptions(), cfg.autoRefreshMs, (v) => setConfig({ autoRefreshMs: v })),
     ]),
     settingsSection(
-      'Navigation',
-      'Reorder or hide tabs in the sidebar. Hidden tabs stay one keystroke away in the command palette (Ctrl/⌘+P).',
+      t('settings.navigation'),
+      t('settings.navigation.hint'),
       [
-        el('label', { class: 'field-label', text: 'Default tab on login' }),
+        el('label', { class: 'field-label', text: t('settings.defaultTab') }),
         segmented(
-          TABS.map((t) => [t.id, t.title]),
+          tabs().map((tb) => [tb.id, tb.title]),
           cfg.defaultTab,
           (v) => setConfig({ defaultTab: v }),
         ),
@@ -724,7 +746,7 @@ function buildSettings() {
       ],
     ),
     el('div', { class: 'panel-actions' }, [
-      el('button', { class: 'btn btn-ghost', type: 'button', onclick: () => resetConfig(), text: 'Reset to defaults' }),
+      el('button', { class: 'btn btn-ghost', type: 'button', onclick: () => resetConfig(), text: t('settings.resetDefaults') }),
     ]),
   ]);
   return el('div', { class: 'overlay-right' }, [backdrop(closeOverlay), panel]);
@@ -732,23 +754,23 @@ function buildSettings() {
 
 function buildHelp() {
   const rows = [
-    ['j / ↓, k / ↑', 'Move selection'],
-    ['Enter', 'Open detail'],
-    ['Tab / Shift+Tab', 'Switch tab'],
-    ['Ctrl/⌘+P', 'Command palette'],
-    ['n', 'New message (Messages) / Check in (Me)'],
-    ['r', 'Refresh'],
-    [',', 'Settings'],
-    ['?', 'This help'],
+    ['j / ↓, k / ↑', t('help.moveSelection')],
+    ['Enter', t('help.openDetail')],
+    ['Tab / Shift+Tab', t('help.switchTab')],
+    ['Ctrl/⌘+P', t('help.commandPalette')],
+    ['n', t('help.newMessage')],
+    ['r', t('help.refresh')],
+    [',', t('help.settings')],
+    ['?', t('help.thisHelp')],
   ];
-  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Keyboard shortcuts' }, [
-    el('div', { class: 'panel-header' }, [el('h2', { text: 'Keyboard shortcuts' }), closeButton()]),
+  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('help.title') }, [
+    el('div', { class: 'panel-header' }, [el('h2', { text: t('help.title') }), closeButton()]),
     el(
       'div',
       { class: 'help-rows' },
       rows.map(([k, d]) => el('div', { class: 'help-row' }, [el('kbd', { text: k }), el('span', { text: d })])),
     ),
-    el('p', { class: 'help-note', text: 'None of this is required — every action here also works by clicking.' }),
+    el('p', { class: 'help-note', text: t('help.note') }),
   ]);
   return el('div', { class: 'overlay-right' }, [backdrop(closeOverlay), panel]);
 }
