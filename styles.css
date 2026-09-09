@@ -810,7 +810,7 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.loading-checklist { padding: 60px 20px; gap: 20px; }
+.loading-checklist { padding: 60px 20px; gap: 20px; min-height: 100%; }
 
 .loading-steps {
   list-style: none;
@@ -861,7 +861,7 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
   stroke-linejoin: round;
   stroke-dasharray: 26;
   stroke-dashoffset: 26;
-  animation: draw-check 300ms ease forwards;
+  animation: draw-check 700ms ease forwards;
 }
 @keyframes draw-check { to { stroke-dashoffset: 0; } }
 

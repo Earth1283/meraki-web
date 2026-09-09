@@ -145,29 +145,63 @@ function renderToolbar() {
   );
 }
 
-function renderLoadingChecklist() {
-  const steps = state.loadingSteps;
-  const doneCount = steps.filter((s) => s.status === 'done').length;
-  const items = steps.map((s) => el(
-    'li',
-    { class: `loading-step is-${s.status}` },
-    [
-      el('span', { class: 'loading-step-icon' }, [
-        s.status === 'done' ? svgIcon(iconPaths('check')) : s.status === 'active' ? el('span', { class: 'spinner spinner-sm' }) : el('span', { class: 'loading-step-dot' }),
-      ]),
-      el('span', { class: 'loading-step-label', text: t(s.labelKey) }),
-    ],
-  ));
+// The loading checklist gets a notify() per step transition, but renderBody()
+// otherwise tears the whole body down every render (see below) — doing that
+// here would restart every earlier step's checkmark animation on each tick.
+// So this card is built once and its <li>s are patched in place instead;
+// these refs are only valid while state.loading && !state.hasLoadedOnce.
+let loadingChecklistEl = null;
+let loadingStepEls = null;
+let loadingProgressFillEl = null;
 
-  return el('div', { class: 'loading-state loading-checklist' }, [
-    el('ul', { class: 'loading-steps' }, items),
-    el('div', { class: 'loading-progress' }, [
-      el('div', { class: 'loading-progress-fill', style: `width: ${(doneCount / steps.length) * 100}%` }),
-    ]),
+function stepIconContent(status) {
+  if (status === 'done') return svgIcon(iconPaths('check'));
+  if (status === 'active') return el('span', { class: 'spinner spinner-sm' });
+  return el('span', { class: 'loading-step-dot' });
+}
+
+function buildLoadingChecklist() {
+  loadingStepEls = state.loadingSteps.map((s) => {
+    const icon = el('span', { class: 'loading-step-icon' }, [stepIconContent(s.status)]);
+    const li = el('li', { class: `loading-step is-${s.status}` }, [icon, el('span', { class: 'loading-step-label', text: t(s.labelKey) })]);
+    return { status: s.status, li, icon };
+  });
+  loadingProgressFillEl = el('div', { class: 'loading-progress-fill' });
+  loadingChecklistEl = el('div', { class: 'loading-state loading-checklist' }, [
+    el('ul', { class: 'loading-steps' }, loadingStepEls.map((s) => s.li)),
+    el('div', { class: 'loading-progress' }, [loadingProgressFillEl]),
   ]);
+  updateLoadingChecklist();
+  return loadingChecklistEl;
+}
+
+function updateLoadingChecklist() {
+  state.loadingSteps.forEach((s, i) => {
+    const stepEl = loadingStepEls[i];
+    if (!stepEl || stepEl.status === s.status) return;
+    stepEl.status = s.status;
+    stepEl.li.className = `loading-step is-${s.status}`;
+    clear(stepEl.icon);
+    stepEl.icon.appendChild(stepIconContent(s.status));
+  });
+  const doneCount = state.loadingSteps.filter((s) => s.status === 'done').length;
+  loadingProgressFillEl.style.width = `${(doneCount / state.loadingSteps.length) * 100}%`;
 }
 
 function renderBody() {
+  if (state.loading && !state.hasLoadedOnce) {
+    if (loadingChecklistEl && body.contains(loadingChecklistEl)) {
+      updateLoadingChecklist();
+    } else {
+      disposeAnalyticsCharts();
+      clear(body);
+      body.classList.remove('chat-mode');
+      body.appendChild(buildLoadingChecklist());
+    }
+    return;
+  }
+  loadingChecklistEl = null;
+
   // renderBody() tears the whole row list down and rebuilds it from scratch
   // (see the note above render()), which would otherwise silently reset
   // scroll position and drop keyboard focus on every refresh — including
@@ -180,11 +214,6 @@ function renderBody() {
   disposeAnalyticsCharts();
   clear(body);
   body.classList.toggle('chat-mode', state.tab === 'messages' && state.chatMode);
-
-  if (state.loading && !state.hasLoadedOnce) {
-    body.appendChild(renderLoadingChecklist());
-    return;
-  }
 
   if (state.tab === 'messages' && state.chatMode) {
     renderChat(body);
