@@ -1,8 +1,9 @@
 import { el, clear, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
-import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget } from './state.js';
+import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setCalendarViewMonth, setCalendarSelectedDate, openReminderForm, removeCalendarReminder } from './state.js';
 import { tabTitle, rowKinds, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs } from './rows.js';
 import { renderAnalyticsTab, chartModeToggle, mountAnalyticsCharts, disposeAnalyticsCharts } from './analytics.js';
+import { renderCalendarGrid, calendarViewToggle } from './calendar.js';
 import { iconPaths } from './icons.js';
 import { privacyParagraphs } from './privacy.js';
 import { mountLogin, renderOverlay, renderDetailPanel, showToast, buildLanguageSwitcher } from './overlays.js';
@@ -122,6 +123,12 @@ function renderToolbar() {
   if (state.tab === 'analytics') {
     actions.push(chartModeToggle(state.config, (chartMode) => setConfig({ chartMode })));
   }
+  if (state.tab === 'calendar') {
+    actions.push(calendarViewToggle(state.config, (calendarView) => setConfig({ calendarView })));
+    if (state.config.calendarView === 'grid') {
+      actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openReminderForm(state.calendarSelectedDate), text: t('calendar.addReminder') }));
+    }
+  }
   actions.push(
     el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.refresh'), title: t('toolbar.refresh'), onclick: () => refresh(), text: '⟳' }),
     el(
@@ -188,6 +195,25 @@ function updateLoadingChecklist() {
   loadingProgressFillEl.style.width = `${(doneCount / state.loadingSteps.length) * 100}%`;
 }
 
+// Right-click menu for a calendar grid day cell. Unlike menuItemsFor() this
+// isn't keyed off a single row target — a day can hold any mix of real
+// events, assignment due dates, and local reminders, so the menu is built
+// straight from the cell's merged item list instead of going through the
+// generic per-kind dispatch in contextmenu.js.
+function dayContextMenuItems(cell) {
+  const items = [{ icon: 'plus', label: t('calendar.addReminder'), action: () => openReminderForm(cell.iso) }];
+  const openable = cell.items.filter((item) => item.kind !== 'reminder');
+  const reminders = cell.items.filter((item) => item.kind === 'reminder');
+  if (openable.length || reminders.length) items.push({ separator: true });
+  for (const item of openable) {
+    items.push({ icon: 'open', label: item.title, action: () => openDetailFor({ kind: item.kind, index: item.index }) });
+  }
+  for (const item of reminders) {
+    items.push({ icon: 'trash', label: t('calendar.deleteReminderNamed', { title: item.title }), action: () => { removeCalendarReminder(item.reminder.id); showToast(t('calendar.reminderDeleted')); } });
+  }
+  return items;
+}
+
 function renderBody() {
   if (state.loading && !state.hasLoadedOnce) {
     if (loadingChecklistEl && body.contains(loadingChecklistEl)) {
@@ -238,6 +264,24 @@ function renderBody() {
     const node = renderAnalyticsTab(state.data, state.config, state.gradeTargets, setGradeTarget);
     body.appendChild(node);
     if (state.config.chartMode === 'echarts') mountAnalyticsCharts(node, { dark: isDarkTheme() });
+    return;
+  }
+
+  if (state.tab === 'calendar' && state.config.calendarView === 'grid') {
+    body.appendChild(renderCalendarGrid(state, {
+      onMonthChange: (delta) => setCalendarViewMonth(state.calendarViewMonth.year, state.calendarViewMonth.month + delta),
+      onToday: () => {
+        const now = new Date();
+        setCalendarViewMonth(now.getFullYear(), now.getMonth());
+        setCalendarSelectedDate(now.toISOString().slice(0, 10));
+      },
+      onSelectDay: (iso) => setCalendarSelectedDate(iso),
+      onOpenDetail: (target) => openDetailFor(target),
+      onRowContextMenu: (x, y, target) => openContextMenu(x, y, menuItemsFor(target)),
+      onDayContextMenu: (x, y, cell) => openContextMenu(x, y, dayContextMenuItems(cell)),
+      onAddReminder: (iso) => openReminderForm(iso),
+      onDeleteReminder: (id) => { removeCalendarReminder(id); showToast(t('calendar.reminderDeleted')); },
+    }));
     return;
   }
 

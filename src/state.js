@@ -48,6 +48,8 @@ export const DEFAULT_CONFIG = {
   tabOrder: [],
   defaultTab: 'overview',
   chartMode: 'simple', // 'simple' (hand-rolled inline SVG) | 'echarts' (lazy-loaded ECharts)
+  calendarView: 'grid', // 'grid' (stylized month view) | 'list' (flat row list)
+  calendarShowAssignments: true, // overlay assignment due_dates onto the calendar grid
 };
 
 function loadConfig() {
@@ -56,6 +58,28 @@ function loadConfig() {
     return raw ? { ...DEFAULT_CONFIG, ...JSON.parse(raw) } : { ...DEFAULT_CONFIG };
   } catch {
     return { ...DEFAULT_CONFIG };
+  }
+}
+
+// Student-authored reminders shown on the Calendar tab, kept entirely
+// client-side since there's no calendar-write endpoint (and no reason a
+// student's personal to-dos should land in the school's shared calendar
+// table). Same storage shape as gradeTargets above.
+const CALENDAR_REMINDERS_KEY = 'meraki-web.calendarReminders';
+function loadCalendarReminders() {
+  try {
+    const raw = localStorage.getItem(CALENDAR_REMINDERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistCalendarReminders() {
+  try {
+    localStorage.setItem(CALENDAR_REMINDERS_KEY, JSON.stringify(state.calendarReminders));
+  } catch {
+    // best-effort; falls back to an empty list next load
   }
 }
 
@@ -111,6 +135,9 @@ export const state = {
   // Set by openCompose() to prefill the compose form (e.g. replying to a
   // message from the context menu); consumed once by buildCompose().
   composePrefill: null,
+  // Set by openReminderForm() to prefill the add-reminder form's date
+  // (e.g. from clicking/right-clicking a day on the calendar grid).
+  reminderPrefill: null,
   detailTarget: null,
   // Stack of targets to return to, most-recent last — lets openSubDetail
   // nest arbitrarily deep (e.g. class -> assignment -> further drill-down)
@@ -125,6 +152,14 @@ export const state = {
   chatMode: loadChatMode(),
   // { [classId]: targetPct } for the Analytics tab's grade-goal calculator.
   gradeTargets: loadGradeTargets(),
+  // [{ id, title, date, note }] personal due-date reminders on the Calendar tab.
+  calendarReminders: loadCalendarReminders(),
+  // The Calendar grid's visible month, not persisted — always opens on
+  // today's month rather than remembering wherever it was last navigated to.
+  calendarViewMonth: (() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })(),
+  // iso date ('YYYY-MM-DD') of the day selected in the calendar grid, whose
+  // items are shown in the day panel below it.
+  calendarSelectedDate: new Date().toISOString().slice(0, 10),
   activeThreadPartnerId: null,
   // Overview's "Due this week" split. Not persisted — resets to the
   // intended default (todo open, done tucked away) on every load rather
@@ -392,6 +427,34 @@ export function setGradeTarget(classId, pct) {
   notify();
 }
 
+export function addCalendarReminder({ title, date, note }) {
+  const reminder = { id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title, date, note: note || null };
+  state.calendarReminders = [...state.calendarReminders, reminder];
+  persistCalendarReminders();
+  notify();
+  return reminder;
+}
+
+export function removeCalendarReminder(id) {
+  state.calendarReminders = state.calendarReminders.filter((r) => r.id !== id);
+  persistCalendarReminders();
+  notify();
+}
+
+export function setCalendarViewMonth(year, month) {
+  // Normalize an out-of-range month (e.g. -1 or 12 from prev/next
+  // navigation) into a valid year/month pair instead of requiring every
+  // caller to do that arithmetic itself.
+  const d = new Date(year, month, 1);
+  state.calendarViewMonth = { year: d.getFullYear(), month: d.getMonth() };
+  notify();
+}
+
+export function setCalendarSelectedDate(iso) {
+  state.calendarSelectedDate = iso;
+  notify();
+}
+
 export function setActiveThread(partnerId) {
   state.activeThreadPartnerId = partnerId;
   notify();
@@ -444,6 +507,7 @@ export function closeOverlay() {
   state.activeOverlay = null;
   state.detailBackStack = [];
   state.composePrefill = null;
+  state.reminderPrefill = null;
   notify();
 }
 
@@ -457,5 +521,13 @@ export function openOverlay(name) {
 export function openCompose(prefill = null) {
   state.composePrefill = prefill;
   state.activeOverlay = 'compose';
+  notify();
+}
+
+/** Opens the add-reminder overlay, optionally prefilled with a date —
+ * used by the calendar grid's day cells (click "+" / context menu). */
+export function openReminderForm(prefillDate = null) {
+  state.reminderPrefill = prefillDate;
+  state.activeOverlay = 'reminder';
   notify();
 }

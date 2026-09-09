@@ -22,6 +22,11 @@ const ICONS = {
   settings: ['M4 21v-7', 'M4 10V3', 'M12 21v-9', 'M12 8V3', 'M20 21v-5', 'M20 12V3', 'M1 14h6', 'M9 8h6', 'M17 16h6'],
   chevronUp: ['M6 15l6-6 6 6'],
   chevronDown: ['M6 9l6 6 6-6'],
+  chevronLeft: ['M15 6l-6 6 6 6'],
+  chevronRight: ['M9 6l6 6-6 6'],
+  grid: ['M4 4h7v7H4z', 'M13 4h7v7h-7z', 'M13 13h7v7h-7z', 'M4 13h7v7H4z'],
+  list: ['M8 6h13', 'M8 12h13', 'M8 18h13', 'M3 6h.01', 'M3 12h.01', 'M3 18h.01'],
+  trash: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13'],
   eye: ['M2 12S5.5 5 12 5s10 7 10 7-3.5 7-10 7S2 12 2 12z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
   eyeOff: [
     'M3 3l18 18',
