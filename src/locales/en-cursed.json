@@ -163,6 +163,7 @@
   "calendar.deleteReminder": "Lift the curse",
   "calendar.deleteReminderNamed": "Lift the curse on \"{title}\"",
   "calendar.reminderDeleted": "Curse lifted",
+  "action.undo": "Reinflict",
   "reminder.addTitle": "Curse a new date",
   "reminder.title": "What haunts you",
   "reminder.titlePlaceholder": "What's coming for you?",

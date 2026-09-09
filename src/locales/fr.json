@@ -259,6 +259,7 @@
   "calendar.deleteReminder": "Supprimer le rappel",
   "calendar.deleteReminderNamed": "Supprimer « {title} »",
   "calendar.reminderDeleted": "Rappel supprimé",
+  "action.undo": "Annuler",
   "reminder.addTitle": "Ajouter un rappel",
   "reminder.title": "Titre",
   "reminder.titlePlaceholder": "Qu'est-ce qui est à rendre ?",

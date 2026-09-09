@@ -163,6 +163,7 @@
   "calendar.deleteReminder": "解除诅咒",
   "calendar.deleteReminderNamed": "解除对“{title}”的诅咒",
   "calendar.reminderDeleted": "诅咒已解除",
+  "action.undo": "重新施咒",
   "reminder.addTitle": "诅咒一个新日子",
   "reminder.title": "缠着你的东西",
   "reminder.titlePlaceholder": "什么在追杀你？",

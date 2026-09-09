@@ -259,6 +259,7 @@
   "calendar.deleteReminder": "删除提醒",
   "calendar.deleteReminderNamed": "删除“{title}”",
   "calendar.reminderDeleted": "提醒已删除",
+  "action.undo": "撤销",
   "reminder.addTitle": "添加提醒",
   "reminder.title": "标题",
   "reminder.titlePlaceholder": "有什么要交的？",

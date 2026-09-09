@@ -1,5 +1,5 @@
-import { state, moveSelection, openDetailForSelection, setTab, openOverlay, openCompose, closeOverlay, refresh } from './state.js';
-import { visibleTabs } from './rows.js';
+import { state, moveSelection, openDetailForSelection, setTab, openOverlay, openCompose, closeOverlay, refresh, setActiveThread } from './state.js';
+import { visibleTabs, messageThreads } from './rows.js';
 import { trapTabKey } from './dom.js';
 
 const overlayRoot = document.getElementById('overlay-root');
@@ -18,12 +18,25 @@ export function installGlobalKeyboard() {
       if (state.activeOverlay !== 'detail') trapTabKey(e, overlayRoot);
       return;
     }
-    if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+    if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+      // Esc blurs the focused field (e.g. the chat composer) so j/k/Tab
+      // shortcuts work again without forcing a mouse click elsewhere.
+      if (e.key === 'Escape') document.activeElement.blur();
+      return;
+    }
 
     // Chat mode replaces the row-list/detail-panel model for Messages —
     // j/k/Enter have nothing sensible to act on there, but tab-switching,
     // refresh, etc. should still work normally.
     const chatModeActive = state.tab === 'messages' && state.chatMode;
+
+    function moveThread(delta) {
+      const threads = messageThreads(state.data, state.ownUserId);
+      if (threads.length === 0) return;
+      const idx = threads.findIndex((th) => th.partnerId === state.activeThreadPartnerId);
+      const next = threads[(Math.max(idx, 0) + delta + threads.length) % threads.length];
+      setActiveThread(next.partnerId);
+    }
 
     if ((e.key === 'p' || e.key === 'k') && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -33,15 +46,15 @@ export function installGlobalKeyboard() {
     switch (e.key) {
       case 'j':
       case 'ArrowDown':
-        if (chatModeActive) break;
         e.preventDefault();
-        moveSelection(1);
+        if (chatModeActive) moveThread(1);
+        else moveSelection(1);
         break;
       case 'k':
       case 'ArrowUp':
-        if (chatModeActive) break;
         e.preventDefault();
-        moveSelection(-1);
+        if (chatModeActive) moveThread(-1);
+        else moveSelection(-1);
         break;
       case 'Enter':
         if (chatModeActive) break;

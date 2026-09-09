@@ -115,7 +115,17 @@ function buildThreadView(thread) {
     );
   }
 
-  const input = el('textarea', { class: 'chat-input', rows: 1, placeholder: t('chat.messagePlaceholder', { name }) });
+  const input = el('textarea', {
+    class: 'chat-input',
+    rows: 1,
+    placeholder: t('chat.messagePlaceholder', { name }),
+    onkeydown: (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    },
+  });
   const subjectInput = el('input', { class: 'chat-subject-input', type: 'text', maxlength: 200, placeholder: t('chat.subjectPlaceholder'), hidden: true });
   const sendBtn = el('button', { class: 'btn btn-primary chat-send-btn', type: 'submit', text: t('chat.send') });
 

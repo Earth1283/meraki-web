@@ -158,7 +158,7 @@ function dayPanel(cell, data, { onOpenDetail, onContextMenuItem, onAddReminder }
         ]),
         el(
           'button',
-          { class: 'btn-icon calendar-reminder-delete', type: 'button', 'aria-label': t('calendar.deleteReminder'), title: t('calendar.deleteReminder'), onclick: (e) => { e.stopPropagation(); onContextMenuItem.delete(r.id); } },
+          { class: 'btn-icon calendar-reminder-delete', type: 'button', 'aria-label': t('calendar.deleteReminder'), title: t('calendar.deleteReminder'), onclick: (e) => { e.stopPropagation(); onContextMenuItem.delete(r); } },
           [svgIcon(iconPaths('trash'))],
         ),
       ]);

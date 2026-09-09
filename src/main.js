@@ -1,6 +1,6 @@
 import { el, clear, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
-import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setCalendarViewMonth, setCalendarSelectedDate, openReminderForm, removeCalendarReminder } from './state.js';
+import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setCalendarViewMonth, setCalendarSelectedDate, openReminderForm, removeCalendarReminder, addCalendarReminder } from './state.js';
 import { tabTitle, rowKinds, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs } from './rows.js';
 import { renderAnalyticsTab, chartModeToggle, mountAnalyticsCharts, disposeAnalyticsCharts } from './analytics.js';
 import { renderCalendarGrid, calendarViewToggle } from './calendar.js';
@@ -200,6 +200,18 @@ function updateLoadingChecklist() {
 // events, assignment due dates, and local reminders, so the menu is built
 // straight from the cell's merged item list instead of going through the
 // generic per-kind dispatch in contextmenu.js.
+// Deletes immediately (no "are you sure?" dialog — reminders are local and
+// low-stakes) but keeps the just-deleted reminder around long enough to
+// re-add verbatim if the toast's Undo is clicked, so the missing confirm
+// dialog doesn't cost real recoverability.
+function deleteReminderWithUndo(reminder) {
+  removeCalendarReminder(reminder.id);
+  showToast(t('calendar.reminderDeleted'), 'ok', {
+    label: t('action.undo'),
+    onClick: () => addCalendarReminder({ title: reminder.title, date: reminder.date, note: reminder.note }),
+  });
+}
+
 function dayContextMenuItems(cell) {
   const items = [{ icon: 'plus', label: t('calendar.addReminder'), action: () => openReminderForm(cell.iso) }];
   const openable = cell.items.filter((item) => item.kind !== 'reminder');
@@ -209,7 +221,7 @@ function dayContextMenuItems(cell) {
     items.push({ icon: 'open', label: item.title, action: () => openDetailFor({ kind: item.kind, index: item.index }) });
   }
   for (const item of reminders) {
-    items.push({ icon: 'trash', label: t('calendar.deleteReminderNamed', { title: item.title }), action: () => { removeCalendarReminder(item.reminder.id); showToast(t('calendar.reminderDeleted')); } });
+    items.push({ icon: 'trash', label: t('calendar.deleteReminderNamed', { title: item.title }), action: () => deleteReminderWithUndo(item.reminder) });
   }
   return items;
 }
@@ -280,7 +292,7 @@ function renderBody() {
       onRowContextMenu: (x, y, target) => openContextMenu(x, y, menuItemsFor(target)),
       onDayContextMenu: (x, y, cell) => openContextMenu(x, y, dayContextMenuItems(cell)),
       onAddReminder: (iso) => openReminderForm(iso),
-      onDeleteReminder: (id) => { removeCalendarReminder(id); showToast(t('calendar.reminderDeleted')); },
+      onDeleteReminder: deleteReminderWithUndo,
     }));
     return;
   }
@@ -368,6 +380,15 @@ function renderBody() {
           oncontextmenu: (e) => {
             e.preventDefault();
             openContextMenu(e.clientX, e.clientY, menuItemsFor(target));
+          },
+          // The keyboard's menu key (and its Shift+F10 fallback) opens the
+          // same context menu mouse right-click does, anchored under the
+          // focused row instead of a pointer position that doesn't exist.
+          onkeydown: (e) => {
+            if (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10')) return;
+            e.preventDefault();
+            const rect = e.currentTarget.getBoundingClientRect();
+            openContextMenu(rect.left, rect.bottom, menuItemsFor(target));
           },
         },
         [

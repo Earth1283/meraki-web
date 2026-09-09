@@ -163,6 +163,7 @@
   "calendar.deleteReminder": "Lever la malédiction",
   "calendar.deleteReminderNamed": "Lever la malédiction sur « {title} »",
   "calendar.reminderDeleted": "Malédiction levée",
+  "action.undo": "Réinfliger",
   "reminder.addTitle": "Maudire une nouvelle date",
   "reminder.title": "Ce qui te hante",
   "reminder.titlePlaceholder": "Qu'est-ce qui te tombe dessus ?",

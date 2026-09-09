@@ -1,7 +1,7 @@
 import { el, clear, mount, svgIcon, focusFirstIn } from './dom.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
-import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, notify, addCalendarReminder } from './state.js';
+import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, notify, addCalendarReminder, openCompose, openReminderForm } from './state.js';
 import { tabs, TAB_IDS, moodLabels, detailFields, commandLabels, filterLabels, fieldDisplay, classSections, renderItemBody, orderedTabIds, submissionForAssessment } from './rows.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 import { t, LOCALES, getLocale, setLocale } from './i18n.js';
@@ -12,14 +12,25 @@ const detailPanel = document.getElementById('detail-panel');
 const shellEl = document.getElementById('shell');
 let detailMobileBackdrop = null;
 
-export function showToast(text, kind = 'ok') {
-  const node = el('div', { class: `toast ${kind}`, text });
-  toastRoot.appendChild(node);
-  requestAnimationFrame(() => node.classList.add('in'));
-  setTimeout(() => {
+// `action` (optional: { label, onClick }) adds a button to the toast — e.g.
+// "Undo" on a destructive-but-recoverable action — so the toast doubles as
+// the confirmation and the recovery path instead of needing a separate
+// "are you sure?" dialog before the action happens.
+export function showToast(text, kind = 'ok', action = null) {
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
     node.classList.remove('in');
     setTimeout(() => node.remove(), 200);
-  }, 3200);
+  };
+  const node = el('div', { class: `toast ${kind}` }, [
+    el('span', { class: 'toast-text', text }),
+    action ? el('button', { class: 'toast-action', type: 'button', onclick: () => { dismiss(); action.onClick(); } }, action.label) : null,
+  ]);
+  toastRoot.appendChild(node);
+  requestAnimationFrame(() => node.classList.add('in'));
+  setTimeout(dismiss, action ? 5000 : 3200);
 }
 
 // Signed URLs expire in an hour and are single-use-ish (Supabase reissues
@@ -309,8 +320,17 @@ export function renderDetailPanel() {
 }
 
 function commands() {
-  const runs = [...tabs().map((tb) => () => setTab(tb.id)), () => refresh(), () => openOverlay('settings'), () => doLogout()];
-  return commandLabels().map((label, i) => ({ label, run: runs[i] }));
+  const runs = [
+    ...tabs().map((tb) => () => setTab(tb.id)),
+    () => refresh(),
+    () => openOverlay('settings'),
+    () => doLogout(),
+    () => openCompose(),
+    () => openOverlay('checkin'),
+    () => openReminderForm(),
+  ];
+  const labels = [...commandLabels(), t('compose.title'), t('checkin.title'), t('calendar.addReminder')];
+  return labels.map((label, i) => ({ label, run: runs[i] }));
 }
 
 function buildPalette() {
@@ -699,6 +719,13 @@ function moveTab(id, dir) {
   setConfig({ tabOrder: order });
 }
 
+function reorderTab(draggedId, beforeId) {
+  const order = orderedTabIds(state.config).filter((x) => x !== draggedId);
+  const target = beforeId === draggedId ? null : order.indexOf(beforeId);
+  order.splice(target === -1 || target === null ? order.length : target, 0, draggedId);
+  setConfig({ tabOrder: order });
+}
+
 function toggleTabVisible(id) {
   const hidden = new Set(state.config.hiddenTabs);
   if (hidden.has(id)) {
@@ -716,7 +743,8 @@ function toggleTabVisible(id) {
 function tabRow(id, index, total) {
   const tb = tabs().find((x) => x.id === id);
   const hidden = state.config.hiddenTabs.includes(id);
-  return el('div', { class: 'settings-tab-row' }, [
+  const row = el('div', { class: 'settings-tab-row', draggable: 'true' }, [
+    el('span', { class: 'settings-tab-drag', 'aria-hidden': 'true' }, [svgIcon(iconPaths('dragHandle'))]),
     el('span', { class: `settings-tab-name ${hidden ? 'dim' : ''}`, text: tb.title }),
     el('div', { class: 'settings-tab-actions' }, [
       el(
@@ -742,6 +770,30 @@ function tabRow(id, index, total) {
       ),
     ]),
   ]);
+
+  // Native HTML5 drag-and-drop, alongside the up/down buttons above rather
+  // than replacing them — buttons stay the only path for keyboard/touch
+  // users, drag is a faster path for a mouse doing a big reorder.
+  row.addEventListener('dragstart', (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    row.classList.add('dragging');
+  });
+  row.addEventListener('dragend', () => row.classList.remove('dragging'));
+  row.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    row.classList.add('drag-over');
+  });
+  row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+  row.addEventListener('drop', (e) => {
+    e.preventDefault();
+    row.classList.remove('drag-over');
+    const draggedId = e.dataTransfer.getData('text/plain');
+    if (draggedId && draggedId !== id) reorderTab(draggedId, id);
+  });
+
+  return row;
 }
 
 function buildSettings() {

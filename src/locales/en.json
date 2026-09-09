@@ -259,6 +259,7 @@
   "calendar.deleteReminder": "Delete reminder",
   "calendar.deleteReminderNamed": "Delete \"{title}\"",
   "calendar.reminderDeleted": "Reminder deleted",
+  "action.undo": "Undo",
   "reminder.addTitle": "Add reminder",
   "reminder.title": "Title",
   "reminder.titlePlaceholder": "What's due?",

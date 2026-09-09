@@ -36,6 +36,10 @@ const ICONS = {
   ],
   check: ['M4 12l6 6L20 6'],
   download: ['M12 3v12', 'M7 10l5 5 5-5', 'M4 21h16'],
+  dragHandle: [
+    'M9 6h.01', 'M9 12h.01', 'M9 18h.01',
+    'M15 6h.01', 'M15 12h.01', 'M15 18h.01',
+  ],
 };
 
 export function iconPaths(id) {
