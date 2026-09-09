@@ -145,6 +145,28 @@ function renderToolbar() {
   );
 }
 
+function renderLoadingChecklist() {
+  const steps = state.loadingSteps;
+  const doneCount = steps.filter((s) => s.status === 'done').length;
+  const items = steps.map((s) => el(
+    'li',
+    { class: `loading-step is-${s.status}` },
+    [
+      el('span', { class: 'loading-step-icon' }, [
+        s.status === 'done' ? svgIcon(iconPaths('check')) : s.status === 'active' ? el('span', { class: 'spinner spinner-sm' }) : el('span', { class: 'loading-step-dot' }),
+      ]),
+      el('span', { class: 'loading-step-label', text: t(s.labelKey) }),
+    ],
+  ));
+
+  return el('div', { class: 'loading-state loading-checklist' }, [
+    el('ul', { class: 'loading-steps' }, items),
+    el('div', { class: 'loading-progress' }, [
+      el('div', { class: 'loading-progress-fill', style: `width: ${(doneCount / steps.length) * 100}%` }),
+    ]),
+  ]);
+}
+
 function renderBody() {
   // renderBody() tears the whole row list down and rebuilds it from scratch
   // (see the note above render()), which would otherwise silently reset
@@ -160,7 +182,7 @@ function renderBody() {
   body.classList.toggle('chat-mode', state.tab === 'messages' && state.chatMode);
 
   if (state.loading && !state.hasLoadedOnce) {
-    body.appendChild(el('div', { class: 'loading-state' }, [el('div', { class: 'spinner' }), el('p', { text: t('state.loading') })]));
+    body.appendChild(renderLoadingChecklist());
     return;
   }
 

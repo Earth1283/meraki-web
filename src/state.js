@@ -102,6 +102,8 @@ export const state = {
   // refresh after that leaves existing content on screen while it updates.
   hasLoadedOnce: false,
   status: 'Loading…',
+  // Only populated during the first load (see STEP_GROUPS); empty otherwise.
+  loadingSteps: [],
   error: null,
   selectedIndex: 0,
   // 'palette' | 'compose' | 'checkin' | 'detail' | null
@@ -211,35 +213,81 @@ const TABLES = [
   ['assessmentSubmissions', 'assessment_submissions', 'select=id,auto_score,manual_score,total_points,submitted_at,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc&limit=69', 'assessment submissions'],
 ];
 
+// refresh() awaits these in order (each group's fields still fetched in
+// parallel) so the loading checklist advances step by step instead of a
+// 19-way Promise.allSettled resolving in a single flicker. 'auth' has no
+// fields — login() already succeeded by the time refresh() runs.
+const STEP_GROUPS = [
+  { id: 'auth', labelKey: 'loading.step.auth' },
+  { id: 'core', labelKey: 'loading.step.core', fields: ['classes', 'calendar', 'enrollments', 'attendance'] },
+  {
+    id: 'academics',
+    labelKey: 'loading.step.academics',
+    fields: ['assignments', 'grades', 'reportCards', 'assessments', 'assignmentSubmissions', 'assessmentSubmissions'],
+  },
+  { id: 'comms', labelKey: 'loading.step.comms', fields: ['announcements', 'messages', 'discussions'] },
+  { id: 'extras', labelKey: 'loading.step.extras', fields: ['portfolio', 'checkins', 'behaviorNotes', 'detentions', 'fileUploads'] },
+];
+
+function setStepStatus(id, status) {
+  const step = state.loadingSteps.find((s) => s.id === id);
+  if (step) step.status = status;
+}
+
 export async function refresh() {
   state.loading = true;
   state.status = 'Refreshing…';
+  const isFirstLoad = !state.hasLoadedOnce;
+  if (isFirstLoad) {
+    state.loadingSteps = STEP_GROUPS.map((g, i) => ({ id: g.id, labelKey: g.labelKey, status: i === 0 ? 'done' : 'pending' }));
+  }
   notify();
 
   const errors = [];
   const record = (msg) => {
     if (!errors.includes(msg)) errors.push(msg);
   };
+  const tableByField = new Map(TABLES.map((t) => [t[0], t]));
 
-  const results = await Promise.allSettled(TABLES.map(([, table, query]) => api.getTable(table, query)));
-  results.forEach((r, i) => {
-    const [field, , , label] = TABLES[i];
-    if (r.status === 'fulfilled') state.data[field] = r.value;
-    else record(api.friendlyLoadError(label, r.reason));
-  });
+  for (const group of STEP_GROUPS) {
+    if (group.id === 'auth') continue;
+    if (isFirstLoad) {
+      setStepStatus(group.id, 'active');
+      notify();
+    }
 
-  const [heroRes, studentsRes] = await Promise.allSettled([
-    api.getTable('hero_profiles', 'select=hero_class,quest_started_at,class_changes'),
-    api.getTable('students', 'select=id,first_name,last_name,grade_level'),
-  ]);
-  if (heroRes.status === 'fulfilled') state.data.hero = heroRes.value[0] ?? null;
-  else record(api.friendlyLoadError('your hero profile', heroRes.reason));
-  if (studentsRes.status === 'fulfilled') state.ownStudentId = studentsRes.value[0]?.id ?? null;
-  else record(api.friendlyLoadError('your student record', studentsRes.reason));
+    const results = await Promise.allSettled(group.fields.map((field) => {
+      const [, table, query] = tableByField.get(field);
+      return api.getTable(table, query);
+    }));
+    results.forEach((r, i) => {
+      const field = group.fields[i];
+      const [, , , label] = tableByField.get(field);
+      if (r.status === 'fulfilled') state.data[field] = r.value;
+      else record(api.friendlyLoadError(label, r.reason));
+    });
+
+    if (group.id === 'extras') {
+      const [heroRes, studentsRes] = await Promise.allSettled([
+        api.getTable('hero_profiles', 'select=hero_class,quest_started_at,class_changes'),
+        api.getTable('students', 'select=id,first_name,last_name,grade_level'),
+      ]);
+      if (heroRes.status === 'fulfilled') state.data.hero = heroRes.value[0] ?? null;
+      else record(api.friendlyLoadError('your hero profile', heroRes.reason));
+      if (studentsRes.status === 'fulfilled') state.ownStudentId = studentsRes.value[0]?.id ?? null;
+      else record(api.friendlyLoadError('your student record', studentsRes.reason));
+    }
+
+    if (isFirstLoad) {
+      setStepStatus(group.id, 'done');
+      notify();
+    }
+  }
 
   state.loading = false;
   state.hasLoadedOnce = true;
   state.status = 'Ready.';
+  state.loadingSteps = [];
   state.error = errors.length ? errors.join('  ') : null;
   const expired = errors.some((e) => e.toLowerCase().includes('log in again'));
   clampSelection();
