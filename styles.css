@@ -12,8 +12,6 @@
   --accent-hover: #1d4ed8;
   --accent-soft: #eaf0fe;
   --accent-text: #ffffff;
-  /* Button-fill blue: paired with --accent-text (white), so it stays fixed
-     across themes instead of following --accent's lighter dark-mode value. */
   --accent-solid: #2563eb;
   --accent-solid-hover: #1d4ed8;
   --good: #16a34a;
@@ -156,6 +154,7 @@ button:active { transform: scale(0.98); }
 p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 
 #app { height: 100%; }
+#login-screen { height: 100%; }
 
 /* --- App shell --- */
 
@@ -336,9 +335,7 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 
 /* --- Chat mode (Messages tab, just for fun) ---
    A Discord pastiche scoped to this one subtree via a local CSS-variable
-   override — everything inside still reads var(--bg)/var(--accent)/etc.,
-   it's just pointed at a different palette here, so no components had to be
-   rebuilt to get the reskin. Always dark, regardless of light/dark mode. */
+   override */
 #body.chat-mode {
   padding: 0;
   overflow: hidden;
@@ -928,7 +925,7 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
   transition: color 200ms ease;
 }
 .loading-step.is-active,
-.loading-step.is-done { color: var(--text); }
+.loading-step.is-done { color: var(--text-primary); }
 
 .loading-step-icon {
   width: 20px; height: 20px;
