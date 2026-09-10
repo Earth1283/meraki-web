@@ -1,0 +1,95 @@
+name: Build Desktop Installers
+
+on:
+  workflow_dispatch:
+
+env:
+  APP_NAME: meraki
+  APP_URL: https://earth1283.github.io/meraki-web/
+  RELEASE_TAG: desktop-latest
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    steps:
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            libssl-dev \
+            libgtk-3-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install pake-cli
+        run: npm install -g pake-cli
+
+      - name: Build installer with Pake
+        run: pake "$APP_URL" --name "$APP_NAME"
+        env:
+          APP_URL: ${{ env.APP_URL }}
+          APP_NAME: ${{ env.APP_NAME }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-${{ matrix.os }}
+          path: |
+            ${{ env.APP_NAME }}.dmg
+            ${{ env.APP_NAME }}.deb
+            ${{ env.APP_NAME }}.msi
+            ${{ env.APP_NAME }}.exe
+          retention-days: 14
+          if-no-files-found: ignore
+
+  release:
+    name: Publish prerelease
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Remove previous desktop-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+
+      - name: Publish prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Desktop build (latest)"
+          body: |
+            Automated desktop installer build from `${{ github.sha }}`,
+            packaging ${{ env.APP_URL }} with Pake.
+
+            This tag is overwritten on every manual run of the
+            "Build Desktop Installers" workflow — it always reflects the
+            most recent build, not a stable version.
+          prerelease: true
+          files: artifacts/**/*
