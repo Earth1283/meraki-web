@@ -49,7 +49,15 @@ function render() {
   renderOverlay();
 }
 
+// The tabbar is rebuilt on every render too, so the highlighter swipe on the
+// active nav item would replay on every refresh/detail-open if it were keyed
+// off .active alone. This remembers the last tab drawn so the swipe only
+// plays on an actual tab switch.
+let lastRenderedTab = null;
+
 function renderTabbar() {
+  const tabJustChanged = lastRenderedTab !== null && lastRenderedTab !== state.tab;
+  lastRenderedTab = state.tab;
   tabbar.classList.toggle('open', state.mobileNavOpen);
   tabbar.classList.toggle('collapsed', state.sidebarCollapsed);
   mount(
@@ -77,9 +85,10 @@ function renderTabbar() {
           el(
             'button',
             {
-              class: `nav-item ${state.tab === tb.id ? 'active' : ''}`,
+              class: `nav-item ${state.tab === tb.id ? 'active' : ''} ${state.tab === tb.id && tabJustChanged ? 'just-activated' : ''}`,
               type: 'button',
               title: tb.title,
+              'aria-current': state.tab === tb.id ? 'page' : null,
               onclick: () => setTab(tb.id),
             },
             [el('span', { class: 'nav-icon' }, [svgIcon(iconPaths(tb.id))]), el('span', { class: 'nav-label', text: tb.title })],
@@ -130,21 +139,21 @@ function renderToolbar() {
     }
   }
   actions.push(
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.refresh'), title: t('toolbar.refresh'), onclick: () => refresh(), text: '⟳' }),
+    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.refresh'), title: t('toolbar.refresh'), onclick: () => refresh() }, [svgIcon(iconPaths('refresh'))]),
     el(
       'button',
       { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.settings'), title: t('toolbar.settings'), onclick: () => openOverlay('settings') },
       [svgIcon(iconPaths('settings'))],
     ),
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.help'), title: t('toolbar.help'), onclick: () => openOverlay('help'), text: '?' }),
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.logout'), title: t('toolbar.logout'), onclick: () => doLogout(), text: '⏻' }),
+    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.help'), title: t('toolbar.help'), onclick: () => openOverlay('help') }, [svgIcon(iconPaths('help'))]),
+    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.logout'), title: t('toolbar.logout'), onclick: () => doLogout() }, [svgIcon(iconPaths('logout'))]),
   );
 
   mount(
     toolbar,
     el('div', { class: 'toolbar-inner' }, [
       el('div', { class: 'toolbar-left' }, [
-        el('button', { class: 'hamburger-btn', type: 'button', 'aria-label': t('toolbar.openMenu'), onclick: () => toggleMobileNav(), text: '☰' }),
+        el('button', { class: 'hamburger-btn', type: 'button', 'aria-label': t('toolbar.openMenu'), onclick: () => toggleMobileNav() }, [svgIcon(iconPaths('menu'))]),
         el('h1', { class: 'toolbar-title', text: tabTitle(state.tab) }),
       ]),
       el('div', { class: 'toolbar-actions' }, actions),
@@ -170,8 +179,9 @@ function stepIconContent(status) {
 function buildLoadingChecklist() {
   loadingStepEls = state.loadingSteps.map((s) => {
     const icon = el('span', { class: 'loading-step-icon' }, [stepIconContent(s.status)]);
-    const li = el('li', { class: `loading-step is-${s.status}` }, [icon, el('span', { class: 'loading-step-label', text: t(s.labelKey) })]);
-    return { status: s.status, li, icon };
+    const label = el('span', { class: 'loading-step-label', text: t(s.labelKey) });
+    const li = el('li', { class: `loading-step is-${s.status}` }, [icon, label]);
+    return { status: s.status, li, icon, label };
   });
   loadingProgressFillEl = el('div', { class: 'loading-progress-fill' });
   loadingChecklistEl = el('div', { class: 'loading-state loading-checklist' }, [
@@ -185,7 +195,12 @@ function buildLoadingChecklist() {
 function updateLoadingChecklist() {
   state.loadingSteps.forEach((s, i) => {
     const stepEl = loadingStepEls[i];
-    if (!stepEl || stepEl.status === s.status) return;
+    if (!stepEl) return;
+    // Re-read on every update, not just at build time: a returning session
+    // starts loading before the locale file has arrived, so the first build
+    // can only hold raw keys.
+    stepEl.label.textContent = t(s.labelKey);
+    if (stepEl.status === s.status) return;
     stepEl.status = s.status;
     stepEl.li.className = `loading-step is-${s.status}`;
     clear(stepEl.icon);
@@ -369,14 +384,17 @@ function renderBody() {
       (activeGroup ?? list).appendChild(renderInfoRow(state.data));
     } else if (kind.type === 'item') {
       itemCounter += 1;
-      const isSelected = itemCounter === state.selectedIndex;
+      // Captured per row: the click handler below runs long after this loop
+      // has finished, when itemCounter itself holds the last row's index.
+      const rowIndex = itemCounter;
+      const isSelected = rowIndex === state.selectedIndex;
       const target = kind.target;
       const rowBtn = el(
         'button',
         {
           class: `row-item ${isSelected ? 'selected' : ''} ${kind.done ? 'row-item-done' : ''}`,
           type: 'button',
-          onclick: () => openDetailFor(target, itemCounter),
+          onclick: () => openDetailFor(target, rowIndex),
           oncontextmenu: (e) => {
             e.preventDefault();
             openContextMenu(e.clientX, e.clientY, menuItemsFor(target));

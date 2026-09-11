@@ -290,7 +290,7 @@ export function renderDetailPanel() {
 
   const headerLeft = [];
   if (state.detailBackStack.length > 0) {
-    headerLeft.push(el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('detail.back'), onclick: detailGoBack, text: '←' }));
+    headerLeft.push(el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('detail.back'), onclick: detailGoBack }, [svgIcon(iconPaths('back'))]));
   }
   headerLeft.push(el('h2', { text: fieldDisplay(title) }));
 
@@ -592,7 +592,7 @@ function buildReminder() {
 }
 
 function closeButton() {
-  return el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('detail.close'), onclick: closeOverlay, text: '✕' });
+  return el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('detail.close'), onclick: closeOverlay }, [svgIcon(iconPaths('close'))]);
 }
 
 function classSubSection(label, indices, kind, emptyText) {
@@ -646,13 +646,16 @@ function buildClassSections(classIndex) {
   ]);
 }
 
+// Highlighter colors — keep in sync with the :root.accent-* --hl values in
+// styles.css.
 const ACCENTS = [
-  ['blue', '#2563eb'],
-  ['green', '#16a34a'],
-  ['purple', '#9333ea'],
-  ['red', '#dc2626'],
-  ['orange', '#d97706'],
-  ['pink', '#db2777'],
+  ['yellow', '#ffe45e'],
+  ['green', '#b5f09b'],
+  ['blue', '#a8dcff'],
+  ['purple', '#d8c5ff'],
+  ['red', '#ffb4a8'],
+  ['orange', '#ffc78a'],
+  ['pink', '#ffb8dc'],
 ];
 
 function autoRefreshOptions() {

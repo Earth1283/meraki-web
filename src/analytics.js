@@ -316,6 +316,7 @@ function safeParse(json) {
 function mountLineChart(node, spec, echarts, dark, accent) {
   const inst = echarts.init(node, dark ? 'dark' : null, { renderer: 'svg' });
   inst.setOption({
+    backgroundColor: 'transparent',
     grid: { left: 34, right: 12, top: 12, bottom: 22 },
     xAxis: { type: 'category', data: spec.dates, axisLabel: { fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100, axisLabel: { fontSize: 10, formatter: '{value}%' } },
@@ -338,6 +339,7 @@ function mountLineChart(node, spec, echarts, dark, accent) {
 function mountBarChart(node, spec, echarts, dark, colorFor) {
   const inst = echarts.init(node, dark ? 'dark' : null, { renderer: 'svg' });
   inst.setOption({
+    backgroundColor: 'transparent',
     grid: { left: 96, right: 24, top: 8, bottom: 8, containLabel: true },
     xAxis: { type: 'value', min: 0, max: 100, axisLabel: { fontSize: 10, formatter: '{value}%' } },
     yAxis: { type: 'category', data: spec.labels, axisLabel: { fontSize: 10 } },

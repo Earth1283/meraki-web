@@ -40,7 +40,7 @@ function loadGradeTargets() {
 const CONFIG_KEY = 'meraki-web.config';
 export const DEFAULT_CONFIG = {
   theme: 'system', // 'system' | 'light' | 'dark'
-  accent: 'blue', // 'blue' | 'green' | 'purple' | 'red' | 'orange' | 'pink'
+  accent: 'yellow', // highlighter color: 'yellow' | 'green' | 'blue' | 'purple' | 'red' | 'orange' | 'pink'
   density: 'comfortable', // 'comfortable' | 'compact'
   timeFormat: '12h', // '12h' | '24h'
   autoRefreshMs: 0, // 0 = off
@@ -97,7 +97,7 @@ function persistConfig() {
 function applyConfigEffects(config) {
   const root = document.documentElement;
   root.dataset.theme = config.theme === 'system' ? '' : config.theme;
-  for (const c of ['blue', 'green', 'purple', 'red', 'orange', 'pink']) root.classList.remove(`accent-${c}`);
+  for (const c of ['yellow', 'blue', 'green', 'purple', 'red', 'orange', 'pink']) root.classList.remove(`accent-${c}`);
   root.classList.add(`accent-${config.accent}`);
   root.classList.toggle('density-compact', config.density === 'compact');
 }
