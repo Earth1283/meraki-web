@@ -2,12 +2,13 @@
 // itself makes possible (jump to its class, reply to its sender, copy what's
 // on screen) — never a generic "Cut/Paste"-style menu that has nothing to do
 // with what was clicked, and never an action the app can't actually perform
-// (no "Delete", no "Mark as read" — there's no API for either).
+// (no "Mark as read" — there's no API for it — and "Delete" only on portfolio
+// items, the one kind of row a student can remove).
 import { el, svgIcon, clear } from './dom.js';
 import { iconPaths } from './icons.js';
 import { state, openDetailFor, setTab, openCompose } from './state.js';
 import { detailFields } from './rows.js';
-import { showToast, downloadFileUpload } from './overlays.js';
+import { showToast, downloadFileUpload, deletePortfolioItem } from './overlays.js';
 import { t } from './i18n.js';
 
 const root = document.getElementById('contextmenu-root');
@@ -107,6 +108,7 @@ export function menuItemsFor(target) {
     case 'portfolio': {
       const p = data.portfolio[target.index];
       if (p.link) items.push({ icon: 'link', label: t('menu.openLink'), action: () => window.open(p.link, '_blank', 'noopener') });
+      if (!String(p.id).startsWith('temp-')) items.push({ icon: 'trash', label: t('portfolio.delete'), action: () => deletePortfolioItem(p) });
       break;
     }
     default:
@@ -140,7 +142,12 @@ export function openContextMenu(x, y, items) {
         },
         [
           el('span', { class: 'context-menu-icon' }, item.icon ? [svgIcon(iconPaths(item.icon))] : []),
-          el('span', { class: 'context-menu-label', text: item.label }),
+          item.hint
+            ? el('span', { class: 'context-menu-text' }, [
+              el('span', { class: 'context-menu-label', text: item.label }),
+              el('span', { class: 'context-menu-hint', text: item.hint }),
+            ])
+            : el('span', { class: 'context-menu-label', text: item.label }),
         ],
       );
       buttons.push(btn);

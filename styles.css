@@ -964,6 +964,59 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 }
 .hero-meta { font-size: 0.8125rem; color: var(--text-muted); }
 
+/* My Record: strikes as carbon-copy behavior slips (strikeSlip in rows.js). */
+.row-item:has(> .strike-slip) { padding: 8px 0; }
+.row-item:has(> .strike-slip)::before { display: none; }
+button.row-item:has(> .strike-slip):hover,
+.row-item.selected:has(> .strike-slip) { background: transparent; }
+.strike-slip {
+  position: relative;
+  padding: 16px 18px 12px;
+  border-radius: 3px;
+  /* A perforated top edge on pink slip paper. */
+  background: radial-gradient(circle at 7px 0, var(--bg) 3px, transparent 3.5px) 0 0 / 14px 8px repeat-x, var(--slip-paper);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+button.row-item:hover > .strike-slip { transform: rotate(-0.4deg); box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.3); }
+.row-item.selected > .strike-slip { box-shadow: 0 0 0 2px var(--focus); }
+.slip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 2px solid var(--bad-text);
+}
+.slip-heading { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bad-text); }
+.slip-no, .slip-line-value { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+.slip-no { font-size: 0.75rem; color: var(--bad-text); }
+.slip-line { display: flex; align-items: baseline; gap: 10px; padding: 4px 0; border-bottom: 1px dotted var(--border-strong); font-size: 0.8125rem; }
+.slip-line-label { flex: none; width: 5.5em; font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.slip-line-value { flex: 1; min-width: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.slip-reason .slip-line-value { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.slip-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 16px; font-size: 0.6875rem; color: var(--text-muted); }
+.slip-sign { flex: 0 1 13em; padding-top: 3px; border-top: 1px solid var(--text-muted); }
+.slip-copy { font-style: italic; }
+.slip-stamp {
+  position: absolute;
+  top: 36px;
+  right: 18px;
+  padding: 2px 8px;
+  border: 2.5px solid var(--bad);
+  border-radius: 4px;
+  color: var(--bad);
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  rotate: -12deg;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
 /* --- Analytics --- */
 
 .analytics-tab { display: flex; flex-direction: column; gap: 14px; }
@@ -1034,6 +1087,21 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 .analytics-target-input { width: 72px; padding: 6px 8px; }
 .analytics-status-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 160px; }
 .analytics-status { font-size: 0.875rem; font-weight: 600; }
+
+/* What if calculator, folded under each class card. */
+.whatif { padding-top: 12px; border-top: 1px solid var(--border); }
+.whatif > summary { display: list-item; width: fit-content; margin-top: 0; cursor: pointer; }
+.whatif > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.whatif-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.whatif-row { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; }
+.whatif-row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+.whatif-input { width: 68px; padding: 5px 7px; font-variant-numeric: tabular-nums; }
+.whatif-of { min-width: 3.2em; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.whatif-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.whatif-result { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.whatif-from { color: var(--text-secondary); font-weight: 500; }
+.whatif-arrow { color: var(--text-muted); }
+.whatif-gpa { font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); }
 
 /* --- Calendar grid ---
    A planner page: one ruled 7x6 sheet rather than 42 separate cards. Cells
@@ -1333,6 +1401,11 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 }
 .style-notebook .row-item[data-kind='detention']::before { display: none; }
 .style-notebook .row-item[data-kind='detention'].selected { box-shadow: inset 0 0 0 2px var(--sketch-ink-blue); }
+
+/* Strike slips: blanks filled in by hand in blue, stamped in red ink. */
+.style-notebook .slip-line-value { font-family: var(--font-hand); font-variation-settings: var(--casual); font-size: 0.9rem; color: var(--sketch-ink-blue); }
+.style-notebook .slip-stamp { border-color: var(--sketch-ink-red); color: var(--sketch-ink-red); }
+.style-notebook .row-item.selected > .strike-slip { box-shadow: 0 0 0 2px var(--sketch-ink-blue); }
 
 /* "Message sent": a paper plane that draws in, then flies off the toast. */
 /* Doubled class: the base .toast rule (and its padding) comes later in the
@@ -1727,8 +1800,49 @@ select.field-input {
 .roster-name { color: var(--text-primary); font-weight: 600; }
 .roster-meta { color: var(--text-muted); font-size: 0.8125rem; }
 
+/* A submitted quiz, question by question. */
+.quiz-review { display: flex; flex-direction: column; }
+.quiz-q { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.quiz-q:last-child { border-bottom: none; }
+.quiz-q-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.quiz-q-n { font-weight: 700; color: var(--text-primary); }
+.quiz-q-pts { margin-left: auto; font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.quiz-q-prompt { margin: 6px 0 8px; font-size: 0.9375rem; line-height: 1.55; color: var(--text-primary); white-space: pre-wrap; }
+.quiz-options { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.quiz-option { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; border-radius: 8px; font-size: 0.875rem; color: var(--text-secondary); }
+.quiz-option-letter { flex: none; width: 1.2em; font-weight: 700; color: var(--text-muted); }
+.quiz-option-text { flex: 1; min-width: 0; }
+.quiz-option-mark { flex: none; font-size: 0.75rem; font-weight: 600; }
+.quiz-option.chosen { color: var(--text-primary); background: var(--bg-subtle); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.quiz-option.chosen.good { background: var(--good-soft); box-shadow: inset 0 0 0 1px var(--good); }
+.quiz-option.chosen.good .quiz-option-mark { color: var(--good-text); }
+.quiz-option.chosen.bad { background: var(--bad-soft); box-shadow: inset 0 0 0 1px var(--bad); }
+.quiz-option.chosen.bad .quiz-option-mark { color: var(--bad-text); }
+.quiz-feedback { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--border-strong); font-size: 0.875rem; color: var(--text-secondary); white-space: pre-wrap; }
+
+/* Teacher feedback on a grade or a submission. */
+.feedback-note { margin: 8px 0 12px; }
+.feedback-label { margin-bottom: 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+.feedback-text {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--bg-subtle);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .panel-form { display: flex; flex-direction: column; gap: 4px; }
 .panel-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.panel-actions-start { justify-content: flex-start; margin-top: 8px; }
+.check-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 0.875rem; color: var(--text-primary); cursor: pointer; }
+.check-row[hidden] { display: none; }
+.check-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-solid); }
+.chat-composer .check-row { margin: 0 0 6px; font-size: 0.8125rem; color: var(--text-secondary); }
 
 /* Detail fields read as a two-column ruled ledger: label left, value right. */
 .detail-fields { display: flex; flex-direction: column; margin-bottom: 18px; border-top: 1px solid var(--border); }
@@ -1885,6 +1999,9 @@ select.field-input {
 .context-menu-icon { display: flex; flex: none; width: 16px; height: 16px; color: var(--text-muted); }
 .context-menu-icon .icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .context-menu-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.context-menu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.context-menu-text .context-menu-label { flex: none; }
+.context-menu-hint { font-size: 0.78rem; line-height: 1.35; color: var(--text-muted); }
 .context-menu-sep { height: 1px; margin: 5px 6px; background: var(--border); }
 
 /* --- Keyboard help --- */

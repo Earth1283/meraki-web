@@ -3,8 +3,8 @@ import { seededRandom, sketchCircle, sketchFace, sketchPlane, sketchSvg } from '
 import { GRADING_SCALES } from './grading.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
-import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, notify, addCalendarReminder, openCompose, openReminderForm } from './state.js';
-import { tabs, TAB_IDS, moodLabels, detailFields, commandLabels, filterLabels, fieldDisplay, classSections, renderItemBody, orderedTabIds, submissionForAssessment } from './rows.js';
+import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, optimisticDelete, setConfig, resetConfig, notify, addCalendarReminder, openCompose, openReminderForm } from './state.js';
+import { tabs, TAB_IDS, moodLabels, detailFields, commandLabels, filterLabels, fieldDisplay, classSections, renderItemBody, orderedTabIds, submissionForAssessment, teacherFeedback, quizReview, pill } from './rows.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 import { t, LOCALES, getLocale, setLocale } from './i18n.js';
 
@@ -63,47 +63,80 @@ export async function downloadFileUpload(f, triggerBtn) {
   }
 }
 
-// Per-question answers are fetched lazily (one submission at a time, on
-// first view) rather than bulk-loaded into state.data like everything
-// else — there's no list of them anywhere else in the UI to justify
-// preloading, and re-fetching on every refresh() would be wasted requests
-// for a detail panel that's usually closed.
-const assessmentAnswersCache = new Map();
-const assessmentAnswersLoading = new Set();
+// A submitted quiz's questions and answers are fetched lazily, on first view,
+// rather than bulk-loaded into state.data like everything else — nothing else
+// in the UI lists them, and re-fetching on every refresh() would be wasted
+// requests for a panel that's usually closed. Each key ends up holding the
+// fetched value, or { error } if the fetch failed.
+const lazyCache = new Map();
+const lazyLoading = new Set();
 
-function loadAssessmentAnswers(submissionId) {
-  if (assessmentAnswersCache.has(submissionId) || assessmentAnswersLoading.has(submissionId)) return;
-  assessmentAnswersLoading.add(submissionId);
-  api
-    .getAssessmentAnswers(submissionId)
-    .then((rows) => assessmentAnswersCache.set(submissionId, rows))
-    .catch((err) => assessmentAnswersCache.set(submissionId, { error: err.message }))
-    .finally(() => {
-      assessmentAnswersLoading.delete(submissionId);
-      notify();
-    });
+function lazyFetch(key, fetcher) {
+  if (!lazyCache.has(key) && !lazyLoading.has(key)) {
+    lazyLoading.add(key);
+    fetcher()
+      .then((value) => lazyCache.set(key, value))
+      .catch((err) => lazyCache.set(key, { error: err.message }))
+      .finally(() => {
+        lazyLoading.delete(key);
+        notify();
+      });
+  }
+  return lazyCache.get(key);
 }
 
-function buildAssessmentAnswers(submissionId) {
-  loadAssessmentAnswers(submissionId);
-  const cached = assessmentAnswersCache.get(submissionId);
-  const section = el('div', { class: 'detail-section' }, [el('div', { class: 'row-section' }, t('detail.yourAnswers'))]);
+function answerStatus(isCorrect, answered = true) {
+  if (!answered) return ['dim', t('quiz.notAnswered')];
+  if (isCorrect === true) return ['good', t('detail.correct')];
+  if (isCorrect === false) return ['bad', t('detail.incorrect')];
+  return ['dim', t('detail.notGraded')];
+}
 
-  if (!cached) {
-    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.loading') }));
-  } else if (cached.error) {
-    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.answersFailed', { msg: cached.error }) }));
-  } else if (cached.length === 0) {
-    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.noAnswers') }));
-  } else {
-    // Question text/options aren't shown because they aren't readable —
-    // meraki-web only ever sees its own past responses, never the bank of
-    // questions, so this is a scored answer log, not a quiz review.
-    const rows = cached.map((a, i) => {
+// With the quiz's questions: each prompt, its options, and the one you
+// picked, marked right or wrong.
+function quizReviewList(questions, answers) {
+  return el(
+    'div',
+    { class: 'quiz-review' },
+    quizReview(questions, answers).map((q) => {
+      const [status, statusText] = answerStatus(q.isCorrect, q.answered);
+      const pts = q.points != null ? `${q.pointsAwarded ?? '-'}/${q.points} ${t('unit.pts')}` : null;
+      return el('div', { class: 'quiz-q' }, [
+        el('div', { class: 'quiz-q-head' }, [
+          el('span', { class: 'quiz-q-n', text: t('detail.question', { n: q.n }) }),
+          pill(statusText, status),
+          pts ? el('span', { class: 'quiz-q-pts', text: pts }) : null,
+        ]),
+        el('p', { class: 'quiz-q-prompt', text: q.prompt }),
+        q.options.length
+          ? el(
+              'ol',
+              { class: 'quiz-options' },
+              q.options.map((option, i) =>
+                el('li', { class: `quiz-option ${i === q.choice ? `chosen ${status}` : ''}` }, [
+                  el('span', { class: 'quiz-option-letter', text: String.fromCharCode(65 + i) }),
+                  el('span', { class: 'quiz-option-text', text: option }),
+                  i === q.choice ? el('span', { class: 'quiz-option-mark', text: t('quiz.yourAnswer') }) : null,
+                ]),
+              ),
+            )
+          : null,
+        q.feedback ? el('p', { class: 'quiz-feedback', text: q.feedback }) : null,
+      ]);
+    }),
+  );
+}
+
+// Without them (Meraki's app unreachable, or the call changed): the scored
+// answer log, which is all the database itself shows a student.
+function answerLog(answers) {
+  return el(
+    'div',
+    { class: 'roster-list' },
+    answers.map((a, i) => {
       const choice = a.response?.choice;
-      const status = a.is_correct === true ? 'good' : a.is_correct === false ? 'bad' : 'dim';
-      const statusText = a.is_correct === true ? t('detail.correct') : a.is_correct === false ? t('detail.incorrect') : t('detail.notGraded');
-      const meta = [choice != null ? t('detail.chose', { n: choice + 1 }) : null, a.points_awarded != null ? `${a.points_awarded} ${t('unit.pts')}` : null]
+      const [status, statusText] = answerStatus(a.is_correct);
+      const meta = [choice != null ? t('detail.chose', { n: choice + 1 }) : null, a.points_awarded != null ? `${a.points_awarded} ${t('unit.pts')}` : null, a.feedback || null]
         .filter(Boolean)
         .join(' · ');
       return el('div', { class: 'roster-row' }, [
@@ -111,10 +144,115 @@ function buildAssessmentAnswers(submissionId) {
         el('span', { class: `pill ${status}`, text: statusText }),
         el('span', { class: 'roster-meta', text: meta }),
       ]);
-    });
-    section.appendChild(el('div', { class: 'roster-list' }, rows));
+    }),
+  );
+}
+
+function buildQuizReview(assessment, submissionId) {
+  const answers = lazyFetch(`answers:${submissionId}`, () => api.getAssessmentAnswers(submissionId));
+  const questions = lazyFetch(`questions:${assessment.id}`, () => api.getAssessmentQuestions(assessment.id));
+  const section = el('div', { class: 'detail-section' }, [el('div', { class: 'row-section' }, t('detail.yourAnswers'))]);
+
+  if (!answers || !questions) {
+    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.loading') }));
+  } else if (answers.error) {
+    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.answersFailed', { msg: answers.error }) }));
+  } else if (answers.length === 0) {
+    section.appendChild(el('div', { class: 'row-placeholder', text: t('detail.noAnswers') }));
+  } else if (Array.isArray(questions) && questions.length > 0) {
+    section.appendChild(quizReviewList(questions, answers));
+  } else {
+    if (questions.error) section.appendChild(el('div', { class: 'row-placeholder', text: t('quiz.questionsUnavailable', { msg: questions.error }) }));
+    section.appendChild(answerLog(answers));
   }
   return section;
+}
+
+// A grade or assignment's detail: what the teacher wrote back, then what you
+// turned in.
+function buildFeedbackSections(target) {
+  const feedback = teacherFeedback(target, state.data);
+  if (!feedback) return [];
+  const sections = [];
+  const notes = [
+    [t('feedback.onGrade'), feedback.comment],
+    [t('feedback.onSubmission'), feedback.teacherNote],
+  ].filter(([, text]) => text);
+  if (notes.length) {
+    sections.push(
+      el('div', { class: 'detail-section' }, [
+        el('div', { class: 'row-section' }, t('feedback.title')),
+        ...notes.map(([label, text]) =>
+          el('figure', { class: 'feedback-note' }, [el('figcaption', { class: 'feedback-label', text: label }), el('blockquote', { class: 'feedback-text', text })]),
+        ),
+      ]),
+    );
+  }
+  if (feedback.submissionBody || feedback.submissionFile) {
+    const children = [el('div', { class: 'row-section' }, t('feedback.yourSubmission'))];
+    if (feedback.submissionBody) children.push(el('p', { class: 'detail-body', text: feedback.submissionBody }));
+    if (feedback.submissionFile) {
+      const file = feedback.submissionFile;
+      const btn = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: t('feedback.download', { name: file.file_name || t('detail.download') }) });
+      btn.addEventListener('click', () => downloadFileUpload(file, btn));
+      children.push(el('div', { class: 'panel-actions panel-actions-start' }, [btn]));
+    }
+    sections.push(el('div', { class: 'detail-section' }, children));
+  }
+  return sections;
+}
+
+/** Sends a message the optimistic way (see optimisticInsert) and then, when
+ * `notifyRecipient` is set, asks Meraki's app to notify the recipient as the
+ * official site does after every send. The notification is its own call that
+ * can fail by itself, so it reports through its own toast. */
+export function sendMessage({ recipientId, subject, body, notifyRecipient = false }) {
+  const row = { id: nextTempId(), subject, body, created_at: new Date().toISOString(), read: true, sender_id: state.ownUserId, recipient_id: recipientId };
+  const apiBody = { sender_id: state.ownUserId, recipient_id: recipientId, subject, body };
+  optimisticInsert('messages', row, 'messages', apiBody, { returnId: notifyRecipient }).then(
+    (id) => {
+      if (!notifyRecipient || !id) return;
+      api.notifyMessageRecipient(id).then(
+        (sent) => showToast(sent ? t('compose.notified') : t('compose.notifyNotSent'), sent ? 'ok' : 'bad'),
+        (err) => showToast(t('compose.notifyFailed', { msg: err.message }), 'bad'),
+      );
+    },
+    (err) => showToast(t('compose.sendFailed', { msg: err.message }), 'bad'),
+  );
+}
+
+// Student-added portfolio work is kind 'artifact', same as on the official
+// site ('evidence' is what staff add).
+function addPortfolioItem({ title, description, link }) {
+  const row = { id: nextTempId(), title, description, link, kind: 'artifact', created_at: new Date().toISOString() };
+  return optimisticInsert('portfolio', row, 'portfolio_items', {
+    student_id: state.ownStudentId,
+    title,
+    description,
+    link,
+    kind: 'artifact',
+    added_by: state.ownUserId,
+  });
+}
+
+/** Removes a portfolio item straight away (the official site doesn't ask
+ * either), with Undo on the toast. Undo adds the same title, link and
+ * description back as a new item: the original row is already gone. */
+export function deletePortfolioItem(item) {
+  if (String(item.id).startsWith('temp-')) return;
+  const { title, description, link } = item;
+  let failed = false;
+  showToast(t('portfolio.deleted'), 'ok', {
+    label: t('action.undo'),
+    onClick: () => {
+      if (failed) return;
+      addPortfolioItem({ title, description, link }).catch((err) => showToast(t('portfolio.addFailed', { msg: err.message }), 'bad'));
+    },
+  });
+  optimisticDelete('portfolio', item.id, 'portfolio_items').catch((err) => {
+    failed = true;
+    showToast(/removed nothing/.test(err.message) ? t('portfolio.deleteNotAllowed') : t('portfolio.deleteFailed', { msg: err.message }), 'bad');
+  });
 }
 
 function backdrop(onClose) {
@@ -237,6 +375,9 @@ export function renderOverlay() {
     case 'reminder':
       overlayRoot.appendChild(buildReminder());
       break;
+    case 'portfolio':
+      overlayRoot.appendChild(buildPortfolioForm());
+      break;
     case 'help':
       overlayRoot.appendChild(buildHelp());
       break;
@@ -328,11 +469,25 @@ export function renderDetailPanel() {
     downloadBtn.addEventListener('click', () => downloadFileUpload(f, downloadBtn));
     detailPanel.appendChild(el('div', { class: 'panel-actions' }, [downloadBtn]));
   }
+  if (target.kind === 'portfolio') {
+    const p = state.data.portfolio[target.index];
+    if (!String(p.id).startsWith('temp-')) {
+      const removeBtn = el('button', { class: 'btn btn-ghost', type: 'button', text: t('portfolio.delete') });
+      removeBtn.addEventListener('click', () => {
+        closeOverlay();
+        deletePortfolioItem(p);
+      });
+      detailPanel.appendChild(el('div', { class: 'panel-actions' }, [removeBtn]));
+    }
+  }
   if (target.kind === 'class') detailPanel.appendChild(buildClassSections(target.index));
+  if (target.kind === 'grade' || target.kind === 'assignment') {
+    for (const section of buildFeedbackSections(target)) detailPanel.appendChild(section);
+  }
   if (target.kind === 'assessment') {
     const a = state.data.assessments[target.index];
     const sub = submissionForAssessment(state.data, a);
-    if (sub) detailPanel.appendChild(buildAssessmentAnswers(sub.id));
+    if (sub) detailPanel.appendChild(buildQuizReview(a, sub.id));
   }
 
   if (!detailMobileBackdrop) {
@@ -353,8 +508,9 @@ function commands() {
     () => openCompose(),
     () => openOverlay('checkin'),
     () => openReminderForm(),
+    () => openOverlay('portfolio'),
   ];
-  const labels = [...commandLabels(), t('compose.title'), t('checkin.title'), t('calendar.addReminder')];
+  const labels = [...commandLabels(), t('compose.title'), t('checkin.title'), t('calendar.addReminder'), t('portfolio.addTitle')];
   return labels.map((label, i) => ({ label, run: runs[i] }));
 }
 
@@ -440,6 +596,15 @@ function buildCompose() {
   const subject = el('input', { class: 'field-input', type: 'text', maxlength: 200, placeholder: t('compose.subject'), value: prefill?.subject || undefined });
   const body = el('textarea', { class: 'field-input textarea', rows: 6, placeholder: t('compose.messagePlaceholder') });
   const sendBtn = el('button', { class: 'btn btn-primary', type: 'submit', text: t('compose.send') });
+  // The official site notifies the recipient after every send; here it's a
+  // visible choice, on by default. Hidden for notes to yourself.
+  const notifyBox = el('input', { type: 'checkbox', checked: true });
+  const notifyRow = el('label', { class: 'check-row' }, [notifyBox, el('span', { text: t('compose.notify') })]);
+  const syncNotify = () => {
+    notifyRow.hidden = select.value === state.ownUserId;
+  };
+  select.addEventListener('change', syncNotify);
+  syncNotify();
 
   const form = el(
     'form',
@@ -448,26 +613,13 @@ function buildCompose() {
       onsubmit: (e) => {
         e.preventDefault();
         if (recipients.length === 0) return;
-        const recipientId = select.value;
-        const subjectVal = subject.value;
-        const bodyVal = body.value;
+        const message = { recipientId: select.value, subject: subject.value, body: body.value, notifyRecipient: !notifyRow.hidden && notifyBox.checked };
 
         // Optimistic: close and confirm immediately, reconcile in the
         // background — see optimisticInsert in state.js.
         closeOverlay();
         showToast(t('compose.sent'), 'ok', null, { flourish: 'plane' });
-        const row = {
-          id: nextTempId(),
-          subject: subjectVal,
-          body: bodyVal,
-          created_at: new Date().toISOString(),
-          read: true,
-          sender_id: state.ownUserId,
-          recipient_id: recipientId,
-        };
-        optimisticInsert('messages', row, 'messages', { sender_id: state.ownUserId, recipient_id: recipientId, subject: subjectVal, body: bodyVal }).catch(
-          (err) => showToast(t('compose.sendFailed', { msg: err.message }), 'bad'),
-        );
+        sendMessage(message);
       },
     },
     [
@@ -477,6 +629,7 @@ function buildCompose() {
       subject,
       el('label', { class: 'field-label', text: t('compose.message') }),
       body,
+      notifyRow,
       el('div', { class: 'panel-actions' }, [el('button', { class: 'btn btn-ghost', type: 'button', onclick: closeOverlay, text: t('compose.cancel') }), sendBtn]),
     ],
   );
@@ -620,6 +773,64 @@ function buildReminder() {
 
   const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('reminder.addTitle') }, [
     el('div', { class: 'panel-header' }, [el('h2', { text: t('reminder.addTitle') }), closeButton()]),
+    form,
+  ]);
+  const wrap = el('div', { class: 'overlay-right' }, [backdrop(closeOverlay), panel]);
+  queueMicrotask(() => title.focus());
+  return wrap;
+}
+
+function buildPortfolioForm() {
+  const title = el('input', { class: 'field-input', type: 'text', required: true, maxlength: 200, placeholder: t('portfolio.titlePlaceholder') });
+  const link = el('input', { class: 'field-input', type: 'text', inputmode: 'url', maxlength: 500, placeholder: t('portfolio.linkPlaceholder') });
+  const description = el('textarea', { class: 'field-input textarea', rows: 4, placeholder: t('portfolio.descriptionPlaceholder') });
+  const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: true });
+  const showError = (text) => {
+    errorLine.textContent = text;
+    errorLine.hidden = false;
+  };
+
+  const form = el(
+    'form',
+    {
+      class: 'panel-form',
+      onsubmit: (e) => {
+        e.preventDefault();
+        if (!state.ownStudentId) {
+          showError(t('portfolio.noStudentRecord'));
+          return;
+        }
+        const titleVal = title.value.trim();
+        // The same minimum the official site enforces.
+        if (titleVal.length < 2) {
+          showError(t('portfolio.titleTooShort'));
+          return;
+        }
+
+        closeOverlay();
+        showToast(t('portfolio.added'));
+        addPortfolioItem({ title: titleVal, description: description.value.trim() || null, link: link.value.trim() || null }).catch(
+          (err) => showToast(t('portfolio.addFailed', { msg: err.message }), 'bad'),
+        );
+      },
+    },
+    [
+      el('label', { class: 'field-label', text: t('portfolio.title') }),
+      title,
+      el('label', { class: 'field-label', text: t('label.link') }),
+      link,
+      el('label', { class: 'field-label', text: t('portfolio.description') }),
+      description,
+      errorLine,
+      el('div', { class: 'panel-actions' }, [
+        el('button', { class: 'btn btn-ghost', type: 'button', onclick: closeOverlay, text: t('compose.cancel') }),
+        el('button', { class: 'btn btn-primary', type: 'submit', text: t('portfolio.save') }),
+      ]),
+    ],
+  );
+
+  const panel = el('div', { class: 'side-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('portfolio.addTitle') }, [
+    el('div', { class: 'panel-header' }, [el('h2', { text: t('portfolio.addTitle') }), closeButton()]),
     form,
   ]);
   const wrap = el('div', { class: 'overlay-right' }, [backdrop(closeOverlay), panel]);

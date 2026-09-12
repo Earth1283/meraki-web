@@ -19,3 +19,9 @@ test('the READS ONLY table becomes label/desc rows', () => {
 test('mentions the self-hosted trust model', () => {
   assert.match(DATA_AND_PRIVACY, /it never\s+sees your password/);
 });
+
+test('lists every table this client writes to', () => {
+  for (const table of ['messages', 'checkins', 'portfolio_items', 'login_events']) {
+    assert.match(DATA_AND_PRIVACY, new RegExp(table));
+  }
+});

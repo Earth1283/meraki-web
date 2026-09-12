@@ -1,8 +1,9 @@
-import { el, svgIcon } from './dom.js';
+import { el, svgIcon, clear } from './dom.js';
 import { t } from './i18n.js';
 import { pctClass, pill, emptyState, gradeCircle } from './rows.js';
 import { seededRandom, sketchArrow, sketchSvg } from './sketch.js';
 import { iconPaths } from './icons.js';
+import { letterGrade, overallGrade } from './grading.js';
 
 export const DEFAULT_TARGET_PCT = 90;
 
@@ -70,6 +71,39 @@ export function targetProjection(stats, targetPct) {
 
   const status = requiredAvgPct <= 0 ? 'guaranteed' : requiredAvgPct > 100 ? 'unreachable' : 'onTrack';
   return { status, diffFromCurrent, requiredAvgPct, maxAchievablePct };
+}
+
+/** A class's assignments with no grade yet: the ones a What if score can
+ * stand in for. */
+export function whatIfCandidates(data, classId) {
+  return data.assignments.filter(
+    (a) => a.class_id === classId && a.points_possible != null && !data.grades.some((g) => g.assignment_id === a.id && g.points_earned != null),
+  );
+}
+
+/** `data` as if every What if score were a real grade: scores fill in
+ * ungraded assignments (a real grade always wins), and a class's `extra`
+ * adds one more graded assignment. Feed the result to classGradeStats or
+ * overallGrade to see where things would land. */
+export function applyWhatIf(data, whatIf = {}) {
+  const assignments = [...data.assignments];
+  const grades = [...data.grades];
+  for (const [classId, entry] of Object.entries(whatIf)) {
+    for (const [assignmentId, points] of Object.entries(entry?.scores ?? {})) {
+      if (Number.isFinite(points)) grades.push({ id: `what-if:${assignmentId}`, assignment_id: assignmentId, points_earned: points, updated_at: null });
+    }
+    const extra = entry?.extra;
+    if (Number.isFinite(extra?.earned) && Number.isFinite(extra?.possible) && extra.possible > 0) {
+      const id = `what-if-extra:${classId}`;
+      assignments.push({ id, class_id: classId, title: null, category: null, points_possible: extra.possible });
+      grades.push({ id, assignment_id: id, points_earned: extra.earned, updated_at: null });
+    }
+  }
+  return { ...data, assignments, grades };
+}
+
+function hasWhatIfScores(entry) {
+  return Object.values(entry?.scores ?? {}).some(Number.isFinite) || (Number.isFinite(entry?.extra?.earned) && entry.extra.possible > 0);
 }
 
 function projectionMessage(stats, projection, targetPct) {
@@ -180,7 +214,7 @@ function targetInput(classId, targetPct, onTargetChange) {
   });
 }
 
-function renderClassCard(cls, data, config, targets, onTargetChange) {
+function renderClassCard(cls, data, config, targets, onTargetChange, whatIf, updaters) {
   const stats = classGradeStats(data, cls.id);
   const targetPct = targets[cls.id] ?? DEFAULT_TARGET_PCT;
   const projection = targetProjection(stats, targetPct);
@@ -233,10 +267,92 @@ function renderClassCard(cls, data, config, targets, onTargetChange) {
       targetInput(cls.id, targetPct, onTargetChange),
       el('div', { class: 'analytics-status-line' }, [el('span', { class: `analytics-status text-${msg.cls}`, text: msg.text }), diffPill(projection.diffFromCurrent, { notebook, seed: cls.id })]),
     ]),
+    whatIf ? renderWhatIf(cls, data, config, whatIf, updaters) : null,
   ]);
 }
 
-function renderComparisonCard(data, config) {
+function whatIfInput(value, onInput, attrs = {}) {
+  return el('input', {
+    class: 'field-input whatif-input',
+    type: 'number',
+    min: '0',
+    step: 'any',
+    inputmode: 'decimal',
+    value: Number.isFinite(value) ? String(value) : undefined,
+    oninput: (e) => {
+      const n = e.target.value === '' ? null : Number(e.target.value);
+      onInput(Number.isFinite(n) ? n : null);
+    },
+    ...attrs,
+  });
+}
+
+function gradeLabel(pct, scale) {
+  if (pct == null) return '—';
+  return `${pct.toFixed(1)}% (${letterGrade(pct, scale).letter})`;
+}
+
+// What if: type a score for any ungraded assignment (or add one more
+// assignment) and watch the class grade move. The inputs write through
+// whatIf.set, which doesn't re-render; instead every result line on the tab
+// is patched in place through the shared `updaters` (the GPA line depends on
+// every class's what-ifs, not just the one being edited).
+function renderWhatIf(cls, data, config, whatIf, updaters) {
+  const scale = config.gradingScale;
+  const entryNow = () => whatIf.get()[cls.id] ?? {};
+  const update = (patch) => {
+    const entry = entryNow();
+    whatIf.set(cls.id, { ...entry, ...patch(entry) });
+    updaters.forEach((fn) => fn());
+  };
+
+  const result = el('div', { class: 'whatif-result', 'aria-live': 'polite' });
+  updaters.push(() => {
+    clear(result);
+    const entry = entryNow();
+    if (!hasWhatIfScores(entry)) {
+      result.append(el('span', { class: 'analytics-empty-note', text: t('analytics.whatIfEmpty') }));
+      return;
+    }
+    const before = classGradeStats(data, cls.id).currentPct;
+    const after = classGradeStats(applyWhatIf(data, { [cls.id]: entry }), cls.id).currentPct;
+    result.append(
+      el('span', { class: 'whatif-from', text: gradeLabel(before, scale) }),
+      el('span', { class: 'whatif-arrow', 'aria-hidden': 'true', text: '→' }),
+      el('span', { class: `whatif-to text-${pctClass(after)}`, text: gradeLabel(after, scale) }),
+    );
+  });
+
+  const rows = whatIfCandidates(data, cls.id).map((a) =>
+    el('label', { class: 'whatif-row' }, [
+      el('span', { class: 'whatif-row-label', text: a.title, title: a.title }),
+      whatIfInput(entryNow().scores?.[a.id], (points) => update((e) => ({ scores: { ...e.scores, [a.id]: points } })), { 'aria-label': a.title }),
+      el('span', { class: 'whatif-of', text: `/ ${a.points_possible}` }),
+    ]),
+  );
+  rows.push(
+    el('div', { class: 'whatif-row' }, [
+      el('span', { class: 'whatif-row-label', text: t('analytics.whatIfExtra') }),
+      whatIfInput(entryNow().extra?.earned, (earned) => update((e) => ({ extra: { ...e.extra, earned } })), { 'aria-label': t('analytics.whatIfEarned') }),
+      el('span', { class: 'whatif-of', text: '/' }),
+      whatIfInput(entryNow().extra?.possible, (possible) => update((e) => ({ extra: { ...e.extra, possible } })), { 'aria-label': t('analytics.whatIfPossible') }),
+    ]),
+  );
+
+  const entry = entryNow();
+  const details = el('details', { class: 'whatif', open: entry.open || hasWhatIfScores(entry) || undefined }, [
+    el('summary', { class: 'field-label', text: t('analytics.whatIf') }),
+    el('div', { class: 'whatif-list' }, rows),
+    el('div', { class: 'whatif-footer' }, [
+      result,
+      el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => whatIf.clear(cls.id), text: t('analytics.whatIfClear') }),
+    ]),
+  ]);
+  details.addEventListener('toggle', () => whatIf.set(cls.id, { ...entryNow(), open: details.open }));
+  return details;
+}
+
+function renderComparisonCard(data, config, whatIf, updaters) {
   const rows = data.classes
     .map((cls) => ({ label: cls.name, pct: classGradeStats(data, cls.id).currentPct }))
     .filter((r) => r.pct != null);
@@ -257,21 +373,40 @@ function renderComparisonCard(data, config) {
     );
   }
 
-  return el('div', { class: 'analytics-card' }, [el('div', { class: 'field-label', text: t('analytics.comparison') }), body]);
+  // Once What if scores are entered anywhere: the GPA they'd add up to.
+  let gpaLine = null;
+  if (whatIf) {
+    gpaLine = el('div', { class: 'whatif-gpa', 'aria-live': 'polite' });
+    updaters.push(() => {
+      clear(gpaLine);
+      const all = whatIf.get();
+      const before = overallGrade(data, config.gradingScale);
+      const after = Object.values(all).some(hasWhatIfScores) ? overallGrade(applyWhatIf(data, all), config.gradingScale) : null;
+      gpaLine.hidden = before?.gpa == null || after?.gpa == null;
+      if (!gpaLine.hidden) gpaLine.append(t('analytics.whatIfGpa', { from: before.gpa.toFixed(2), to: after.gpa.toFixed(2) }));
+    });
+  }
+
+  return el('div', { class: 'analytics-card' }, [el('div', { class: 'field-label', text: t('analytics.comparison') }), body, gpaLine]);
 }
 
-export function renderAnalyticsTab(data, config, targets, onTargetChange) {
+/** `whatIf` ({ get, set, clear }, optional) adds the What if calculator to
+ * each class card; see renderWhatIf. */
+export function renderAnalyticsTab(data, config, targets, onTargetChange, whatIf = null) {
   if (data.classes.length === 0) {
     return emptyState(t('analytics.noClasses'), { notebook: config.style === 'notebook' });
   }
-  return el('div', { class: 'analytics-tab' }, [
-    renderComparisonCard(data, config),
+  const updaters = [];
+  const node = el('div', { class: 'analytics-tab' }, [
+    renderComparisonCard(data, config, whatIf, updaters),
     el(
       'div',
       { class: 'analytics-grid' },
-      data.classes.map((cls) => renderClassCard(cls, data, config, targets, onTargetChange)),
+      data.classes.map((cls) => renderClassCard(cls, data, config, targets, onTargetChange, whatIf, updaters)),
     ),
   ]);
+  updaters.forEach((fn) => fn());
+  return node;
 }
 
 export function chartModeToggle(config, onToggle) {

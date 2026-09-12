@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classGradeStats, targetProjection } from '../src/analytics.js';
+import { classGradeStats, targetProjection, applyWhatIf, whatIfCandidates } from '../src/analytics.js';
 import { i18nReady } from '../src/i18n.js';
 
 await i18nReady;
@@ -80,4 +80,27 @@ test('targetProjection: final when there is no remaining graded work', () => {
   assert.equal(projection.status, 'final');
   assert.equal(projection.maxAchievablePct, 80);
   assert.equal(projection.diffFromCurrent, 10);
+});
+
+test('applyWhatIf fills in ungraded work and never overrides a real grade', () => {
+  const data = dataWith(ASSIGNMENTS, GRADES);
+  // a1 is already graded 90/100, so its what-if 0 is ignored; a3 becomes 50/50.
+  const projected = applyWhatIf(data, { c1: { scores: { a1: 0, a3: 50 } } });
+  assert.equal(classGradeStats(projected, 'c1').currentPct, ((90 + 70 + 50) / 250) * 100);
+  assert.equal(data.grades.length, 2, 'the real data is left alone');
+});
+
+test('applyWhatIf can add one more assignment to a class', () => {
+  const projected = applyWhatIf(dataWith(ASSIGNMENTS, GRADES), { c1: { extra: { earned: 40, possible: 50 } } });
+  assert.equal(classGradeStats(projected, 'c1').currentPct, ((90 + 70 + 40) / 250) * 100);
+});
+
+test('applyWhatIf ignores blank scores and an extra assignment worth nothing', () => {
+  const data = dataWith(ASSIGNMENTS, GRADES);
+  const projected = applyWhatIf(data, { c1: { scores: { a3: null }, extra: { earned: 5, possible: 0 } } });
+  assert.equal(classGradeStats(projected, 'c1').currentPct, classGradeStats(data, 'c1').currentPct);
+});
+
+test('whatIfCandidates lists only the ungraded assignments in the class', () => {
+  assert.deepEqual(whatIfCandidates(dataWith(ASSIGNMENTS, GRADES), 'c1').map((a) => a.id), ['a3']);
 });

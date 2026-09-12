@@ -1,8 +1,8 @@
 import { el, clear, svgIcon } from './dom.js';
-import { state, setActiveThread, nextTempId, optimisticInsert } from './state.js';
+import { state, setActiveThread } from './state.js';
 import { messageThreads, partnerName, initials, dayKey, formatDaySeparator, formatTime12 } from './rows.js';
 import { iconPaths } from './icons.js';
-import { showToast } from './overlays.js';
+import { sendMessage } from './overlays.js';
 import { t } from './i18n.js';
 
 // Module-level, not per-call: lets us tell "new message arrived" apart from
@@ -146,6 +146,11 @@ function buildThreadView(thread) {
     [svgIcon(iconPaths('plus'))],
   );
 
+  // The compose panel's "Notify the teacher" choice, here too; not offered
+  // in a thread with yourself.
+  const notifyBox = el('input', { type: 'checkbox', checked: true });
+  const notifyRow = thread.partnerId === state.ownUserId ? null : el('label', { class: 'check-row' }, [notifyBox, el('span', { text: t('compose.notify') })]);
+
   const form = el(
     'form',
     {
@@ -154,29 +159,16 @@ function buildThreadView(thread) {
         e.preventDefault();
         const body = input.value.trim();
         if (!body) return;
-        const subject = subjectInput.value.trim();
-        const recipientId = thread.partnerId;
 
-        // Optimistic: build the row locally and show it immediately: the
-        // re-render this triggers rebuilds this whole form, so clear the
-        // fields and re-focus a fresh input right away rather than relying
-        // on stale references to the (about to be destroyed) DOM nodes.
-        const row = {
-          id: nextTempId(),
-          subject,
-          body,
-          created_at: new Date().toISOString(),
-          read: true,
-          sender_id: state.ownUserId,
-          recipient_id: recipientId,
-        };
-        optimisticInsert('messages', row, 'messages', { sender_id: state.ownUserId, recipient_id: recipientId, subject, body }).catch(
-          (err) => showToast(t('compose.sendFailed', { msg: err.message }), 'bad'),
-        );
+        // Optimistic: sendMessage shows the row immediately, and the
+        // re-render that triggers rebuilds this whole form, so re-focus a
+        // fresh input right away rather than relying on stale references to
+        // the (about to be destroyed) DOM nodes.
+        sendMessage({ recipientId: thread.partnerId, subject: subjectInput.value.trim(), body, notifyRecipient: !!notifyRow && notifyBox.checked });
         queueMicrotask(() => document.querySelector('.chat-input')?.focus());
       },
     },
-    [subjectInput, el('div', { class: 'chat-input-row' }, [subjectToggle, input, sendBtn])],
+    [subjectInput, notifyRow, el('div', { class: 'chat-input-row' }, [subjectToggle, input, sendBtn])],
   );
 
   return [header, messages, form];

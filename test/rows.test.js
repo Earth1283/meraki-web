@@ -4,7 +4,7 @@ import {
   rowKinds, detailFields, commandLabels, filterLabels, moodLabels, tabs, TAB_IDS, daysUntil, overviewSummary, fieldDisplay,
   classSections, submissionForAssignment, submissionForAssessment, formatBytes, formatDateTime,
   messageThreads, partnerName, initials, dayKey, formatDaySeparator, formatTime12,
-  orderedTabIds, visibleTabs,
+  orderedTabIds, visibleTabs, teacherFeedback, quizReview, strikeNumber,
 } from '../src/rows.js';
 import { i18nReady } from '../src/i18n.js';
 
@@ -447,4 +447,56 @@ test('visibleTabs filters out hidden tabs but preserves the configured order', (
   const rest = ids.slice(3);
   const result = visibleTabs({ tabOrder: [third, first, second, ...rest], hiddenTabs: [second] });
   assert.deepEqual(result.map((t) => t.id), [third, first, ...rest]);
+});
+
+test('teacherFeedback pairs the grade comment with the submission note and what was turned in', () => {
+  const file = { id: 'f1', file_name: 'essay.pdf', storage_path: 'c1/u1/essay.pdf' };
+  const data = emptyData({
+    assignments: [{ id: 'a1', title: 'Essay' }],
+    grades: [{ id: 'g1', assignment_id: 'a1', points_earned: 9, comment: 'Strong thesis.' }],
+    assignmentSubmissions: [{ id: 's1', assignment_id: 'a1', teacher_note: 'Cite your sources.', body: 'My essay', file_uploads: file }],
+  });
+  const expected = { comment: 'Strong thesis.', teacherNote: 'Cite your sources.', submissionBody: 'My essay', submissionFile: file };
+  assert.deepEqual(teacherFeedback({ kind: 'assignment', index: 0 }, data), expected);
+  assert.deepEqual(teacherFeedback({ kind: 'grade', index: 0 }, data), expected);
+});
+
+test('teacherFeedback is null when there is nothing to show', () => {
+  const data = emptyData({ assignments: [{ id: 'a1' }], grades: [{ id: 'g1', assignment_id: 'a1', points_earned: 9, comment: null }] });
+  assert.equal(teacherFeedback({ kind: 'grade', index: 0 }, data), null);
+  assert.equal(teacherFeedback({ kind: 'announcement', index: 0 }, data), null);
+});
+
+test('quizReview orders questions by position and attaches each answer', () => {
+  const questions = [
+    { id: 'q2', position: 1, prompt: 'Second', options: ['x', 'y'], points: 1 },
+    { id: 'q1', position: 0, prompt: 'First', options: ['a', 'b', 'c'], points: 2 },
+  ];
+  const answers = [{ question_id: 'q1', response: { choice: 2 }, is_correct: true, points_awarded: 2, feedback: 'Nice' }];
+  const review = quizReview(questions, answers);
+  assert.deepEqual(
+    review.map((q) => [q.n, q.prompt, q.answered, q.choice, q.isCorrect]),
+    [[1, 'First', true, 2, true], [2, 'Second', false, null, null]],
+  );
+  assert.equal(review[0].feedback, 'Nice');
+});
+
+test('strikeNumber counts strikes oldest first and skips other notes', () => {
+  const data = emptyData({
+    behaviorNotes: [
+      { id: 'n3', kind: 'strike', date: '2026-09-06' },
+      { id: 'n2', kind: 'praise', date: '2026-09-05' },
+      { id: 'n1', kind: 'strike', date: '2026-09-02' },
+    ],
+  });
+  assert.deepEqual([0, 1, 2].map((i) => strikeNumber(data, i)), [2, null, 1]);
+});
+
+test('detailFields for an assignment shows your score once it is graded', () => {
+  const data = emptyData({
+    assignments: [{ id: 'a1', title: 'Essay', points_possible: 10 }],
+    grades: [{ id: 'g1', assignment_id: 'a1', points_earned: 9 }],
+  });
+  const { fields } = detailFields({ kind: 'assignment', index: 0 }, data);
+  assert.deepEqual(fields.find(([label]) => label === 'Your score'), ['Your score', '9/10']);
 });

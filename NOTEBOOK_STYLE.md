@@ -74,6 +74,8 @@ days. In the dark theme the pen turns to chalk.
 - [x] **Empty states:** a star-and-spiral margin doodle instead of the `·` icon
 - [x] **My Record:** detentions as pink punched slips (all locales, CSS only,
       no new strings)
+- [x] **My Record:** strikes as carbon-copy behavior slips in both styles;
+      Notebook fills in the blanks in blue handwriting and stamps them in red ink
 - [x] **Calendar list view:** merged with assignments and reminders and
       grouped by day in both styles (today's header highlighted, past days
       folded under "Earlier"); Notebook adds kind-colored highlighter swipes

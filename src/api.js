@@ -1,7 +1,19 @@
+import { encodeServerFnBody, decodeServerFnResponse } from './serverfn.js';
+
 // Public Supabase anon key, same one meraki-education.app ships client-side;
 // row-level security, not key secrecy, is what scopes data per user.
 export const SUPABASE_URL = 'https://qjzryyxpbofeesmtdpvi.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_A46q6yNO7bKHJO4WqrqCkQ_4K8nO2TY';
+
+// Meraki's own app, for the few things it serves through server functions
+// instead of Supabase (see serverfn.js). Each id is a hash from the app's
+// current build, so these break whenever Meraki ships a change to that
+// function; callers treat a failure as "feature unavailable", never fatal.
+export const APP_URL = 'https://meraki-education.app';
+const SERVER_FNS = {
+  assessmentWithQuestions: '7cb06537c536f77255905af66a89d7c4dfa691e83a9096078709110c3a571da9',
+  notifyMessage: 'b6d92294f634873df182796b77a7b3ee247ce7573b4b9c02e05d0ef5f5b82216',
+};
 
 const SESSION_KEY = 'meraki-web.session';
 
@@ -63,6 +75,10 @@ export async function login(email, password) {
     email: normalizedEmail,
   };
   persist();
+  // The official site records every password sign-in in login_events, which
+  // staff can see; doing the same keeps a student who uses this client from
+  // looking like they never log in. Best-effort: it mustn't block signing in.
+  if (session.user_id) insertRow('login_events', { user_id: session.user_id }).catch(() => {});
   return session;
 }
 
@@ -97,12 +113,12 @@ async function doRefresh() {
   return session.access_token;
 }
 
-async function authedFetch(path, init = {}) {
+async function authedRequest(url, init = {}, extraHeaders = {}) {
   if (!session) throw new Error('not logged in');
   const attempt = (token) =>
-    fetch(`${SUPABASE_URL}${path}`, {
+    fetch(url, {
       ...init,
-      headers: { ...(init.headers || {}), apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+      headers: { ...(init.headers || {}), ...extraHeaders, Authorization: `Bearer ${token}` },
     });
 
   let resp = await attempt(session.access_token);
@@ -111,6 +127,10 @@ async function authedFetch(path, init = {}) {
     resp = await attempt(fresh);
   }
   return resp;
+}
+
+function authedFetch(path, init = {}) {
+  return authedRequest(`${SUPABASE_URL}${path}`, init, { apikey: SUPABASE_ANON_KEY });
 }
 
 export async function getTable(table, query) {
@@ -122,16 +142,39 @@ export async function getTable(table, query) {
   return resp.json();
 }
 
-export async function insertRow(table, body) {
-  const resp = await authedFetch(`/rest/v1/${table}`, {
+/** Inserts one row. With `returnId`, has PostgREST echo the new row back (as
+ * the official site does before notifying a message's recipient) and
+ * resolves to its id. */
+export async function insertRow(table, body, { returnId = false } = {}) {
+  const resp = await authedFetch(`/rest/v1/${table}${returnId ? '?select=id' : ''}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    headers: returnId
+      ? { 'Content-Type': 'application/json', Prefer: 'return=representation', Accept: 'application/vnd.pgrst.object+json' }
+      : { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify(body),
   });
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
     throw new Error(`POST ${table} failed (${resp.status}): ${text}`);
   }
+  if (returnId) return (await resp.json()).id;
+  return undefined;
+}
+
+// Row-level security doesn't make a DELETE fail when it hides the row —
+// PostgREST just reports success having deleted nothing. Asking for the
+// deleted rows back is the only way to tell "gone" from "not yours to delete".
+export async function deleteRow(table, id) {
+  const resp = await authedFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&select=id`, {
+    method: 'DELETE',
+    headers: { Prefer: 'return=representation' },
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`DELETE ${table} failed (${resp.status}): ${text}`);
+  }
+  const rows = await resp.json();
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error(`DELETE ${table} removed nothing`);
 }
 
 // Classroom files live in a private storage bucket; a signed URL (short-lived
@@ -152,13 +195,48 @@ export async function getSignedFileUrl(storagePath, { bucket = 'school-files', e
   return `${SUPABASE_URL}/storage/v1${v.signedURL}`;
 }
 
-// assessment_questions is unreadable for students (RLS returns it empty
-// unconditionally — the prompt/options/rubric only ever reach the client
-// through Meraki's own app), so this is the only per-question detail
-// meraki-web can show: your own past answers, scoped to your own
-// submissions the same way the rest of this app's tables are.
+// The captured traffic had its auth headers stripped, so sending the Supabase
+// access token as a bearer token (the usual TanStack Start + Supabase setup)
+// is an assumption until a live call confirms it.
+async function callServerFn(id, data) {
+  const resp = await authedRequest(`${APP_URL}/_serverFn/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-tsr-serverfn': 'true' },
+    body: JSON.stringify(encodeServerFnBody(data)),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`server function failed (${resp.status}): ${text.slice(0, 200)}`);
+  }
+  const { result, error } = decodeServerFnResponse(await resp.json());
+  if (error != null) {
+    const detail = typeof error === 'object' ? error.message ?? JSON.stringify(error) : String(error);
+    throw new Error(`server function error: ${detail}`);
+  }
+  return result;
+}
+
+// assessment_questions itself is unreadable for students (RLS returns it
+// empty), but Meraki's app hands a quiz's questions to whoever opens it. Only
+// call this for quizzes you've already submitted: it's the same call the site
+// makes when a quiz is opened, and whether that also starts the quiz's timer
+// isn't known. The questions carry no answer key.
+export async function getAssessmentQuestions(assessmentId) {
+  const result = await callServerFn(SERVER_FNS.assessmentWithQuestions, { assessmentId });
+  return Array.isArray(result?.questions) ? result.questions : [];
+}
+
+// Your own recorded answers, scoped to your own submissions the same way the
+// rest of this app's tables are.
 export async function getAssessmentAnswers(submissionId) {
   return getTable('assessment_answers', `select=id,question_id,response,is_correct,points_awarded,feedback,created_at&submission_id=eq.${submissionId}&order=created_at.asc`);
+}
+
+/** Asks Meraki's app to notify a message's recipient, as the official site
+ * does right after every send. Resolves to whether it says one went out. */
+export async function notifyMessageRecipient(messageId) {
+  const result = await callServerFn(SERVER_FNS.notifyMessage, { message_id: messageId });
+  return result?.sent === true;
 }
 
 export function friendlyLoadError(label, err) {

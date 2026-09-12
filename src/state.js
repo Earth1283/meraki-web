@@ -145,7 +145,7 @@ export const state = {
   loadingSteps: [],
   error: null,
   selectedIndex: 0,
-  // 'palette' | 'compose' | 'checkin' | 'detail' | null
+  // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'help' | 'settings' | 'detail' | null
   activeOverlay: null,
   // Set by openCompose() to prefill the compose form (e.g. replying to a
   // message from the context menu); consumed once by buildCompose().
@@ -169,6 +169,10 @@ export const state = {
   gradeTargets: loadGradeTargets(),
   // [{ id, title, date, note }] personal due-date reminders on the Calendar tab.
   calendarReminders: loadCalendarReminders(),
+  // { [classId]: { scores: { [assignmentId]: points }, extra: { earned, possible }, open } }
+  // for the Analytics tab's What if calculator. Not persisted: a what-if is
+  // scratch work, and one left over from last week would read as a real grade.
+  whatIf: {},
   // The Calendar grid's visible month, not persisted — always opens on
   // today's month rather than remembering wherever it was last navigated to.
   calendarViewMonth: (() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })(),
@@ -218,7 +222,7 @@ export function doLogout() {
   Object.assign(state, {
     tab: 'overview', data: emptyData(), ownUserId: '', ownStudentId: null,
     loading: true, hasLoadedOnce: false, status: 'Loading…', error: null, selectedIndex: 0,
-    activeOverlay: null, detailTarget: null, detailBackStack: [],
+    activeOverlay: null, detailTarget: null, detailBackStack: [], whatIf: {},
   });
   notify();
 }
@@ -245,21 +249,21 @@ export function resetConfig() {
 const TABLES = [
   ['classes', 'classes', 'select=id,name,subject,period,room,term,teacher_id,teacher_name&order=period.asc', 'your classes'],
   ['assignments', 'assignments', 'select=id,title,category,due_date,points_possible,description,submission_mode,class_id,classes(name)&order=due_date.asc', 'assignments'],
-  ['grades', 'grades', 'select=id,points_earned,updated_at,assignment_id,assignments(title,points_possible,due_date,class_id)&order=updated_at.desc&limit=69', 'grades'],
+  ['grades', 'grades', 'select=id,points_earned,comment,updated_at,assignment_id,assignments(title,points_possible,due_date,class_id)&order=updated_at.desc&limit=69', 'grades'],
   ['attendance', 'attendance', 'select=id,date,status,note&order=date.desc&limit=69', 'attendance'],
   ['calendar', 'calendar_events', 'select=id,title,description,event_date,start_time,end_time,location,category&order=event_date.asc&limit=69', 'the calendar'],
   ['announcements', 'announcements', 'select=id,title,body,created_at&order=created_at.desc&limit=69', 'announcements'],
   ['messages', 'messages', 'select=id,subject,body,created_at,read,sender_id,recipient_id&order=created_at.desc&limit=69', 'messages'],
   ['portfolio', 'portfolio_items', 'select=id,title,description,link,kind,created_at&order=created_at.desc', 'your portfolio'],
   ['checkins', 'checkins', 'select=id,mood,note,date&order=date.desc&limit=69', 'check-ins'],
-  ['behaviorNotes', 'behavior_notes', 'select=id,kind,notes,date&order=date.desc&limit=69', 'behavior notes'],
+  ['behaviorNotes', 'behavior_notes', 'select=id,kind,notes,date,students(first_name,last_name)&order=date.desc&limit=69', 'behavior notes'],
   ['detentions', 'detentions', 'select=id,reason,strike_count,scheduled_date,status,notes&order=scheduled_date.desc', 'detentions'],
   ['reportCards', 'report_cards', 'select=id,class_id,term,grade_pct,letter,comment,published,updated_at&order=updated_at.desc', 'report cards'],
   ['assessments', 'assessments', 'select=id,title,kind,instructions,due_at,time_limit_minutes,published,grammar_check_enabled,assignment_id,class_id,classes(name)&order=due_at.desc&limit=69', 'assessments'],
   ['discussions', 'discussions', 'select=id,title,prompt,due_date,required_replies,graded,points_possible,closed,assignment_id,class_id,classes(name),created_at&order=created_at.desc&limit=69', 'discussions'],
   ['fileUploads', 'file_uploads', 'select=id,title,file_name,mime_type,size_bytes,storage_path,audience,created_at,uploaded_by,class_id,classes(name)&order=created_at.desc&limit=69', 'class files'],
   ['enrollments', 'enrollments', 'select=id,student_id,class_id,students(id,first_name,last_name,grade_level,student_number)&order=class_id.asc', 'class rosters'],
-  ['assignmentSubmissions', 'assignment_submissions', 'select=id,assignment_id,submitted_at,status&order=submitted_at.desc&limit=69', 'assignment submissions'],
+  ['assignmentSubmissions', 'assignment_submissions', 'select=id,assignment_id,submitted_at,status,body,teacher_note,file_upload_id,file_uploads(id,file_name,storage_path)&order=submitted_at.desc&limit=69', 'assignment submissions'],
   ['assessmentSubmissions', 'assessment_submissions', 'select=id,auto_score,manual_score,total_points,submitted_at,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc&limit=69', 'assessment submissions'],
 ];
 
@@ -357,16 +361,40 @@ export function nextTempId() {
  * silent refresh() replaces the whole array with the server's authoritative
  * rows (the temp row is never merged in, just naturally superseded); on
  * failure the temp row is rolled back and the error re-thrown for the
- * caller to surface however fits its UI.
+ * caller to surface however fits its UI. With `returnId`, resolves to the
+ * new row's server-side id once the insert lands.
  */
-export async function optimisticInsert(field, row, table, apiBody) {
+export async function optimisticInsert(field, row, table, apiBody, { returnId = false } = {}) {
   state.data[field] = [row, ...state.data[field]];
   notify();
   try {
-    await api.insertRow(table, apiBody);
+    const id = await api.insertRow(table, apiBody, { returnId });
     await refresh();
+    return id;
   } catch (err) {
     state.data[field] = state.data[field].filter((r) => r.id !== row.id);
+    notify();
+    throw err;
+  }
+}
+
+/** The delete counterpart of optimisticInsert: drops the row locally at
+ * once, deletes it on the server, then reconciles with a silent refresh().
+ * On failure the row goes back where it was and the error is re-thrown. */
+export async function optimisticDelete(field, id, table) {
+  const index = state.data[field].findIndex((r) => r.id === id);
+  if (index === -1) return;
+  const row = state.data[field][index];
+  state.data[field] = state.data[field].filter((r) => r.id !== id);
+  clampSelection();
+  notify();
+  try {
+    await api.deleteRow(table, id);
+    await refresh();
+  } catch (err) {
+    const rows = state.data[field].filter((r) => r.id !== id);
+    rows.splice(Math.min(index, rows.length), 0, row);
+    state.data[field] = rows;
     notify();
     throw err;
   }
@@ -445,6 +473,19 @@ export function setGradeTarget(classId, pct) {
   } catch {
     // best-effort; falls back to the default target next load
   }
+  notify();
+}
+
+/** Stores a class's What if entry without re-rendering: the What if inputs
+ * patch their own results in place, and a notify() (which rebuilds the whole
+ * tab) would pull focus out of the field being typed in. */
+export function setWhatIf(classId, entry) {
+  state.whatIf = { ...state.whatIf, [classId]: entry };
+}
+
+/** Empties a class's What if scores, leaving its panel open. */
+export function clearWhatIf(classId) {
+  state.whatIf = { ...state.whatIf, [classId]: { open: true } };
   notify();
 }
 

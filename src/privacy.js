@@ -6,19 +6,27 @@ browser or click through their pages. Here's exactly what each tab touches:
 READS ONLY
   Overview       -> assignments (due dates, class), announcements (latest)
   Classes        -> classes (name, subject, period, room, teacher)
-  Grades         -> grades, joined with assignments (points, due dates)
+  Grades         -> grades (points, teacher comments), joined with assignments
   Assignments    -> assignments (all, joined class name)
   Attendance     -> attendance (date, status, notes)
   Calendar       -> calendar_events
   Announcements  -> announcements (title, body, timestamp)
   Messages       -> messages (subject, body, sender/recipient, read state)
   Me             -> hero_profiles, portfolio_items, checkins
+  Quizzes        -> question text for quizzes you've already submitted,
+                    from Meraki's own app server (meraki-education.app)
 
 WRITES (real rows, visible to staff exactly like the website)
   Messages [n]   -> inserts into messages. The recipient sees it the same
                     way they would a message sent from the site.
+  Notify         -> with "Notify the teacher" ticked, asks Meraki's app to
+                    notify the recipient, as the site does on every send.
   Me [n]         -> inserts into checkins. Same table counselors/admins
                     can see through the site.
+  Portfolio      -> inserts into portfolio_items, and deletes the items
+                    you added yourself.
+  Log in         -> inserts a login_events row, exactly as the site does
+                    every time you sign in.
 
 Transparency goes both ways: staff also keep records about you that the
 official site doesn't put front and center. This client surfaces the ones
@@ -57,7 +65,10 @@ If you're using the self-hosted web version of this client: your email and
 password go straight from your browser to Meraki's own Supabase project,
 the same place the official site sends them. The server hosting this page
 only ever serves the static files you're looking at right now — it never
-sees your password, your session token, or anything you type.
+sees your password, your session token, or anything you type. Quiz
+questions and "Notify the teacher" go to Meraki's own app server
+(meraki-education.app) with your session token, the same way the
+official site calls it.
 `;
 
 function classifyParagraph(firstLine) {

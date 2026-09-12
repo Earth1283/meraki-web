@@ -1,6 +1,6 @@
 import { el, clear, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
-import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setCalendarViewMonth, setCalendarSelectedDate, openReminderForm, removeCalendarReminder, addCalendarReminder, rowKindsForCurrentTab } from './state.js';
+import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setWhatIf, clearWhatIf, setCalendarViewMonth, setCalendarSelectedDate, openReminderForm, removeCalendarReminder, addCalendarReminder, rowKindsForCurrentTab } from './state.js';
 import { tabTitle, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs, emptyState, renderAttendanceTally } from './rows.js';
 import { renderAnalyticsTab, chartModeToggle, mountAnalyticsCharts, disposeAnalyticsCharts } from './analytics.js';
 import { renderCalendarGrid, calendarViewToggle } from './calendar.js';
@@ -129,7 +129,10 @@ function renderToolbar() {
     actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openCompose(), text: t('toolbar.newMessage') }));
   }
   if (state.tab === 'me') {
-    actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openOverlay('checkin'), text: t('toolbar.checkIn') }));
+    actions.push(
+      el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('portfolio.addTitle'), title: t('portfolio.addTitle'), onclick: () => openOverlay('portfolio') }, [svgIcon(iconPaths('plus'))]),
+      el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openOverlay('checkin'), text: t('toolbar.checkIn') }),
+    );
   }
   if (state.tab === 'analytics') {
     actions.push(chartModeToggle(state.config, (chartMode) => setConfig({ chartMode })));
@@ -334,7 +337,7 @@ function renderBody() {
   }
 
   if (state.tab === 'analytics') {
-    const node = renderAnalyticsTab(state.data, state.config, state.gradeTargets, setGradeTarget);
+    const node = renderAnalyticsTab(state.data, state.config, state.gradeTargets, setGradeTarget, { get: () => state.whatIf, set: setWhatIf, clear: clearWhatIf });
     body.appendChild(node);
     if (state.config.chartMode === 'echarts') mountAnalyticsCharts(node, { dark: isDarkTheme() });
     return;
@@ -367,6 +370,7 @@ function renderBody() {
       onPickScale: (x, y) => openContextMenu(x, y, GRADING_SCALES.map((scale) => ({
         icon: scale === state.config.gradingScale ? 'check' : null,
         label: t(`grade.scale.${scale}`),
+        hint: t(`grade.scale.${scale}.hint`),
         action: () => setConfig({ gradingScale: scale }),
       }))),
     }));
