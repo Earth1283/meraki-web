@@ -8,8 +8,10 @@ import { seededRandom, sketchBox, sketchLine, sketchTick, sketchSvg } from './sk
 import { GRADING_SCALES, overallGrade } from './grading.js';
 import { iconPaths } from './icons.js';
 import { privacyParagraphs } from './privacy.js';
-import { mountLogin, renderOverlay, renderDetailPanel, showToast, buildLanguageSwitcher } from './overlays.js';
+import { mountLogin, renderOverlay, renderDetailPanel, buildLanguageSwitcher } from './overlays.js';
+import { showToast } from './toast.js';
 import { renderChat } from './chat.js';
+import { renderLoadMore, disconnectLoadMore } from './loadmore.js';
 import { installGlobalKeyboard } from './keyboard.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 import { i18nReady, t, onChange as onLocaleChange } from './i18n.js';
@@ -306,10 +308,14 @@ function renderBody() {
   // background auto-refreshes the user didn't ask for. Save both before the
   // teardown and restore them after the rebuild below.
   const savedScrollTop = body.scrollTop;
-  const focusWasInBody = body.contains(document.activeElement) && document.activeElement !== body;
+  // Focus on the Load more button goes back to the new button, not to the
+  // selected row (which would scroll the list back up to it).
+  const focusWasOnLoadMore = !!document.activeElement?.closest?.('.load-more');
+  const focusWasInBody = body.contains(document.activeElement) && document.activeElement !== body && !focusWasOnLoadMore;
   const focusedSelectedIndex = focusWasInBody ? state.selectedIndex : null;
 
   disposeAnalyticsCharts();
+  disconnectLoadMore();
   clear(body);
   body.classList.toggle('chat-mode', state.tab === 'messages' && state.chatMode);
   const notebook = state.config.style === 'notebook';
@@ -366,7 +372,7 @@ function renderBody() {
     body.appendChild(renderOverviewStats(summary, setTab, {
       notebook,
       draw: freshView,
-      grade: overallGrade(state.data, state.config.gradingScale, summary.avgGradePct),
+      grade: overallGrade(state.data, state.config.gradingScale),
       onPickScale: (x, y) => openContextMenu(x, y, GRADING_SCALES.map((scale) => ({
         icon: scale === state.config.gradingScale ? 'check' : null,
         label: t(`grade.scale.${scale}`),
@@ -522,6 +528,8 @@ function renderBody() {
     }
   }
   body.appendChild(list);
+  const loadMoreNode = renderLoadMore(state.tab, { refocus: focusWasOnLoadMore });
+  if (loadMoreNode) body.appendChild(loadMoreNode);
   body.scrollTop = savedScrollTop;
   if (focusedSelectedIndex !== null) {
     const rows = list.querySelectorAll('.row-item');

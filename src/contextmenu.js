@@ -8,7 +8,9 @@ import { el, svgIcon, clear } from './dom.js';
 import { iconPaths } from './icons.js';
 import { state, openDetailFor, setTab, openCompose } from './state.js';
 import { detailFields } from './rows.js';
-import { showToast, downloadFileUpload, deletePortfolioItem } from './overlays.js';
+import { showToast } from './toast.js';
+import { downloadFileUpload } from './files.js';
+import { deletePortfolioItem } from './portfolio.js';
 import { t } from './i18n.js';
 
 const root = document.getElementById('contextmenu-root');

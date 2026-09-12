@@ -1,0 +1,15 @@
+/* What if calculator, folded under each Analytics class card (whatif.js). */
+.whatif { padding-top: 12px; border-top: 1px solid var(--border); }
+.whatif > summary { display: list-item; width: fit-content; margin-top: 0; cursor: pointer; }
+.whatif > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.whatif-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.whatif-row { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; }
+.whatif-row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+.whatif-input { width: 68px; padding: 5px 7px; font-variant-numeric: tabular-nums; }
+.whatif-category { width: auto; max-width: 9em; padding: 5px 7px; }
+.whatif-of { min-width: 3.2em; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.whatif-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.whatif-result { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.whatif-from { color: var(--text-secondary); font-weight: 500; }
+.whatif-arrow { color: var(--text-muted); }
+.whatif-gpa { font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); }

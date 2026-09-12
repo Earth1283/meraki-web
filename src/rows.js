@@ -2,6 +2,8 @@ import { el, svgIcon } from './dom.js';
 import { t } from './i18n.js';
 import { iconPaths } from './icons.js';
 import { seededRandom, sketchCircle, sketchSpiral, sketchStar, sketchSvg, sketchTallyGroup, tallyGroups } from './sketch.js';
+import { strikeNumber, strikeSlip } from './slips.js';
+import { markCode } from './marks.js';
 
 // Mood/tab labels are looked up live (functions, not module-eval constants)
 // so every call site re-reads them under the current locale on each render.
@@ -227,15 +229,7 @@ export function overviewSummary(data, today = new Date()) {
   const unreadCount = data.messages.filter((m) => m.read === false).length;
   const attendanceToday = data.attendance.find((r) => r.date === todayStr) ?? null;
 
-  const gradedPcts = data.grades
-    .map((g) => {
-      const possible = g.assignments?.points_possible;
-      return g.points_earned != null && possible ? (g.points_earned / possible) * 100 : null;
-    })
-    .filter((p) => p != null);
-  const avgGradePct = gradedPcts.length ? gradedPcts.reduce((sum, p) => sum + p, 0) / gradedPcts.length : null;
-
-  return { dueThisWeek, dueThisWeekTasks, overdueUngraded, unreadCount, attendanceToday, avgGradePct };
+  return { dueThisWeek, dueThisWeekTasks, overdueUngraded, unreadCount, attendanceToday };
 }
 
 /** Index lists of everything scoped to one class, for the class detail
@@ -258,69 +252,6 @@ export function submissionForAssignment(data, assignmentId) {
 
 export function gradeForAssignment(data, assignmentId) {
   return data.grades.find((g) => g.assignment_id === assignmentId) ?? null;
-}
-
-/** What came back on a piece of work, and what was turned in: the grade's
- * comment, the submission's teacher note, and the submission's own text and
- * file. Null for anything but a grade or an assignment, or when there's none
- * of it to show. */
-export function teacherFeedback(target, data) {
-  let grade = null;
-  let assignmentId = null;
-  if (target.kind === 'grade') {
-    grade = data.grades[target.index] ?? null;
-    assignmentId = grade?.assignment_id ?? null;
-  } else if (target.kind === 'assignment') {
-    assignmentId = data.assignments[target.index]?.id ?? null;
-    grade = assignmentId ? gradeForAssignment(data, assignmentId) : null;
-  } else {
-    return null;
-  }
-  const sub = assignmentId ? submissionForAssignment(data, assignmentId) : null;
-  const feedback = {
-    comment: grade?.comment || null,
-    teacherNote: sub?.teacher_note || null,
-    submissionBody: sub?.body || null,
-    submissionFile: sub?.file_uploads?.storage_path ? sub.file_uploads : null,
-  };
-  return Object.values(feedback).some(Boolean) ? feedback : null;
-}
-
-/** A submitted quiz's questions (from Meraki's app, see
- * api.getAssessmentQuestions) paired with your recorded answers, in question
- * order. `choice` is the 0-based option you picked; `isCorrect` stays null
- * until it's graded. The questions carry no answer key, so a wrong answer
- * can't show which option was right. */
-export function quizReview(questions, answers) {
-  const byQuestion = new Map(answers.map((a) => [a.question_id, a]));
-  return [...questions]
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-    .map((q, i) => {
-      const answer = byQuestion.get(q.id) ?? null;
-      return {
-        n: i + 1,
-        prompt: q.prompt ?? '',
-        options: Array.isArray(q.options) ? q.options.map(String) : [],
-        points: q.points ?? null,
-        answered: answer !== null,
-        choice: Number.isInteger(answer?.response?.choice) ? answer.response.choice : null,
-        isCorrect: answer?.is_correct ?? null,
-        pointsAwarded: answer?.points_awarded ?? null,
-        feedback: answer?.feedback || null,
-      };
-    });
-}
-
-/** Which strike this behavior note is, counting from your first (1), or null
- * when it isn't a strike. Rows arrive newest first, so on a shared date the
- * later row is the older one. */
-export function strikeNumber(data, index) {
-  if (data.behaviorNotes[index]?.kind !== 'strike') return null;
-  const order = data.behaviorNotes
-    .map((note, i) => ({ note, i }))
-    .filter(({ note }) => note.kind === 'strike')
-    .sort((a, b) => (a.note.date ?? '').localeCompare(b.note.date ?? '') || b.i - a.i);
-  return order.findIndex(({ i }) => i === index) + 1;
 }
 
 // assessment_submissions has no assignment_id/assessment_id scalar in the
@@ -440,31 +371,6 @@ function itemRow({ leading, title, titleClass = '', pillNode, meta, preview }) {
   return el('div', { class: 'row-item-inner' }, children);
 }
 
-// My Record: a strike filled into a carbon-copy behavior slip, for fun. Same
-// data as the plain row (date, reason), just dressed up as the paperwork.
-function strikeSlip(b, number) {
-  const student = `${b.students?.first_name ?? ''} ${b.students?.last_name ?? ''}`.trim();
-  const line = (label, value, cls = '') =>
-    el('div', { class: `slip-line ${cls}` }, [
-      el('span', { class: 'slip-line-label', text: label }),
-      el('span', { class: 'slip-line-value', text: value || '—' }),
-    ]);
-  return el('div', { class: 'strike-slip' }, [
-    el('div', { class: 'slip-head' }, [
-      el('span', { class: 'slip-heading', text: t('slip.heading') }),
-      el('span', { class: 'slip-no', text: t('slip.number', { n: String(number).padStart(3, '0') }) }),
-    ]),
-    line(t('slip.student'), student),
-    line(t('slip.date'), b.date),
-    line(t('slip.reason'), b.notes, 'slip-reason'),
-    el('div', { class: 'slip-foot' }, [
-      el('span', { class: 'slip-sign', text: t('slip.signature') }),
-      el('span', { class: 'slip-copy', text: t('slip.copy') }),
-    ]),
-    el('span', { class: 'slip-stamp', 'aria-hidden': 'true', text: t('slip.stamp', { n: number }) }),
-  ]);
-}
-
 export function renderItemBody(target, data, ownUserId) {
   switch (target.kind) {
     case 'class': {
@@ -483,7 +389,7 @@ export function renderItemBody(target, data, ownUserId) {
       return itemRow({
         title: a?.title ?? t('field.noAssignment'),
         pillNode: pct != null ? pill(`${pct.toFixed(0)}%`, pctClass(pct)) : null,
-        meta: [`${g.points_earned ?? '-'}/${possible ?? '-'} ${t('unit.pts')}`, g.comment ? t('feedback.hasComment') : null].filter(Boolean).join(' · '),
+        meta: [`${g.points_earned ?? '-'}/${possible ?? '-'} ${t('unit.pts')}`, markCode(g.comment) ? t('feedback.markShort', { mark: markCode(g.comment) }) : g.comment ? t('feedback.hasComment') : null].filter(Boolean).join(' · '),
       });
     }
     case 'assignment': {
@@ -760,7 +666,8 @@ export function detailFields(target, data) {
     case 'grade': {
       const g = data.grades[target.index];
       const a = g.assignments;
-      return { title: a?.title ?? t('field.noAssignment'), fields: [[t('label.score'), `${g.points_earned ?? '-'}/${a?.points_possible ?? '-'}`], [t('label.due'), a?.due_date], [t('label.updated'), g.updated_at]] };
+      const score = g.points_earned == null && markCode(g.comment) ? t('feedback.markShort', { mark: markCode(g.comment) }) : `${g.points_earned ?? '-'}/${a?.points_possible ?? '-'}`;
+      return { title: a?.title ?? t('field.noAssignment'), fields: [[t('label.score'), score], [t('label.due'), a?.due_date], [t('label.updated'), g.updated_at]] };
     }
     case 'assignment': {
       const a = data.assignments[target.index];
@@ -773,7 +680,7 @@ export function detailFields(target, data) {
           [t('label.class'), cls],
           [t('label.due'), a.due_date],
           [t('label.points'), a.points_possible],
-          [t('label.yourScore'), grade?.points_earned != null ? `${grade.points_earned}/${a.points_possible ?? '-'}` : null],
+          [t('label.yourScore'), grade?.points_earned != null ? `${grade.points_earned}/${a.points_possible ?? '-'}` : markCode(grade?.comment) ? t('feedback.markShort', { mark: markCode(grade.comment) }) : null],
           [t('label.category'), a.category],
           [t('label.submissionMode'), a.submission_mode],
           [t('label.submitted'), sub?.submitted_at ? formatDateTime(sub.submitted_at) : null],

@@ -21,7 +21,7 @@ test('mentions the self-hosted trust model', () => {
 });
 
 test('lists every table this client writes to', () => {
-  for (const table of ['messages', 'checkins', 'portfolio_items', 'login_events']) {
+  for (const table of ['messages', 'checkins', 'portfolio_items', 'login_events', 'assignment_submissions', 'file_uploads']) {
     assert.match(DATA_AND_PRIVACY, new RegExp(table));
   }
 });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classGradeStats, targetProjection, applyWhatIf, whatIfCandidates } from '../src/analytics.js';
+import { classGradeStats, targetProjection } from '../src/analytics.js';
 import { i18nReady } from '../src/i18n.js';
 
 await i18nReady;
@@ -82,25 +82,42 @@ test('targetProjection: final when there is no remaining graded work', () => {
   assert.equal(projection.diffFromCurrent, 10);
 });
 
-test('applyWhatIf fills in ungraded work and never overrides a real grade', () => {
-  const data = dataWith(ASSIGNMENTS, GRADES);
-  // a1 is already graded 90/100, so its what-if 0 is ignored; a3 becomes 50/50.
-  const projected = applyWhatIf(data, { c1: { scores: { a1: 0, a3: 50 } } });
-  assert.equal(classGradeStats(projected, 'c1').currentPct, ((90 + 70 + 50) / 250) * 100);
-  assert.equal(data.grades.length, 2, 'the real data is left alone');
+const near = (actual, expected) => Math.abs(actual - expected) < 1e-9;
+
+test('classGradeStats counts marks the way the official site does', () => {
+  const withMark = (comment) => [...GRADES, { id: 'g3', assignment_id: 'a3', points_earned: null, comment, updated_at: '2026-03-01' }];
+  const missing = classGradeStats(dataWith(ASSIGNMENTS, withMark('MARK:M')), 'c1');
+  assert.ok(near(missing.currentPct, (160 / 250) * 100), 'missing counts as zero');
+  assert.equal(missing.remainingPossible, 0);
+  const excused = classGradeStats(dataWith(ASSIGNMENTS, withMark('MARK:EX')), 'c1');
+  assert.equal(excused.currentPct, 80, 'excused drops out');
+  assert.equal(excused.remainingPossible, 0);
+  assert.equal(targetProjection(excused, 90).status, 'final');
+  const late = classGradeStats(dataWith(ASSIGNMENTS, withMark('MARK:L')), 'c1');
+  assert.ok(near(late.currentPct, (185 / 250) * 100), 'late is half credit');
 });
 
-test('applyWhatIf can add one more assignment to a class', () => {
-  const projected = applyWhatIf(dataWith(ASSIGNMENTS, GRADES), { c1: { extra: { earned: 40, possible: 50 } } });
-  assert.equal(classGradeStats(projected, 'c1').currentPct, ((90 + 70 + 40) / 250) * 100);
+test('classGradeStats adds extra credit without adding to what is possible', () => {
+  const assignments = [
+    ...ASSIGNMENTS,
+    { id: 'a5', class_id: 'c1', category: 'Extra credit', points_possible: 10 },
+    { id: 'a6', class_id: 'c1', category: 'Extra credit', points_possible: 10 },
+  ];
+  const stats = classGradeStats(dataWith(assignments, [...GRADES, { id: 'g5', assignment_id: 'a5', points_earned: 10, updated_at: '2026-03-01' }]), 'c1');
+  assert.ok(near(stats.currentPct, 85));
+  assert.equal(stats.gradedPossible, 200);
+  assert.equal(stats.remainingPossible, 50, 'ungraded extra credit is not remaining work');
 });
 
-test('applyWhatIf ignores blank scores and an extra assignment worth nothing', () => {
-  const data = dataWith(ASSIGNMENTS, GRADES);
-  const projected = applyWhatIf(data, { c1: { scores: { a3: null }, extra: { earned: 5, possible: 0 } } });
-  assert.equal(classGradeStats(projected, 'c1').currentPct, classGradeStats(data, 'c1').currentPct);
-});
-
-test('whatIfCandidates lists only the ungraded assignments in the class', () => {
-  assert.deepEqual(whatIfCandidates(dataWith(ASSIGNMENTS, GRADES), 'c1').map((a) => a.id), ['a3']);
+test('classGradeStats and targetProjection follow a weighted class setup', () => {
+  const classes = [{ id: 'c1', weights: { mode: 'weighted', categories: [{ name: 'Homework', weight: 40 }, { name: 'Tests', weight: 60 }] } }];
+  const data = { ...dataWith(ASSIGNMENTS, GRADES), classes };
+  const stats = classGradeStats(data, 'c1');
+  assert.ok(near(stats.currentPct, 90 * 0.4 + 70 * 0.6));
+  const projection = targetProjection(stats, 75);
+  assert.equal(projection.status, 'onTrack');
+  assert.ok(near(projection.requiredAvgPct, 67.5), String(projection.requiredAvgPct));
+  // Scoring exactly that on the remaining homework lands on the target.
+  const scored = classGradeStats({ ...data, grades: [...GRADES, { id: 'g3', assignment_id: 'a3', points_earned: 50 * 0.675, updated_at: '2026-03-01' }] }, 'c1');
+  assert.ok(near(scored.currentPct, 75), String(scored.currentPct));
 });

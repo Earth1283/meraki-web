@@ -2,6 +2,7 @@
 // the shell's notify() loop — see overlays.js for why.
 import * as api from './api.js';
 import { rowKinds, TAB_IDS } from './rows.js';
+import { PAGE_SIZE, hasMoreRows } from './paging.js';
 import { calendarAgendaKinds } from './calendar.js';
 
 const SIDEBAR_KEY = 'meraki-web.sidebarCollapsed';
@@ -145,7 +146,7 @@ export const state = {
   loadingSteps: [],
   error: null,
   selectedIndex: 0,
-  // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'help' | 'settings' | 'detail' | null
+  // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'turnin' | 'help' | 'settings' | 'detail' | null
   activeOverlay: null,
   // Set by openCompose() to prefill the compose form (e.g. replying to a
   // message from the context menu); consumed once by buildCompose().
@@ -153,6 +154,12 @@ export const state = {
   // Set by openReminderForm() to prefill the add-reminder form's date
   // (e.g. from clicking/right-clicking a day on the calendar grid).
   reminderPrefill: null,
+  // Set by openTurnIn(): the assignment the turn-in overlay is for, whether
+  // its next build should put the cursor in the text box, and the detail
+  // view to go back to once the work is saved.
+  turnInAssignmentId: null,
+  turnInFocus: false,
+  turnInReturn: null,
   detailTarget: null,
   // Stack of targets to return to, most-recent last — lets openSubDetail
   // nest arbitrarily deep (e.g. class -> assignment -> further drill-down)
@@ -173,6 +180,9 @@ export const state = {
   // for the Analytics tab's What if calculator. Not persisted: a what-if is
   // scratch work, and one left over from last week would read as a real grade.
   whatIf: {},
+  // { [field]: { total, full, exhausted, loading, error } } for the fields in
+  // PAGED_FIELDS; see loadMore.
+  pages: {},
   // The Calendar grid's visible month, not persisted — always opens on
   // today's month rather than remembering wherever it was last navigated to.
   calendarViewMonth: (() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })(),
@@ -222,7 +232,7 @@ export function doLogout() {
   Object.assign(state, {
     tab: 'overview', data: emptyData(), ownUserId: '', ownStudentId: null,
     loading: true, hasLoadedOnce: false, status: 'Loading…', error: null, selectedIndex: 0,
-    activeOverlay: null, detailTarget: null, detailBackStack: [], whatIf: {},
+    activeOverlay: null, detailTarget: null, detailBackStack: [], whatIf: {}, pages: {},
   });
   notify();
 }
@@ -246,11 +256,17 @@ export function resetConfig() {
   notify();
 }
 
+// Grades, attendance and both submission tables load a page at a time (see
+// loadMore), so their queries below carry no limit of their own. A refresh
+// re-fetches as many rows as are already loaded, so pages pulled in by
+// scrolling don't vanish on the next auto-refresh.
+const PAGED_FIELDS = ['grades', 'attendance', 'assignmentSubmissions', 'assessmentSubmissions'];
+
 const TABLES = [
-  ['classes', 'classes', 'select=id,name,subject,period,room,term,teacher_id,teacher_name&order=period.asc', 'your classes'],
+  ['classes', 'classes', 'select=id,name,subject,period,room,term,teacher_id,teacher_name,weights&order=period.asc', 'your classes'],
   ['assignments', 'assignments', 'select=id,title,category,due_date,points_possible,description,submission_mode,class_id,classes(name)&order=due_date.asc', 'assignments'],
-  ['grades', 'grades', 'select=id,points_earned,comment,updated_at,assignment_id,assignments(title,points_possible,due_date,class_id)&order=updated_at.desc&limit=69', 'grades'],
-  ['attendance', 'attendance', 'select=id,date,status,note&order=date.desc&limit=69', 'attendance'],
+  ['grades', 'grades', 'select=id,points_earned,comment,updated_at,assignment_id,assignments(title,points_possible,due_date,class_id)&order=updated_at.desc', 'grades'],
+  ['attendance', 'attendance', 'select=id,date,status,note&order=date.desc', 'attendance'],
   ['calendar', 'calendar_events', 'select=id,title,description,event_date,start_time,end_time,location,category&order=event_date.asc&limit=69', 'the calendar'],
   ['announcements', 'announcements', 'select=id,title,body,created_at&order=created_at.desc&limit=69', 'announcements'],
   ['messages', 'messages', 'select=id,subject,body,created_at,read,sender_id,recipient_id&order=created_at.desc&limit=69', 'messages'],
@@ -263,8 +279,8 @@ const TABLES = [
   ['discussions', 'discussions', 'select=id,title,prompt,due_date,required_replies,graded,points_possible,closed,assignment_id,class_id,classes(name),created_at&order=created_at.desc&limit=69', 'discussions'],
   ['fileUploads', 'file_uploads', 'select=id,title,file_name,mime_type,size_bytes,storage_path,audience,created_at,uploaded_by,class_id,classes(name)&order=created_at.desc&limit=69', 'class files'],
   ['enrollments', 'enrollments', 'select=id,student_id,class_id,students(id,first_name,last_name,grade_level,student_number)&order=class_id.asc', 'class rosters'],
-  ['assignmentSubmissions', 'assignment_submissions', 'select=id,assignment_id,submitted_at,status,body,teacher_note,file_upload_id,file_uploads(id,file_name,storage_path)&order=submitted_at.desc&limit=69', 'assignment submissions'],
-  ['assessmentSubmissions', 'assessment_submissions', 'select=id,auto_score,manual_score,total_points,submitted_at,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc&limit=69', 'assessment submissions'],
+  ['assignmentSubmissions', 'assignment_submissions', 'select=id,assignment_id,submitted_at,status,body,teacher_note,file_upload_id,file_uploads(id,file_name,storage_path)&order=submitted_at.desc', 'assignment submissions'],
+  ['assessmentSubmissions', 'assessment_submissions', 'select=id,auto_score,manual_score,total_points,submitted_at,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc', 'assessment submissions'],
 ];
 
 // refresh() awaits these in order (each group's fields still fetched in
@@ -310,15 +326,24 @@ export async function refresh() {
       notify();
     }
 
+    const pagedLimit = (field) => Math.max(PAGE_SIZE, state.data[field].length);
     const results = await Promise.allSettled(group.fields.map((field) => {
       const [, table, query] = tableByField.get(field);
-      return api.getTable(table, query);
+      if (!PAGED_FIELDS.includes(field)) return api.getTable(table, query);
+      return api.getTablePage(table, query, { limit: pagedLimit(field) });
     }));
     results.forEach((r, i) => {
       const field = group.fields[i];
       const [, , , label] = tableByField.get(field);
-      if (r.status === 'fulfilled') state.data[field] = r.value;
-      else record(api.friendlyLoadError(label, r.reason));
+      if (r.status !== 'fulfilled') {
+        record(api.friendlyLoadError(label, r.reason));
+      } else if (PAGED_FIELDS.includes(field)) {
+        const full = r.value.rows.length >= pagedLimit(field);
+        state.data[field] = r.value.rows;
+        state.pages[field] = { ...state.pages[field], total: r.value.total, full, exhausted: false, error: null };
+      } else {
+        state.data[field] = r.value;
+      }
     });
 
     if (group.id === 'extras') {
@@ -347,6 +372,29 @@ export async function refresh() {
   clampSelection();
   notify();
   if (expired) doLogout();
+}
+
+/** Fetches the next page of a paged field and appends it. Rows already
+ * loaded are skipped: a row added (or re-graded, for grades) since the last
+ * page shifts every later offset. A page that adds nothing marks the field
+ * exhausted until the next refresh, so scrolling can't loop on it. */
+export async function loadMore(field) {
+  const page = state.pages[field];
+  if (!PAGED_FIELDS.includes(field) || page?.loading) return;
+  if (!page?.error && !hasMoreRows(state.data[field].length, page)) return;
+  const [, table, query, label] = TABLES.find(([f]) => f === field);
+  state.pages[field] = { ...page, loading: true, error: null };
+  notify();
+  try {
+    const { rows, total } = await api.getTablePage(table, query, { offset: state.data[field].length, limit: PAGE_SIZE });
+    const loaded = new Set(state.data[field].map((r) => r.id));
+    const added = rows.filter((r) => !loaded.has(r.id));
+    state.data[field] = [...state.data[field], ...added];
+    state.pages[field] = { total, full: rows.length >= PAGE_SIZE, exhausted: added.length === 0, loading: false, error: null };
+  } catch (err) {
+    state.pages[field] = { ...state.pages[field], loading: false, error: api.friendlyLoadError(label, err) };
+  }
+  notify();
 }
 
 let tempSeq = 0;
@@ -591,5 +639,15 @@ export function openCompose(prefill = null) {
 export function openReminderForm(prefillDate = null) {
   state.reminderPrefill = prefillDate;
   state.activeOverlay = 'reminder';
+  notify();
+}
+
+/** Opens the turn-in overlay for an assignment (see turnin.js), coming back
+ * to the detail view it was opened from once the work is saved. */
+export function openTurnIn(assignmentId) {
+  state.turnInAssignmentId = assignmentId;
+  state.turnInFocus = true;
+  state.turnInReturn = state.activeOverlay === 'detail' ? state.detailTarget : null;
+  state.activeOverlay = 'turnin';
   notify();
 }

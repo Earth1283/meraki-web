@@ -44,8 +44,11 @@ jobs:
       - name: Install pake-cli
         run: npm install -g pake-cli
 
+      # The icon is the deployed site's own (src/assets/icon-512.png), so run
+      # this after the Pages deploy that ships it. Pake converts it to each
+      # platform's format.
       - name: Build installer with Pake
-        run: pake "$APP_URL" --name "$APP_NAME"
+        run: pake "$APP_URL" --name "$APP_NAME" --icon "${APP_URL}src/assets/icon-512.png"
         env:
           APP_URL: ${{ env.APP_URL }}
           APP_NAME: ${{ env.APP_NAME }}

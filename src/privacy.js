@@ -15,6 +15,8 @@ READS ONLY
   Me             -> hero_profiles, portfolio_items, checkins
   Quizzes        -> question text for quizzes you've already submitted,
                     from Meraki's own app server (meraki-education.app)
+  Your work      -> what you turned in, and your teacher's marks on it
+                    (assignment_submissions, submission_annotations)
 
 WRITES (real rows, visible to staff exactly like the website)
   Messages [n]   -> inserts into messages. The recipient sees it the same
@@ -25,6 +27,10 @@ WRITES (real rows, visible to staff exactly like the website)
                     can see through the site.
   Portfolio      -> inserts into portfolio_items, and deletes the items
                     you added yourself.
+  Turn in        -> uploads your file to school-files storage, adds its
+                    file_uploads row, then updates or inserts your
+                    assignment_submissions row: the same writes the site
+                    makes when you turn work in or save progress.
   Log in         -> inserts a login_events row, exactly as the site does
                     every time you sign in.
 

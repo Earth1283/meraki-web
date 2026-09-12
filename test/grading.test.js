@@ -57,29 +57,42 @@ const ASSIGNMENTS = [
   { id: 'a3', class_id: 'c3', points_possible: 10 }, // ungraded: c3 stays out of the average
 ];
 const GRADES = [
-  { id: 'g1', assignment_id: 'a1', points_earned: 90 },
-  { id: 'g2', assignment_id: 'a2', points_earned: 16 },
+  { id: 'g1', assignment_id: 'a1', points_earned: 90, assignments: { points_possible: 100 } },
+  { id: 'g2', assignment_id: 'a2', points_earned: 16, assignments: { points_possible: 20 } },
 ];
 
-test('overallGrade averages graded classes and grades each class on its own for the GPA', () => {
+const near = (actual, expected) => Math.abs(actual - expected) < 1e-9;
+
+test('overallGrade takes the official dashboard percentage and averages class grades for the GPA', () => {
   const data = dataWith(CLASSES, ASSIGNMENTS, GRADES); // c1 90%, c2 80%
 
   const standard = overallGrade(data, 'standard');
-  assert.equal(standard.pct, 85);
-  assert.equal(standard.letter, 'B+');
+  // 106 of 120 points across both classes, as the official dashboard counts it.
+  assert.ok(near(standard.pct, (106 / 120) * 100));
+  assert.equal(standard.letter, 'A-');
   assert.equal(standard.classCount, 2);
-  assert.ok(Math.abs(standard.gpa - 3.35) < 1e-9, 'A- (3.7) and B (3.0)');
+  assert.ok(near(standard.gpa, 3.35), 'A- (3.7) and B (3.0)');
 
   const legacy = overallGrade(data, 'legacy');
-  assert.equal(legacy.letter, 'B');
-  assert.ok(Math.abs(legacy.gpa - 3.2) < 1e-9, 'A- (3.7) and B- (2.7)');
+  assert.equal(legacy.letter, 'B+');
+  assert.ok(near(legacy.gpa, 3.2), 'A- (3.7) and B- (2.7)');
 });
 
-test('overallGrade falls back to a letter-only grade, or null, when no class can be graded', () => {
-  const ungraded = dataWith(CLASSES, ASSIGNMENTS, []);
-  assert.equal(overallGrade(ungraded, 'standard'), null);
-  const fallback = overallGrade(ungraded, 'legacy', 78);
-  assert.equal(fallback.letter, 'C+');
-  assert.equal(fallback.gpa, null);
-  assert.equal(fallback.scale, 'legacy');
+test('overallGrade leaves marks out of the percentage but counts them in the class grades behind the GPA', () => {
+  const assignments = [...ASSIGNMENTS, { id: 'a4', class_id: 'c2', points_possible: 20 }];
+  const grades = [...GRADES, { id: 'g4', assignment_id: 'a4', points_earned: null, comment: 'MARK:M', assignments: { points_possible: 20 } }];
+  const grade = overallGrade(dataWith(CLASSES, assignments, grades), 'standard');
+  assert.ok(near(grade.pct, (106 / 120) * 100));
+  // c2 is now 16 of 40 (40%, an F), so the GPA is A- (3.7) and F (0).
+  assert.ok(near(grade.gpa, 1.85));
+});
+
+test('overallGrade has no GPA when no class can be graded, and is null with nothing scored', () => {
+  assert.equal(overallGrade(dataWith(CLASSES, ASSIGNMENTS, []), 'standard'), null);
+  const unloaded = overallGrade(dataWith(CLASSES, [], [{ id: 'g1', assignment_id: 'gone', points_earned: 39, assignments: { points_possible: 50 } }]), 'legacy');
+  assert.ok(near(unloaded.pct, 78));
+  assert.equal(unloaded.letter, 'C+');
+  assert.equal(unloaded.gpa, null);
+  assert.equal(unloaded.classCount, 0);
+  assert.equal(unloaded.scale, 'legacy');
 });

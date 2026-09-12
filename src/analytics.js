@@ -1,53 +1,73 @@
-import { el, svgIcon, clear } from './dom.js';
+import { el, svgIcon } from './dom.js';
 import { t } from './i18n.js';
 import { pctClass, pill, emptyState, gradeCircle } from './rows.js';
 import { seededRandom, sketchArrow, sketchSvg } from './sketch.js';
 import { iconPaths } from './icons.js';
-import { letterGrade, overallGrade } from './grading.js';
+import { renderWhatIf, renderWhatIfGpa } from './whatif.js';
+import { gradeSetup, classPercent, countedPoints, isExtraCredit } from './gradebook.js';
+import { markCode } from './marks.js';
 
 export const DEFAULT_TARGET_PCT = 90;
 
+/** A class's grade and what feeds it, worked out the way the official site
+ * does (see gradebook.js). `lowPct` and `highPct` are where the grade ends up
+ * if every ungraded assignment scores nothing or full marks; the target
+ * projection works from those. Ungraded extra credit isn't work anyone has
+ * to do, so it's left out of both. */
 export function classGradeStats(data, classId) {
+  const setup = gradeSetup(data.classes.find((c) => c.id === classId)?.weights);
   const assignments = data.assignments.filter((a) => a.class_id === classId && a.points_possible != null);
-  const gradeFor = (assignmentId) => data.grades.find((g) => g.assignment_id === assignmentId && g.points_earned != null) ?? null;
+  // A grade counts once it has points or a mark. What-if grades come after
+  // the real ones, so a real grade always wins.
+  const gradeFor = (assignmentId) => data.grades.find((g) => g.assignment_id === assignmentId && (g.points_earned != null || markCode(g.comment))) ?? null;
 
+  const graded = [];
+  const remaining = [];
   let earnedPoints = 0;
   let gradedPossible = 0;
   let remainingPossible = 0;
   const categoryTotals = new Map();
-  const trendEntries = [];
 
   for (const a of assignments) {
     const g = gradeFor(a.id);
+    const entry = { category: a.category, pointsPossible: Number(a.points_possible), pointsEarned: g?.points_earned == null ? null : Number(g.points_earned), markCode: markCode(g?.comment) };
     if (!g) {
-      remainingPossible += a.points_possible;
+      if (!isExtraCredit(a.category)) {
+        remaining.push(entry);
+        remainingPossible += entry.pointsPossible;
+      }
       continue;
     }
-    earnedPoints += g.points_earned;
-    gradedPossible += a.points_possible;
+    const earned = countedPoints(entry, setup.marks);
+    // Excused: it counts for nothing, now or later.
+    if (earned == null) continue;
+    graded.push({ entry, date: g.updated_at });
+    earnedPoints += earned;
+    if (!isExtraCredit(a.category)) gradedPossible += entry.pointsPossible;
     const cat = a.category || t('label.category');
     const totals = categoryTotals.get(cat) ?? { earned: 0, possible: 0 };
-    totals.earned += g.points_earned;
-    totals.possible += a.points_possible;
+    totals.earned += earned;
+    totals.possible += entry.pointsPossible;
     categoryTotals.set(cat, totals);
-    trendEntries.push({ date: g.updated_at, earned: g.points_earned, possible: a.points_possible });
   }
 
-  trendEntries.sort((x, y) => (x.date ?? '').localeCompare(y.date ?? ''));
-  let runEarned = 0;
-  let runPossible = 0;
-  const trend = trendEntries.map((e) => {
-    runEarned += e.earned;
-    runPossible += e.possible;
-    return { date: e.date, pct: (runEarned / runPossible) * 100 };
-  });
+  const entries = graded.map((g) => g.entry);
+  graded.sort((x, y) => (x.date ?? '').localeCompare(y.date ?? ''));
+  const trend = graded
+    .map((g, i) => ({ date: g.date, pct: classPercent(graded.slice(0, i + 1).map((x) => x.entry), setup) }))
+    .filter((point) => point.pct != null);
 
   const categoryBreakdown = [...categoryTotals.entries()]
+    .filter(([, { possible }]) => possible > 0)
     .map(([category, { earned, possible }]) => ({ category, earned, possible, pct: (earned / possible) * 100 }))
     .sort((a, b) => a.category.localeCompare(b.category));
 
+  const currentPct = classPercent(entries, setup);
+  const withRemainingAt = (share) => classPercent([...entries, ...remaining.map((e) => ({ ...e, pointsEarned: e.pointsPossible * share }))], setup);
   return {
-    currentPct: gradedPossible > 0 ? (earnedPoints / gradedPossible) * 100 : null,
+    currentPct,
+    lowPct: remaining.length ? withRemainingAt(0) : currentPct,
+    highPct: remaining.length ? withRemainingAt(1) : currentPct,
     earnedPoints,
     gradedPossible,
     remainingPossible,
@@ -57,53 +77,19 @@ export function classGradeStats(data, classId) {
   };
 }
 
+/** What it takes to reach `targetPct`: the average needed on the remaining
+ * work, or whether the target is already locked in or out of reach. The
+ * grade moves in a straight line between the remaining work scoring nothing
+ * (lowPct) and full marks (highPct), in weighted classes too. */
 export function targetProjection(stats, targetPct) {
-  const { earnedPoints, gradedPossible, remainingPossible, currentPct } = stats;
+  const { currentPct, remainingPossible, lowPct, highPct } = stats;
   const diffFromCurrent = currentPct != null ? targetPct - currentPct : null;
-
-  if (remainingPossible <= 0) {
-    return { status: 'final', diffFromCurrent, requiredAvgPct: null, maxAchievablePct: currentPct };
+  if (remainingPossible <= 0 || lowPct == null || highPct == null || highPct <= lowPct) {
+    return { status: 'final', diffFromCurrent, requiredAvgPct: null, maxAchievablePct: highPct ?? currentPct };
   }
-
-  const totalPossible = gradedPossible + remainingPossible;
-  const requiredAvgPct = ((targetPct / 100) * totalPossible - earnedPoints) / remainingPossible * 100;
-  const maxAchievablePct = ((earnedPoints + remainingPossible) / totalPossible) * 100;
-
+  const requiredAvgPct = ((targetPct - lowPct) / (highPct - lowPct)) * 100;
   const status = requiredAvgPct <= 0 ? 'guaranteed' : requiredAvgPct > 100 ? 'unreachable' : 'onTrack';
-  return { status, diffFromCurrent, requiredAvgPct, maxAchievablePct };
-}
-
-/** A class's assignments with no grade yet: the ones a What if score can
- * stand in for. */
-export function whatIfCandidates(data, classId) {
-  return data.assignments.filter(
-    (a) => a.class_id === classId && a.points_possible != null && !data.grades.some((g) => g.assignment_id === a.id && g.points_earned != null),
-  );
-}
-
-/** `data` as if every What if score were a real grade: scores fill in
- * ungraded assignments (a real grade always wins), and a class's `extra`
- * adds one more graded assignment. Feed the result to classGradeStats or
- * overallGrade to see where things would land. */
-export function applyWhatIf(data, whatIf = {}) {
-  const assignments = [...data.assignments];
-  const grades = [...data.grades];
-  for (const [classId, entry] of Object.entries(whatIf)) {
-    for (const [assignmentId, points] of Object.entries(entry?.scores ?? {})) {
-      if (Number.isFinite(points)) grades.push({ id: `what-if:${assignmentId}`, assignment_id: assignmentId, points_earned: points, updated_at: null });
-    }
-    const extra = entry?.extra;
-    if (Number.isFinite(extra?.earned) && Number.isFinite(extra?.possible) && extra.possible > 0) {
-      const id = `what-if-extra:${classId}`;
-      assignments.push({ id, class_id: classId, title: null, category: null, points_possible: extra.possible });
-      grades.push({ id, assignment_id: id, points_earned: extra.earned, updated_at: null });
-    }
-  }
-  return { ...data, assignments, grades };
-}
-
-function hasWhatIfScores(entry) {
-  return Object.values(entry?.scores ?? {}).some(Number.isFinite) || (Number.isFinite(entry?.extra?.earned) && entry.extra.possible > 0);
+  return { status, diffFromCurrent, requiredAvgPct, maxAchievablePct: highPct };
 }
 
 function projectionMessage(stats, projection, targetPct) {
@@ -271,87 +257,6 @@ function renderClassCard(cls, data, config, targets, onTargetChange, whatIf, upd
   ]);
 }
 
-function whatIfInput(value, onInput, attrs = {}) {
-  return el('input', {
-    class: 'field-input whatif-input',
-    type: 'number',
-    min: '0',
-    step: 'any',
-    inputmode: 'decimal',
-    value: Number.isFinite(value) ? String(value) : undefined,
-    oninput: (e) => {
-      const n = e.target.value === '' ? null : Number(e.target.value);
-      onInput(Number.isFinite(n) ? n : null);
-    },
-    ...attrs,
-  });
-}
-
-function gradeLabel(pct, scale) {
-  if (pct == null) return '—';
-  return `${pct.toFixed(1)}% (${letterGrade(pct, scale).letter})`;
-}
-
-// What if: type a score for any ungraded assignment (or add one more
-// assignment) and watch the class grade move. The inputs write through
-// whatIf.set, which doesn't re-render; instead every result line on the tab
-// is patched in place through the shared `updaters` (the GPA line depends on
-// every class's what-ifs, not just the one being edited).
-function renderWhatIf(cls, data, config, whatIf, updaters) {
-  const scale = config.gradingScale;
-  const entryNow = () => whatIf.get()[cls.id] ?? {};
-  const update = (patch) => {
-    const entry = entryNow();
-    whatIf.set(cls.id, { ...entry, ...patch(entry) });
-    updaters.forEach((fn) => fn());
-  };
-
-  const result = el('div', { class: 'whatif-result', 'aria-live': 'polite' });
-  updaters.push(() => {
-    clear(result);
-    const entry = entryNow();
-    if (!hasWhatIfScores(entry)) {
-      result.append(el('span', { class: 'analytics-empty-note', text: t('analytics.whatIfEmpty') }));
-      return;
-    }
-    const before = classGradeStats(data, cls.id).currentPct;
-    const after = classGradeStats(applyWhatIf(data, { [cls.id]: entry }), cls.id).currentPct;
-    result.append(
-      el('span', { class: 'whatif-from', text: gradeLabel(before, scale) }),
-      el('span', { class: 'whatif-arrow', 'aria-hidden': 'true', text: '→' }),
-      el('span', { class: `whatif-to text-${pctClass(after)}`, text: gradeLabel(after, scale) }),
-    );
-  });
-
-  const rows = whatIfCandidates(data, cls.id).map((a) =>
-    el('label', { class: 'whatif-row' }, [
-      el('span', { class: 'whatif-row-label', text: a.title, title: a.title }),
-      whatIfInput(entryNow().scores?.[a.id], (points) => update((e) => ({ scores: { ...e.scores, [a.id]: points } })), { 'aria-label': a.title }),
-      el('span', { class: 'whatif-of', text: `/ ${a.points_possible}` }),
-    ]),
-  );
-  rows.push(
-    el('div', { class: 'whatif-row' }, [
-      el('span', { class: 'whatif-row-label', text: t('analytics.whatIfExtra') }),
-      whatIfInput(entryNow().extra?.earned, (earned) => update((e) => ({ extra: { ...e.extra, earned } })), { 'aria-label': t('analytics.whatIfEarned') }),
-      el('span', { class: 'whatif-of', text: '/' }),
-      whatIfInput(entryNow().extra?.possible, (possible) => update((e) => ({ extra: { ...e.extra, possible } })), { 'aria-label': t('analytics.whatIfPossible') }),
-    ]),
-  );
-
-  const entry = entryNow();
-  const details = el('details', { class: 'whatif', open: entry.open || hasWhatIfScores(entry) || undefined }, [
-    el('summary', { class: 'field-label', text: t('analytics.whatIf') }),
-    el('div', { class: 'whatif-list' }, rows),
-    el('div', { class: 'whatif-footer' }, [
-      result,
-      el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => whatIf.clear(cls.id), text: t('analytics.whatIfClear') }),
-    ]),
-  ]);
-  details.addEventListener('toggle', () => whatIf.set(cls.id, { ...entryNow(), open: details.open }));
-  return details;
-}
-
 function renderComparisonCard(data, config, whatIf, updaters) {
   const rows = data.classes
     .map((cls) => ({ label: cls.name, pct: classGradeStats(data, cls.id).currentPct }))
@@ -374,18 +279,7 @@ function renderComparisonCard(data, config, whatIf, updaters) {
   }
 
   // Once What if scores are entered anywhere: the GPA they'd add up to.
-  let gpaLine = null;
-  if (whatIf) {
-    gpaLine = el('div', { class: 'whatif-gpa', 'aria-live': 'polite' });
-    updaters.push(() => {
-      clear(gpaLine);
-      const all = whatIf.get();
-      const before = overallGrade(data, config.gradingScale);
-      const after = Object.values(all).some(hasWhatIfScores) ? overallGrade(applyWhatIf(data, all), config.gradingScale) : null;
-      gpaLine.hidden = before?.gpa == null || after?.gpa == null;
-      if (!gpaLine.hidden) gpaLine.append(t('analytics.whatIfGpa', { from: before.gpa.toFixed(2), to: after.gpa.toFixed(2) }));
-    });
-  }
+  const gpaLine = whatIf ? renderWhatIfGpa(data, config, whatIf, updaters) : null;
 
   return el('div', { class: 'analytics-card' }, [el('div', { class: 'field-label', text: t('analytics.comparison') }), body, gpaLine]);
 }

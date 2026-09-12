@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The highlighter swipe from behind the Meraki wordmark, with a
+       hand-lettered m in the wordmark's ink. -->
+  <path fill="#ffe45e" d="M4.6 5.2C11 4.2 20.5 3.6 27.8 3.9c1.5.1 2.3 1.1 2.2 2.5l-1 19.5c-.1 1.3-1 2.1-2.3 2.2-7.7.5-15.5.8-22.3.2-1.5-.1-2.4-1.1-2.3-2.5L2.9 7c.1-1.1.7-1.7 1.7-1.8Z"/>
+  <path fill="none" stroke="#1b2540" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" d="M9 21.5v-7.6M9 15.9c0-2.6 1.4-4.2 3.5-4.2s3.4 1.6 3.4 4.2v5.6M15.9 15.9c0-2.6 1.4-4.2 3.5-4.2s3.4 1.6 3.4 4.2v5.6"/>
+</svg>

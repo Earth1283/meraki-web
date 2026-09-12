@@ -142,6 +142,24 @@ export async function getTable(table, query) {
   return resp.json();
 }
 
+/** The total row count PostgREST puts after the slash in a Content-Range
+ * header ("0-68/245"), or null when it didn't count ("0-68/*") or sent none. */
+export function parseContentRangeTotal(header) {
+  const match = /\/(\d+)$/.exec(header ?? '');
+  return match ? Number(match[1]) : null;
+}
+
+/** One page of a table query, plus how many rows the whole query matches
+ * (null if the server didn't say). */
+export async function getTablePage(table, query, { offset = 0, limit }) {
+  const resp = await authedFetch(`/rest/v1/${table}?${query}&limit=${limit}&offset=${offset}`, { headers: { Prefer: 'count=exact' } });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error(`GET ${table} failed (${resp.status}): ${body}`);
+  }
+  return { rows: await resp.json(), total: parseContentRangeTotal(resp.headers?.get?.('content-range')) };
+}
+
 /** Inserts one row. With `returnId`, has PostgREST echo the new row back (as
  * the official site does before notifying a message's recipient) and
  * resolves to its id. */
@@ -177,6 +195,22 @@ export async function deleteRow(table, id) {
   if (!Array.isArray(rows) || rows.length === 0) throw new Error(`DELETE ${table} removed nothing`);
 }
 
+// Same for a PATCH: one that row-level security filters out succeeds having
+// changed nothing, so the updated row is asked for back here too.
+export async function updateRow(table, id, body) {
+  const resp = await authedFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&select=id`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`PATCH ${table} failed (${resp.status}): ${text}`);
+  }
+  const rows = await resp.json();
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error(`PATCH ${table} changed nothing`);
+}
+
 // Classroom files live in a private storage bucket; a signed URL (short-lived
 // download token) is the only way to fetch one, and it has to be requested
 // fresh each time — Supabase won't hand out a durable public link for it.
@@ -193,6 +227,23 @@ export async function getSignedFileUrl(storagePath, { bucket = 'school-files', e
   const v = await resp.json();
   if (!v.signedURL) throw new Error('no signedURL in response');
   return `${SUPABASE_URL}/storage/v1${v.signedURL}`;
+}
+
+/** Uploads a file into a storage bucket at `storagePath` the way the official
+ * site does: multipart, and never over an existing file. */
+export async function uploadFile(storagePath, file, { bucket = 'school-files' } = {}) {
+  const form = new FormData();
+  form.append('cacheControl', '3600');
+  form.append('', file);
+  const resp = await authedFetch(`/storage/v1/object/${bucket}/${storagePath}`, {
+    method: 'POST',
+    headers: { 'x-upsert': 'false' },
+    body: form,
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`upload failed (${resp.status}): ${text}`);
+  }
 }
 
 // The captured traffic had its auth headers stripped, so sending the Supabase
@@ -230,6 +281,11 @@ export async function getAssessmentQuestions(assessmentId) {
 // rest of this app's tables are.
 export async function getAssessmentAnswers(submissionId) {
   return getTable('assessment_answers', `select=id,question_id,response,is_correct,points_awarded,feedback,created_at&submission_id=eq.${submissionId}&order=created_at.asc`);
+}
+
+// What a teacher marked up on a turned-in submission, in reading order.
+export async function getSubmissionAnnotations(submissionId) {
+  return getTable('submission_annotations', `select=id,mark_code,mark_symbol,mark_label,excerpt,start_offset,end_offset,comment,created_at&submission_id=eq.${submissionId}&order=start_offset.asc.nullslast`);
 }
 
 /** Asks Meraki's app to notify a message's recipient, as the official site

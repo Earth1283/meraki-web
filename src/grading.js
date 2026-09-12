@@ -9,6 +9,7 @@
 // The GPA is unweighted: every class counts once at its standard-course
 // points. Course levels (honors, AP) aren't in the data yet.
 import { classGradeStats } from './analytics.js';
+import { overallPointsPct } from './gradebook.js';
 
 export const GRADING_SCALES = ['standard', 'legacy'];
 
@@ -45,19 +46,17 @@ export function letterGrade(pct, scale = 'standard') {
   return { letter, points };
 }
 
-/** The Overall grade tile's numbers. Each class's points-based percentage
- * (the one Analytics shows) is graded on its own; the overall percentage is
- * the average of those and gets its own letter, and the GPA averages the
- * classes' grade points. With no class percentage at all (e.g. grades whose
- * assignments aren't loaded), `fallbackPct` still gets a letter, but no GPA.
- * Returns null when there's nothing to grade. */
-export function overallGrade(data, scale = 'standard', fallbackPct = null) {
+/** The Overall grade tile's numbers. The percentage is the official
+ * dashboard's (every scored grade's points over its assignment's points,
+ * see gradebook.overallPointsPct), lettered on `scale`. The GPA averages the
+ * grade points of each class's own grade, the one Analytics shows, so it's
+ * null when no class can be graded (e.g. grades whose assignments aren't
+ * loaded). Returns null when nothing is scored at all. */
+export function overallGrade(data, scale = 'standard') {
   const s = GRADING_SCALES.includes(scale) ? scale : 'standard';
-  const pcts = data.classes.map((c) => classGradeStats(data, c.id).currentPct).filter((p) => p != null);
-  if (pcts.length === 0) {
-    return fallbackPct == null ? null : { pct: fallbackPct, gpa: null, classCount: 0, scale: s, ...letterGrade(fallbackPct, s) };
-  }
-  const pct = pcts.reduce((sum, p) => sum + p, 0) / pcts.length;
-  const gpa = pcts.reduce((sum, p) => sum + letterGrade(p, s).points, 0) / pcts.length;
-  return { pct, gpa, classCount: pcts.length, scale: s, ...letterGrade(pct, s) };
+  const pct = overallPointsPct(data.grades);
+  if (pct == null) return null;
+  const classPcts = data.classes.map((c) => classGradeStats(data, c.id).currentPct).filter((p) => p != null);
+  const gpa = classPcts.length ? classPcts.reduce((sum, p) => sum + letterGrade(p, s).points, 0) / classPcts.length : null;
+  return { pct, gpa, classCount: classPcts.length, scale: s, ...letterGrade(pct, s) };
 }

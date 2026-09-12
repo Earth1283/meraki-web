@@ -2,7 +2,7 @@ import { el, clear, svgIcon } from './dom.js';
 import { state, setActiveThread } from './state.js';
 import { messageThreads, partnerName, initials, dayKey, formatDaySeparator, formatTime12 } from './rows.js';
 import { iconPaths } from './icons.js';
-import { sendMessage } from './overlays.js';
+import { sendMessage } from './messaging.js';
 import { t } from './i18n.js';
 
 // Module-level, not per-call: lets us tell "new message arrived" apart from

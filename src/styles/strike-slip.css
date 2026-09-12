@@ -1,0 +1,57 @@
+/* My Record: strikes as carbon-copy behavior slips (slips.js). */
+.row-item:has(> .strike-slip) { padding: 8px 0; }
+.row-item:has(> .strike-slip)::before { display: none; }
+button.row-item:has(> .strike-slip):hover,
+.row-item.selected:has(> .strike-slip) { background: transparent; }
+.strike-slip {
+  position: relative;
+  padding: 16px 18px 12px;
+  border-radius: 3px;
+  /* A perforated top edge on pink slip paper. */
+  background: radial-gradient(circle at 7px 0, var(--bg) 3px, transparent 3.5px) 0 0 / 14px 8px repeat-x, var(--slip-paper);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+button.row-item:hover > .strike-slip { transform: rotate(-0.4deg); box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.3); }
+.row-item.selected > .strike-slip { box-shadow: 0 0 0 2px var(--focus); }
+.slip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 2px solid var(--bad-text);
+}
+.slip-heading { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bad-text); }
+.slip-no, .slip-line-value { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+.slip-no { font-size: 0.75rem; color: var(--bad-text); }
+.slip-line { display: flex; align-items: baseline; gap: 10px; padding: 4px 0; border-bottom: 1px dotted var(--border-strong); font-size: 0.8125rem; }
+.slip-line-label { flex: none; width: 5.5em; font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.slip-line-value { flex: 1; min-width: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.slip-reason .slip-line-value { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.slip-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 16px; font-size: 0.6875rem; color: var(--text-muted); }
+.slip-sign { flex: 0 1 13em; padding-top: 3px; border-top: 1px solid var(--text-muted); }
+.slip-copy { font-style: italic; }
+.slip-stamp {
+  position: absolute;
+  top: 36px;
+  right: 18px;
+  padding: 2px 8px;
+  border: 2.5px solid var(--bad);
+  border-radius: 4px;
+  color: var(--bad);
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  rotate: -12deg;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* Notebook style: blanks filled in by hand in blue, stamped in red ink. */
+.style-notebook .slip-line-value { font-family: var(--font-hand); font-variation-settings: var(--casual); font-size: 0.9rem; color: var(--sketch-ink-blue); }
+.style-notebook .slip-stamp { border-color: var(--sketch-ink-red); color: var(--sketch-ink-red); }
+.style-notebook .row-item.selected > .strike-slip { box-shadow: 0 0 0 2px var(--sketch-ink-blue); }
