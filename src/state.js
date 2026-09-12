@@ -2,6 +2,7 @@
 // the shell's notify() loop — see overlays.js for why.
 import * as api from './api.js';
 import { rowKinds, TAB_IDS } from './rows.js';
+import { calendarAgendaKinds } from './calendar.js';
 
 const SIDEBAR_KEY = 'meraki-web.sidebarCollapsed';
 function loadSidebarCollapsed() {
@@ -42,6 +43,7 @@ export const DEFAULT_CONFIG = {
   theme: 'system', // 'system' | 'light' | 'dark'
   accent: 'yellow', // highlighter color: 'yellow' | 'green' | 'blue' | 'purple' | 'red' | 'orange' | 'pink'
   density: 'comfortable', // 'comfortable' | 'compact'
+  style: 'normal', // 'normal' | 'notebook' (hand-drawn marks, see NOTEBOOK_STYLE.md)
   timeFormat: '12h', // '12h' | '24h'
   autoRefreshMs: 0, // 0 = off
   hiddenTabs: [],
@@ -50,6 +52,7 @@ export const DEFAULT_CONFIG = {
   chartMode: 'simple', // 'simple' (hand-rolled inline SVG) | 'echarts' (lazy-loaded ECharts)
   calendarView: 'grid', // 'grid' (stylized month view) | 'list' (flat row list)
   calendarShowAssignments: true, // overlay assignment due_dates onto the calendar grid
+  gradingScale: 'standard', // 'standard' (school profile table) | 'legacy' (tens digit = letter, ones digit = +/-), see grading.js
 };
 
 function loadConfig() {
@@ -91,6 +94,16 @@ function persistConfig() {
   }
 }
 
+// Notebook style's handwritten headings fall back to ZCOOL KuaiLe for CJK text
+// (Recursive has no CJK glyphs). The stylesheet is only requested once someone
+// turns the style on, and Google Fonts splits the font by unicode-range, so a
+// reader who never renders CJK in it never downloads a glyph file.
+const HAND_FONT_CJK_HREF = 'https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap';
+function ensureHandFont() {
+  if (document.getElementById('hand-font-cjk')) return;
+  document.head.appendChild(Object.assign(document.createElement('link'), { id: 'hand-font-cjk', rel: 'stylesheet', href: HAND_FONT_CJK_HREF }));
+}
+
 /** Theme/accent/density are applied as attributes/classes on <html> rather
  * than re-rendered by the shell, so styles.css can own the actual color and
  * spacing values — this just flips the switches CSS reads. */
@@ -100,6 +113,8 @@ function applyConfigEffects(config) {
   for (const c of ['yellow', 'blue', 'green', 'purple', 'red', 'orange', 'pink']) root.classList.remove(`accent-${c}`);
   root.classList.add(`accent-${config.accent}`);
   root.classList.toggle('density-compact', config.density === 'compact');
+  root.classList.toggle('style-notebook', config.style === 'notebook');
+  if (config.style === 'notebook') ensureHandFont();
 }
 
 let autoRefreshTimer = null;
@@ -164,7 +179,7 @@ export const state = {
   // Overview's "Due this week" split. Not persisted — resets to the
   // intended default (todo open, done tucked away) on every load rather
   // than remembering a stale collapse state across days.
-  overviewCollapse: { todo: false, done: true },
+  overviewCollapse: { todo: false, done: true, calendarPast: true },
 };
 
 function emptyData() {
@@ -357,7 +372,13 @@ export async function optimisticInsert(field, row, table, apiBody) {
   }
 }
 
-function rowKindsForCurrentTab() {
+export function rowKindsForCurrentTab() {
+  // The calendar's list view merges in assignment due dates and local
+  // reminders (which rowKinds' per-tab data doesn't have), so calendar.js
+  // builds it.
+  if (state.tab === 'calendar') {
+    return calendarAgendaKinds({ data: state.data, config: state.config, reminders: state.calendarReminders, collapse: state.overviewCollapse, today: new Date() });
+  }
   return rowKinds(state.tab, state.data, new Date(), state.overviewCollapse);
 }
 

@@ -1,6 +1,7 @@
 import { el, svgIcon } from './dom.js';
 import { t } from './i18n.js';
-import { pctClass, pill } from './rows.js';
+import { pctClass, pill, emptyState, gradeCircle } from './rows.js';
+import { seededRandom, sketchArrow, sketchSvg } from './sketch.js';
 import { iconPaths } from './icons.js';
 
 export const DEFAULT_TARGET_PCT = 90;
@@ -82,11 +83,19 @@ function projectionMessage(stats, projection, targetPct) {
   return { text: t('analytics.status.onTrack', { pct: projection.requiredAvgPct.toFixed(0), target: targetPct }), cls: 'accent' };
 }
 
-function diffPill(diffFromCurrent) {
+function diffPill(diffFromCurrent, { notebook = false, seed = '' } = {}) {
   if (diffFromCurrent == null) return null;
   const rounded = Math.round(diffFromCurrent * 10) / 10;
-  if (rounded <= 0) return pill(t('analytics.diff.above', { diff: Math.abs(rounded).toFixed(1) }), 'good');
-  return pill(t('analytics.diff.below', { diff: rounded.toFixed(1) }), 'warn');
+  const [text, cls] = rounded <= 0
+    ? [t('analytics.diff.above', { diff: Math.abs(rounded).toFixed(1) }), 'good']
+    : [t('analytics.diff.below', { diff: rounded.toFixed(1) }), 'warn'];
+  if (!notebook) return pill(text, cls);
+  // Notebook style: a note scribbled in the margin, arrow pointing back at
+  // the status line it annotates.
+  return el('span', { class: `margin-note text-${cls}` }, [
+    sketchSvg(sketchArrow(22, 4, 2, 10, seededRandom(`note-arrow:${seed}`)), { viewBox: [24, 14], className: 'sketch-note-arrow' }),
+    el('span', { text }),
+  ]);
 }
 
 function emptyNote(text) {
@@ -177,6 +186,7 @@ function renderClassCard(cls, data, config, targets, onTargetChange) {
   const projection = targetProjection(stats, targetPct);
   const msg = projectionMessage(stats, projection, targetPct);
 
+  const notebook = config.style === 'notebook';
   const meta = [cls.subject, cls.teacher_name].filter(Boolean).join(' · ');
 
   const noWorkYet = stats.totalAssignments === 0;
@@ -210,14 +220,18 @@ function renderClassCard(cls, data, config, targets, onTargetChange) {
     el('div', { class: 'analytics-card-header' }, [
       pill(cls.period != null ? `P${cls.period}` : null, 'accent'),
       el('div', { class: 'analytics-card-title' }, [el('div', { class: 'row-title', text: cls.name }), meta ? el('div', { class: 'row-meta', text: meta }) : null]),
-      stats.currentPct != null ? pill(`${stats.currentPct.toFixed(0)}%`, pctClass(stats.currentPct)) : pill(t('analytics.noGradesYet'), 'dim'),
+      stats.currentPct == null
+        ? pill(t('analytics.noGradesYet'), 'dim')
+        : notebook
+          ? el('span', { class: `grade-mark text-${pctClass(stats.currentPct)}`, text: `${stats.currentPct.toFixed(0)}%` }, [gradeCircle(`class:${cls.id}`)])
+          : pill(`${stats.currentPct.toFixed(0)}%`, pctClass(stats.currentPct)),
     ]),
     el('div', { class: 'analytics-card-section' }, [el('div', { class: 'field-label', text: t('analytics.trend') }), trendSection]),
     el('div', { class: 'analytics-card-section' }, [el('div', { class: 'field-label', text: t('analytics.category') }), categorySection]),
     el('div', { class: 'analytics-target-row' }, [
       el('label', { class: 'field-label', text: t('analytics.target') }),
       targetInput(cls.id, targetPct, onTargetChange),
-      el('div', { class: 'analytics-status-line' }, [el('span', { class: `analytics-status text-${msg.cls}`, text: msg.text }), diffPill(projection.diffFromCurrent)]),
+      el('div', { class: 'analytics-status-line' }, [el('span', { class: `analytics-status text-${msg.cls}`, text: msg.text }), diffPill(projection.diffFromCurrent, { notebook, seed: cls.id })]),
     ]),
   ]);
 }
@@ -248,7 +262,7 @@ function renderComparisonCard(data, config) {
 
 export function renderAnalyticsTab(data, config, targets, onTargetChange) {
   if (data.classes.length === 0) {
-    return el('div', { class: 'empty-state' }, [el('div', { class: 'empty-icon', text: '·' }), el('p', { text: t('analytics.noClasses') })]);
+    return emptyState(t('analytics.noClasses'), { notebook: config.style === 'notebook' });
   }
   return el('div', { class: 'analytics-tab' }, [
     renderComparisonCard(data, config),

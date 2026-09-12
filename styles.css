@@ -21,6 +21,12 @@
   --ruled: #e7ecf4;
   --margin-rule: rgba(222, 92, 104, 0.42);
   --focus: #3355e0;
+  /* The login page's sticky note — always yellow paper with dark ink,
+     independent of the highlighter accent. */
+  --sticky-paper: #fff0a0;
+  --sticky-tape: rgba(201, 208, 221, 0.55);
+  --sticky-shadow: 0 1px 1px rgba(27, 37, 64, 0.08), 0 12px 20px -10px rgba(27, 37, 64, 0.35);
+  --sticky-shadow-lift: 0 2px 3px rgba(27, 37, 64, 0.08), 0 22px 32px -14px rgba(27, 37, 64, 0.42);
 
   /* Highlighter — swapped per Settings → Accent (see the accent-* classes).
      --hl is the solid marker color, --mark is how it's laid behind text
@@ -66,6 +72,29 @@
   --scrim: rgba(22, 29, 50, 0.34);
 
   --font-ui: 'Recursive', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  /* Notebook style: handwritten headings (ZCOOL KuaiLe covers the CJK that
+     Recursive lacks) and the pen that sketch marks are drawn with. In the
+     dark theme the pen turns to chalk via --sketch-filter. */
+  --font-hand: 'Recursive', 'ZCOOL KuaiLe', system-ui, sans-serif;
+  --sketch-ink: var(--text-primary);
+  --sketch-grid: color-mix(in srgb, var(--text-primary) 36%, transparent);
+  /* Colored pens: red ink crosses off past days, blue ink marks today. The
+     dark theme swaps both for chalk tones (coral, sky blue). */
+  --sketch-ink-red: #c62f25;
+  --sketch-ink-blue: #1d3a9e;
+  --sketch-filter: none;
+  /* Today's number under its blue circle: a marker swipe on paper. */
+  --sketch-today-bg: linear-gradient(var(--mark), var(--mark)) no-repeat 0 var(--mark-y) / 100% var(--mark-h);
+  /* Notebook paper objects: the announcements corkboard and detention slips. */
+  --cork: #c9a47b;
+  --cork-speck: rgba(92, 58, 28, 0.38);
+  --cork-fleck: rgba(255, 242, 216, 0.4);
+  --slip-paper: #ffe1e9;
+  /* Notebook calendar list: highlighter colors per item kind. Solid pastel
+     markers, so the dark theme's opaque, dark-text marks can use them too. */
+  --hl-event: #a8dcff;
+  --hl-assignment: #ffc78a;
+  --hl-reminder: #b5f09b;
   /* Recursive's Casual axis: 1 reads like a marker, 0 like a plain sans. */
   --casual: 'CASL' 1;
   --linear: 'CASL' 0;
@@ -91,6 +120,20 @@
     --ruled: #1b2340;
     --margin-rule: rgba(255, 128, 140, 0.3);
     --focus: #8fb0ff;
+    --sticky-paper: #efd76e;
+    --sticky-tape: rgba(232, 236, 246, 0.22);
+    --sticky-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 14px 24px -10px rgba(0, 0, 0, 0.7);
+    --sticky-shadow-lift: 0 2px 3px rgba(0, 0, 0, 0.35), 0 24px 36px -14px rgba(0, 0, 0, 0.85);
+    --sketch-filter: url(#sketch-chalk);
+    --sketch-ink-red: #ff8a80;
+    --sketch-ink-blue: #7cc8ff;
+    --cork: #4d3b2b;
+    --cork-speck: rgba(0, 0, 0, 0.4);
+    --cork-fleck: rgba(255, 228, 196, 0.1);
+    --slip-paper: #3b2533;
+    /* The dark mark is a solid full-height block, which would swallow the
+       chalk circle, so today is just sky-blue chalk. */
+    --sketch-today-bg: none;
     --hl-soft: color-mix(in srgb, var(--hl) 12%, transparent);
     /* A translucent marker over navy turns olive, so on the ink pad the
        mark is a solid full-height stroke with dark ink text on top. */
@@ -134,6 +177,18 @@
   --ruled: #1b2340;
   --margin-rule: rgba(255, 128, 140, 0.3);
   --focus: #8fb0ff;
+  --sticky-paper: #efd76e;
+  --sticky-tape: rgba(232, 236, 246, 0.22);
+  --sticky-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 14px 24px -10px rgba(0, 0, 0, 0.7);
+  --sticky-shadow-lift: 0 2px 3px rgba(0, 0, 0, 0.35), 0 24px 36px -14px rgba(0, 0, 0, 0.85);
+  --sketch-filter: url(#sketch-chalk);
+  --sketch-ink-red: #ff8a80;
+  --sketch-ink-blue: #7cc8ff;
+  --cork: #4d3b2b;
+  --cork-speck: rgba(0, 0, 0, 0.4);
+  --cork-fleck: rgba(255, 228, 196, 0.1);
+  --slip-paper: #3b2533;
+  --sketch-today-bg: none;
   --hl-soft: color-mix(in srgb, var(--hl) 12%, transparent);
   --mark: var(--hl);
   --mark-h: 100%;
@@ -250,6 +305,8 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
    ends, sized in em so the same rule works on a nav label and a 5rem
    wordmark. Only used where something needs attention or is selected. */
 .nav-item.active .nav-label,
+.row-section-mark,
+.style-notebook .hl-swipe,
 .stat-value.text-accent,
 .stat-value.text-bad,
 .hero-value,
@@ -748,6 +805,12 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 .row-section-chevron-icon { transition: transform 0.18s ease; transform: rotate(0deg); }
 .row-section-chevron-icon.collapsed { transform: rotate(-90deg); }
 
+/* Calendar list: day headers inside the folded "Earlier" section, and past
+   items faded back. Today's header text gets the highlighter
+   (.row-section-mark, with the other marker-stroke rules). */
+.row-subsection { padding-top: 8px; font-size: 0.8125rem; }
+.row-item-past .row-item-inner { opacity: 0.6; }
+
 /* Freshly-expanded section content fades/slides in — see the comment on
    prevOverviewCollapse in main.js for why this needs the mount-then-flip
    two-step instead of a plain class-toggle transition. */
@@ -858,6 +921,29 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 }
 .stat-value.text-accent, .stat-value.text-bad { padding-inline: 0.32em; margin-inline: -0.32em; }
 .stat-label { font-size: 0.8125rem; color: var(--text-secondary); font-weight: 500; }
+.stat-sub { margin-top: -3px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Overall grade: the tile plus its grading-scale chip, laid over the
+   tile's top-right corner (see gradeTile in rows.js). */
+.stat-tile-group { position: relative; display: flex; min-width: 0; }
+.stat-tile-group > .stat-tile { flex: 1; }
+.grade-scale-chip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 5px 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.grade-scale-chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.grade-scale-chip .icon { width: 12px; height: 12px; }
 
 .hero-card {
   display: flex;
@@ -1063,6 +1149,222 @@ button.row-item.selected:hover { background: var(--hl-soft); }
   .calendar-month-label { min-width: 0; font-size: 1.125rem; }
 }
 
+/* --- Notebook style (Settings → Appearance → Style) ---
+   Hand-drawn marks from src/sketch.js layered over the normal layout; see
+   NOTEBOOK_STYLE.md. Marks and headings may look handwritten, data text
+   never does. Pen ink draws structure; the highlighter still only marks
+   what matters. In the dark theme the pen becomes chalk (#sketch-chalk in
+   index.html). */
+
+.sketch {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--sketch-ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sketch-strokes { filter: var(--sketch-filter); }
+.sketch-even path { vector-effect: non-scaling-stroke; }
+.sketch-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sketch-draw var(--sketch-draw-ms, 420ms) cubic-bezier(0.45, 0.1, 0.25, 1) calc(var(--i, 0) * var(--sketch-stagger, 90ms)) forwards;
+}
+@keyframes sketch-draw { to { stroke-dashoffset: 0; } }
+
+.style-notebook .calendar-month-label,
+.style-notebook .calendar-daypanel-title { font-family: var(--font-hand); }
+.style-notebook .calendar-month-label { position: relative; }
+.sketch-underline { left: 10%; bottom: -4px; width: 80%; height: 8px; stroke-width: 2; }
+
+.style-notebook .calendar-grid { position: relative; border: 0; border-radius: 0; overflow: visible; }
+.sketch-grid { inset: 0; width: 100%; height: 100%; z-index: 1; stroke: var(--sketch-grid); stroke-width: 1.25; }
+
+/* Each cell is its own stacking context so its marks can sit at z-index -1:
+   above the cell's background, below its day number and chips. */
+.style-notebook .calendar-day,
+.style-notebook .calendar-day:hover,
+.style-notebook .calendar-day-outside { position: relative; isolation: isolate; background: transparent; box-shadow: none; }
+.style-notebook .calendar-day-selected,
+.style-notebook .calendar-day-selected:hover { box-shadow: none; }
+/* Hover is a soft smudge inset from the wobbly rules, since a straight-edged
+   fill would show against them. */
+.style-notebook .calendar-day::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  z-index: -1;
+  border-radius: 12px 7px 14px 6px / 8px 13px 6px 12px;
+  background: var(--bg-subtle);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.style-notebook .calendar-day:hover::before { opacity: 1; }
+
+/* Chips get an opaque paper backing so a pencil slash never runs through
+   their text. */
+.style-notebook .calendar-chip-event { background: linear-gradient(var(--info-soft), var(--info-soft)) var(--bg); }
+.style-notebook .calendar-chip-assignment { background: linear-gradient(var(--warn-soft), var(--warn-soft)) var(--bg); }
+.style-notebook .calendar-chip-reminder { background: linear-gradient(var(--good-soft), var(--good-soft)) var(--bg); }
+.style-notebook .calendar-chip-more { background: var(--bg); }
+
+/* Today is written and circled in blue ink (sky-blue chalk on the dark
+   board). On paper the highlighter swipe stays underneath the number. */
+.style-notebook .calendar-day-today .calendar-day-num {
+  position: relative;
+  background: var(--sketch-today-bg);
+  color: var(--sketch-ink-blue);
+  border-radius: 0;
+}
+.sketch-today { left: 50%; top: 50%; width: 2.9em; height: 2.2em; translate: -50% -50%; stroke: var(--sketch-ink-blue); stroke-width: 2; --sketch-draw-ms: 520ms; }
+
+/* Not evenStroke (it draws in), so its strokes scale with the cell: wider
+   on the sides of a wide desktop cell, which reads as pen pressure, and
+   thin on a narrow phone cell, hence the heavier mobile width below. */
+.sketch-select { left: 7px; top: 7px; width: calc(100% - 14px); height: calc(100% - 14px); z-index: -1; stroke-width: 1.8; --sketch-draw-ms: 200ms; --sketch-stagger: 70ms; }
+/* Past days crossed off in red ink, eased back so eleven of them don't
+   shout over the week ahead. */
+.sketch-slash { left: 14%; top: 18%; width: 72%; height: 66%; z-index: -1; stroke: var(--sketch-ink-red); stroke-opacity: 0.7; stroke-width: 1.5; }
+
+@media (max-width: 640px) {
+  .sketch-select { left: 4px; top: 4px; width: calc(100% - 8px); height: calc(100% - 8px); stroke-width: 3.2; }
+}
+
+/* Overview: done rows crossed out in red ink with a pen tick; the flex
+   override shrinks the title's box to its text so the stroke ends with it. */
+.style-notebook .row-item-done .row-title { position: relative; flex: 0 1 auto; text-decoration: none; }
+.sketch-strike { left: -3px; top: 50%; width: calc(100% + 6px); height: 10px; translate: 0 -50%; stroke: var(--sketch-ink-red); stroke-width: 1.8; --sketch-draw-ms: 360ms; }
+.style-notebook .row-done-check { position: relative; background: none; }
+.sketch-done-tick { inset: 0; width: 100%; height: 100%; stroke: var(--sketch-ink); stroke-width: 2.2; }
+
+/* Loading: hand-drawn checkboxes, ticked as each step lands. */
+.style-notebook .loading-step-icon,
+.style-notebook .loading-step.is-done .loading-step-icon { position: relative; background: none; }
+.sketch-step-box { inset: 0; width: 100%; height: 100%; stroke: var(--sketch-ink); stroke-width: 1.4; }
+.loading-step.is-pending .sketch-step-box { stroke: var(--text-muted); }
+.sketch-step-tick { left: 1px; top: -3px; width: 22px; height: 22px; stroke: var(--sketch-ink); stroke-width: 2.4; --sketch-draw-ms: 300ms; }
+
+/* Empty states: a margin doodle instead of the dot. */
+.sketch-doodle { position: static; width: 64px; height: 42px; stroke: var(--text-muted); stroke-width: 1.8; --sketch-draw-ms: 700ms; --sketch-stagger: 250ms; }
+
+/* Check-in: doodled mood faces, the chosen one circled in blue ink. */
+.style-notebook .mood-btn,
+.style-notebook .mood-btn.active {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.style-notebook .mood-btn:hover { background: var(--bg-subtle); }
+.style-notebook .mood-btn.active { color: var(--text-primary); }
+.sketch-face { position: static; width: 38px; height: 38px; stroke-width: 1.7; }
+.sketch-mood-pick { left: 50%; top: -3px; width: 56px; height: 50px; translate: -50% 0; stroke: var(--sketch-ink-blue); stroke-width: 2; }
+
+/* Attendance: tally marks per status, count alongside in plain type. */
+.attendance-tally { display: flex; flex-direction: column; gap: 10px; padding: 6px 14px 16px; margin-bottom: 10px; border-bottom: 1px dashed var(--border-strong); }
+.attendance-tally-row { display: grid; grid-template-columns: 88px 1fr auto; align-items: center; gap: 12px; }
+.attendance-tally-row > .pill { justify-self: start; }
+.attendance-tally-marks { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.sketch-tally { position: static; width: 30px; height: 24px; stroke-width: 1.8; --sketch-draw-ms: 120ms; --sketch-stagger: 25ms; }
+.attendance-tally-count { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+
+/* Grades: the teacher's red circle around a grade, and target notes
+   scribbled in the margin. */
+.stat-value-marked { position: relative; align-self: flex-start; width: fit-content; }
+.sketch-grade { left: -34%; top: -32%; width: 168%; height: 164%; stroke: var(--sketch-ink-red); stroke-width: 2; --sketch-draw-ms: 600ms; }
+.grade-mark { position: relative; margin-left: auto; margin-right: 8px; padding: 0 2px; font-variation-settings: var(--casual); font-size: 1.125rem; font-weight: 800; }
+.margin-note { display: inline-flex; align-items: center; gap: 4px; font-variation-settings: var(--casual); font-size: 0.875rem; font-weight: 700; rotate: -2deg; }
+.sketch-note-arrow { position: static; width: 24px; height: 14px; stroke: currentColor; stroke-width: 1.6; }
+
+/* Announcements: paper cards taped to a corkboard. */
+.style-notebook .corkboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 26px 18px;
+  padding: 28px 20px 22px;
+  border-radius: 10px;
+  background-color: var(--cork);
+  background-image: radial-gradient(var(--cork-speck) 0.8px, transparent 1.3px), radial-gradient(var(--cork-fleck) 0.8px, transparent 1.4px);
+  background-size: 7px 7px, 11px 11px;
+  background-position: 0 0, 3px 5px;
+  box-shadow: inset 0 0 0 6px color-mix(in srgb, var(--cork) 70%, #3b2412), inset 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+.style-notebook .corkboard > .row-item {
+  position: relative;
+  border-radius: 2px;
+  padding: 20px 16px 14px;
+  background: var(--bg-card);
+  box-shadow: var(--sticky-shadow);
+  rotate: -0.8deg;
+  transition: translate 0.18s ease, box-shadow 0.18s ease;
+}
+.style-notebook .corkboard > .row-item:nth-child(3n + 2) { rotate: 0.9deg; }
+.style-notebook .corkboard > .row-item:nth-child(3n) { rotate: -0.3deg; }
+.style-notebook .corkboard > .row-item:hover { translate: 0 -2px; box-shadow: var(--sticky-shadow-lift); }
+.style-notebook .corkboard > .row-item.selected { box-shadow: var(--sticky-shadow), 0 0 0 2px var(--sketch-ink-blue); }
+.style-notebook .corkboard > .row-item::before { display: none; }
+.style-notebook .corkboard > .row-item::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 72px;
+  height: 20px;
+  translate: -50% 0;
+  rotate: -3deg;
+  background: var(--sticky-tape);
+}
+
+/* My Record: detentions as pink slips, punched down the left edge. */
+.style-notebook .row-item[data-kind='detention'] {
+  margin: 6px 0;
+  padding-left: 26px;
+  border-radius: 3px;
+  background: radial-gradient(circle at 10px 50%, var(--bg) 2.5px, transparent 3px) 0 0 / 100% 14px repeat-y, var(--slip-paper);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+.style-notebook .row-item[data-kind='detention']::before { display: none; }
+.style-notebook .row-item[data-kind='detention'].selected { box-shadow: inset 0 0 0 2px var(--sketch-ink-blue); }
+
+/* "Message sent": a paper plane that draws in, then flies off the toast. */
+/* Doubled class: the base .toast rule (and its padding) comes later in the
+   file, so a lone .toast-with-plane would lose to it. */
+.toast.toast-with-plane { position: relative; padding-left: 50px; }
+.toast-with-plane .sketch-strokes { filter: none; }
+.sketch-plane {
+  left: 12px;
+  top: calc(50% - 10.5px);
+  width: 30px;
+  height: 21px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  --sketch-draw-ms: 380ms;
+  --sketch-stagger: 220ms;
+  animation: plane-fly 900ms cubic-bezier(0.5, 0, 0.75, 0) 750ms forwards;
+}
+@keyframes plane-fly { to { translate: 220px -90px; rotate: -14deg; opacity: 0; } }
+
+/* Calendar list: this week's items swiped in highlighter colored by kind,
+   past items crossed off (see the done-row rules above), and a blue-ink
+   "you are here" line where today falls. */
+.style-notebook .hl-swipe { flex: 0 1 auto; }
+.hl-calendarEvent { --mark-color: var(--hl-event); }
+.hl-assignment { --mark-color: var(--hl-assignment); }
+.hl-reminder { --mark-color: var(--hl-reminder); }
+.hl-swipe-in { animation: mark-swipe 520ms cubic-bezier(0.3, 0.7, 0.2, 1) calc(var(--i, 0) * 70ms) both; }
+.style-notebook .row-item-past .row-title { position: relative; flex: 0 1 auto; }
+.agenda-now { display: flex; align-items: center; gap: 10px; margin: 16px 0 2px; padding: 0 14px; color: var(--sketch-ink-blue); }
+.agenda-now .margin-note { flex: none; }
+.sketch-now-line { position: static; flex: 1; min-width: 0; width: 100%; height: 6px; stroke: var(--sketch-ink-blue); stroke-width: 1.6; }
+
 /* --- States --- */
 
 .loading-state, .empty-state {
@@ -1180,15 +1482,19 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 
 /* --- Login ---
    A ruled notebook page: blue lines, the red margin rule, and the wordmark
-   written just right of the margin. The one page-load moment in the app
-   is the highlighter swiping under it. */
+   written just right of the margin. The page-load moment is the
+   highlighter swiping under it, with the sticky note slapped on as the
+   swipe finishes. */
 
 .login-screen {
   --margin-x: clamp(28px, 11vw, 168px);
   position: relative;
   min-height: 100%;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  align-content: center;
+  gap: 48px clamp(40px, 7vw, 112px);
   padding: 88px 24px 72px calc(var(--margin-x) + clamp(22px, 5vw, 80px));
   background-color: var(--bg);
   background-image:
@@ -1249,6 +1555,86 @@ select.field-input {
 .textarea { resize: vertical; line-height: 1.5; }
 
 .login-form .btn { margin-top: 20px; padding: 11px 18px; font-size: 0.9375rem; }
+
+/* Stuck to the notebook page beside the form (wraps below it when narrow),
+   taped at the top and written in the marker cut of Recursive. It sticks
+   on after the wordmark swipe, lifts and peels a corner on hover, and
+   swings from its tape when clicked (see mountLogin).
+   Motion uses the individual rotate/translate/scale properties rather
+   than `transform`, so the stick-on and swing animations and the hover
+   transition each own one axis instead of clobbering each other. */
+.sticky-note {
+  --tilt: 2.5deg;
+  position: relative;
+  flex: 0 0 auto;
+  width: 236px;
+  padding: 26px 22px 24px;
+  background: var(--sticky-paper);
+  color: var(--on-hl);
+  font-variation-settings: var(--casual);
+  border-radius: 2px 2px 3px 3px;
+  box-shadow: var(--sticky-shadow);
+  rotate: var(--tilt);
+  transform-origin: 50% 0;
+  transition:
+    rotate 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    translate 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 240ms ease;
+  --note-stick: note-stick 480ms cubic-bezier(0.2, 0.8, 0.2, 1) 820ms backwards;
+  animation: var(--note-stick);
+}
+/* note-stick stays in the list: dropping it while swinging would make the
+   browser treat it as a brand-new animation once the class comes off,
+   replaying the whole stick-on (invisible for 820ms) after every swing. */
+.sticky-note.is-swinging { animation: var(--note-stick), note-swing 1000ms ease-in-out; }
+
+/* The peeled corner: the note's underside folding up over the page. */
+.sticky-note::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 26px;
+  height: 26px;
+  background: linear-gradient(to top left, var(--bg) 50%, color-mix(in srgb, var(--sticky-paper) 78%, #000) 50%, var(--sticky-paper) 100%);
+  scale: 0;
+  transform-origin: 100% 100%;
+  transition: scale 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (hover: hover) {
+  .sticky-note:hover { --tilt: 0.5deg; translate: 0 -4px; box-shadow: var(--sticky-shadow-lift); }
+  .sticky-note:hover::after { scale: 1; }
+}
+
+@keyframes note-stick {
+  from { opacity: 0; scale: 1.1; translate: 0 -14px; }
+  55% { opacity: 1; }
+  75% { scale: 0.985; translate: 0 0; }
+  to { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+/* A damped pendulum around whatever the resting tilt currently is. */
+@keyframes note-swing {
+  0% { rotate: var(--tilt); }
+  16% { rotate: calc(var(--tilt) + 8deg); }
+  38% { rotate: calc(var(--tilt) - 5deg); }
+  58% { rotate: calc(var(--tilt) + 2.5deg); }
+  78% { rotate: calc(var(--tilt) - 1deg); }
+  100% { rotate: var(--tilt); }
+}
+.sticky-note::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 88px;
+  height: 24px;
+  background: var(--sticky-tape);
+  transform: translateX(-50%) rotate(-3deg);
+}
+.sticky-note-title { margin: 0 0 6px; font-size: 1.25rem; font-weight: 850; line-height: 1.2; color: inherit; }
+.sticky-note-body { margin: 0; font-size: 0.9375rem; font-weight: 500; line-height: 1.45; color: inherit; }
 
 .form-error {
   color: var(--bad-text);
@@ -1676,7 +2062,8 @@ select.field-input {
 }
 
 @media (max-width: 520px) {
-  .login-screen { align-items: flex-start; padding-top: 96px; padding-right: 20px; }
+  .login-screen { align-items: flex-start; align-content: flex-start; padding-top: 96px; padding-right: 20px; }
+  .sticky-note { --tilt: -1.5deg; }
   .detail-field { grid-template-columns: 1fr; gap: 1px; }
 }
 

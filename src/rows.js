@@ -1,5 +1,7 @@
-import { el } from './dom.js';
+import { el, svgIcon } from './dom.js';
 import { t } from './i18n.js';
+import { iconPaths } from './icons.js';
+import { seededRandom, sketchCircle, sketchSpiral, sketchStar, sketchSvg, sketchTallyGroup, tallyGroups } from './sketch.js';
 
 // Mood/tab labels are looked up live (functions, not module-eval constants)
 // so every call site re-reads them under the current locale on each render.
@@ -419,6 +421,16 @@ export function renderItemBody(target, data, ownUserId) {
         meta: [e.category, e.location].filter(Boolean).join(' · '),
       });
     }
+    case 'reminder': {
+      // Local reminders live outside `data`, so the target carries the row.
+      const r = target.reminder;
+      return itemRow({
+        leading: dot('good'),
+        title: r.title,
+        pillNode: pill(t('calendar.reminder'), 'good'),
+        meta: r.note ?? '',
+      });
+    }
     case 'announcement': {
       const a = data.announcements[target.index];
       return itemRow({
@@ -516,19 +528,94 @@ export function renderItemBody(target, data, ownUserId) {
   }
 }
 
-function statTile({ label, value, cls = '', onClick }) {
+function statTile({ label, value, cls = '', onClick, mark = null, sub = null }) {
   const alert = cls === 'bad' || cls === 'warn' ? ` alert-${cls}` : '';
   return el('button', { class: `stat-tile${alert}`, type: 'button', onclick: onClick }, [
-    el('span', { class: `stat-value text-${cls}`, text: value }),
+    el('span', { class: `stat-value text-${cls}${mark ? ' stat-value-marked' : ''}`, text: value }, mark ? [mark] : []),
     el('span', { class: 'stat-label', text: label }),
+    sub ? el('span', { class: 'stat-sub', text: sub }) : null,
   ]);
+}
+
+// The Overall grade tile: the letter as the headline, percentage and GPA
+// estimate beneath it, and a chip for switching grading scales. The chip is a
+// sibling laid over the tile's corner, not a child: a button can't hold one.
+function gradeTile({ grade, notebook, draw, onClick, onPickScale }) {
+  if (!grade) return statTile({ label: t('stat.overallGrade'), value: t('stat.noGrades'), cls: 'dim', onClick });
+  const tile = statTile({
+    label: `${t('stat.overallGrade')} · ${grade.pct.toFixed(0)}%`,
+    value: grade.letter,
+    cls: pctClass(grade.pct),
+    sub: grade.gpa != null ? t('grade.gpaEstimate', { gpa: grade.gpa.toFixed(2) }) : null,
+    mark: notebook ? gradeCircle('overall', draw) : null,
+    onClick,
+  });
+  const scaleName = t(`grade.scale.${grade.scale}`);
+  const chip = el(
+    'button',
+    {
+      class: 'grade-scale-chip',
+      type: 'button',
+      title: t('grade.changeScale'),
+      'aria-label': `${t('grade.changeScale')}: ${scaleName}`,
+      'aria-haspopup': 'menu',
+      onclick: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        onPickScale?.(r.left, r.bottom + 4);
+      },
+    },
+    [el('span', { text: scaleName }), svgIcon(iconPaths('chevronDown'))],
+  );
+  return el('div', { class: 'stat-tile-group' }, [tile, chip]);
+}
+
+/** Notebook style: the teacher's red-pen circle around a grade. */
+export function gradeCircle(seed, draw = false) {
+  return sketchSvg([sketchCircle(40, 25, 34, 20, seededRandom(`grade:${seed}`), { turns: 1.15 })], { viewBox: [80, 50], stretch: true, draw, className: 'sketch-grade' });
+}
+
+/** The centered "nothing here" block. Notebook style swaps the dot for a
+ * margin doodle (a star and a spiral) that draws in on a fresh visit. */
+export function emptyState(text, { notebook = false, draw = false } = {}) {
+  const icon = notebook
+    ? sketchSvg([sketchStar(18, 21, 13, seededRandom(`doodle-star:${text}`)), sketchSpiral(47, 21, 11, seededRandom(`doodle-spiral:${text}`))], { viewBox: [64, 42], draw, className: 'sketch-doodle' })
+    : el('div', { class: 'empty-icon', text: '·' });
+  return el('div', { class: 'empty-state' }, [icon, el('p', { text })]);
+}
+
+// Notebook style's attendance summary: each status's days as tally marks in
+// groups of five, with the count written beside them so nobody has to count
+// strokes. Known statuses first, anything else after in first-seen order.
+const TALLY_ORDER = ['present', 'tardy', 'late', 'absent', 'excused'];
+export function renderAttendanceTally(records, { draw = false } = {}) {
+  const counts = new Map();
+  for (const r of records) {
+    const status = String(r.status ?? '').toLowerCase() || '-';
+    counts.set(status, (counts.get(status) ?? 0) + 1);
+  }
+  const rank = (status) => {
+    const i = TALLY_ORDER.indexOf(status);
+    return i === -1 ? TALLY_ORDER.length : i;
+  };
+  const statuses = [...counts.keys()].sort((a, b) => rank(a) - rank(b));
+  return el('div', { class: 'attendance-tally' }, statuses.map((status) => {
+    const count = counts.get(status);
+    const groups = tallyGroups(count).map((n, g) =>
+      sketchSvg(sketchTallyGroup(n, seededRandom(`tally:${status}:${g}`)), { viewBox: [30, 24], draw, drawOffset: g * 5, className: 'sketch-tally' }),
+    );
+    return el('div', { class: 'attendance-tally-row' }, [
+      pill(status, statusClass(status)),
+      el('div', { class: 'attendance-tally-marks' }, groups),
+      el('span', { class: 'attendance-tally-count', text: String(count) }),
+    ]);
+  }));
 }
 
 /** The stat row at the top of Overview — always shows all five tiles, even
  * at zero, since "nothing overdue" and "no unread messages" are useful
  * things to confirm, not just states to hide. */
-export function renderOverviewStats(summary, onNavigate) {
-  const { dueThisWeek, overdueUngraded, unreadCount, attendanceToday, avgGradePct } = summary;
+export function renderOverviewStats(summary, onNavigate, { notebook = false, draw = false, grade = null, onPickScale = null } = {}) {
+  const { dueThisWeek, overdueUngraded, unreadCount, attendanceToday } = summary;
   return el('div', { class: 'stat-grid' }, [
     statTile({
       label: t('stat.dueThisWeek'),
@@ -554,12 +641,7 @@ export function renderOverviewStats(summary, onNavigate) {
       cls: attendanceToday ? statusClass(attendanceToday.status) : 'dim',
       onClick: () => onNavigate('attendance'),
     }),
-    statTile({
-      label: t('stat.overallGrade'),
-      value: avgGradePct != null ? `${avgGradePct.toFixed(0)}%` : t('stat.noGrades'),
-      cls: avgGradePct != null ? pctClass(avgGradePct) : 'dim',
-      onClick: () => onNavigate('grades'),
-    }),
+    gradeTile({ grade, notebook, draw, onClick: () => onNavigate('grades'), onPickScale }),
   ]);
 }
 
@@ -613,6 +695,10 @@ export function detailFields(target, data) {
       const e = data.calendar[target.index];
       const time = e.start_time || e.end_time ? `${e.start_time ?? '?'}–${e.end_time ?? '?'}` : null;
       return { title: e.title, fields: [[t('label.date'), e.event_date], [t('label.time'), time], [t('label.location'), e.location]], body: e.description ?? null };
+    }
+    case 'reminder': {
+      const r = target.reminder;
+      return { title: r.title, fields: [[t('label.date'), r.date]], body: r.note ?? null };
     }
     case 'announcement': {
       const a = data.announcements[target.index];

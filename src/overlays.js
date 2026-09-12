@@ -1,4 +1,6 @@
 import { el, clear, mount, svgIcon, focusFirstIn } from './dom.js';
+import { seededRandom, sketchCircle, sketchFace, sketchPlane, sketchSvg } from './sketch.js';
+import { GRADING_SCALES } from './grading.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
 import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, notify, addCalendarReminder, openCompose, openReminderForm } from './state.js';
@@ -16,7 +18,7 @@ let detailMobileBackdrop = null;
 // "Undo" on a destructive-but-recoverable action — so the toast doubles as
 // the confirmation and the recovery path instead of needing a separate
 // "are you sure?" dialog before the action happens.
-export function showToast(text, kind = 'ok', action = null) {
+export function showToast(text, kind = 'ok', action = null, { flourish = null } = {}) {
   let dismissed = false;
   const dismiss = () => {
     if (dismissed) return;
@@ -24,7 +26,13 @@ export function showToast(text, kind = 'ok', action = null) {
     node.classList.remove('in');
     setTimeout(() => node.remove(), 200);
   };
-  const node = el('div', { class: `toast ${kind}` }, [
+  // Notebook style's "passing a note": a paper plane draws itself in on the
+  // toast, then flies off it.
+  const plane = flourish === 'plane' && state.config.style === 'notebook'
+    ? sketchSvg(sketchPlane(seededRandom('toast-plane')), { viewBox: [40, 28], draw: true, className: 'sketch-plane' })
+    : null;
+  const node = el('div', { class: `toast ${kind}${plane ? ' toast-with-plane' : ''}` }, [
+    plane,
     el('span', { class: 'toast-text', text }),
     action ? el('button', { class: 'toast-action', type: 'button', onclick: () => { dismiss(); action.onClick(); } }, action.label) : null,
   ]);
@@ -130,6 +138,19 @@ export function buildLanguageSwitcher(extraClass = '') {
   return select;
 }
 
+/** Flicking the login sticky note swings it from its tape (.is-swinging in
+ * styles.css). Clicks mid-swing are ignored rather than restarting it, which
+ * would snap the note back to rest first; so is the click that ends a text
+ * selection, so the note doesn't jerk away from someone copying it. */
+function swingNote(note) {
+  if (note.classList.contains('is-swinging') || String(window.getSelection())) return;
+  note.classList.add('is-swinging');
+}
+
+function settleNote(e) {
+  if (e.animationName === 'note-swing') e.currentTarget.classList.remove('is-swinging');
+}
+
 export function mountLogin(root, onLoggedIn) {
   const emailInput = el('input', { type: 'text', name: 'email', autocomplete: 'username', required: true, placeholder: t('login.emailPlaceholder') });
   const passwordInput = el('input', { type: 'password', name: 'password', autocomplete: 'current-password', required: true, placeholder: '••••••••' });
@@ -176,6 +197,10 @@ export function mountLogin(root, onLoggedIn) {
         el('h1', { class: 'brand', text: t('brand') }),
         el('p', { class: 'login-sub', text: t('login.subtitle') }),
         form,
+      ]),
+      el('div', { class: 'sticky-note', role: 'note', onclick: (e) => swingNote(e.currentTarget), onanimationend: settleNote }, [
+        el('p', { class: 'sticky-note-title', text: t('login.noteTitle') }),
+        el('p', { class: 'sticky-note-body', text: t('login.noteBody') }),
       ]),
     ]),
   );
@@ -430,7 +455,7 @@ function buildCompose() {
         // Optimistic: close and confirm immediately, reconcile in the
         // background — see optimisticInsert in state.js.
         closeOverlay();
-        showToast(t('compose.sent'));
+        showToast(t('compose.sent'), 'ok', null, { flourish: 'plane' });
         const row = {
           id: nextTempId(),
           subject: subjectVal,
@@ -476,20 +501,31 @@ function buildCheckin() {
 
   function drawMood() {
     clear(moodRow);
+    const notebook = state.config.style === 'notebook';
     moodLabels().forEach((label, i) => {
       const value = i + 1;
+      const chosen = value === mood;
+      // Notebook style: a doodled face per mood, and the chosen one circled
+      // in blue ink. The row is rebuilt on every pick, so the circle draws in
+      // exactly when a mood gets chosen.
+      const doodles = notebook
+        ? [
+            sketchSvg(sketchFace(value, seededRandom(`mood-face:${value}`)), { viewBox: [40, 40], className: 'sketch-face' }),
+            chosen ? sketchSvg([sketchCircle(25, 22, 22, 20, seededRandom(`mood-pick:${value}`))], { viewBox: [50, 44], draw: true, className: 'sketch-mood-pick' }) : null,
+          ]
+        : [];
       moodRow.appendChild(
         el(
           'button',
           {
             type: 'button',
-            class: `mood-btn ${value === mood ? 'active' : ''}`,
+            class: `mood-btn ${chosen ? 'active' : ''}`,
             onclick: () => {
               mood = value;
               drawMood();
             },
           },
-          label,
+          [...doodles, label],
         ),
       );
     });
@@ -828,6 +864,15 @@ function buildSettings() {
         cfg.density,
         (v) => setConfig({ density: v }),
       ),
+      el('label', { class: 'field-label', text: t('settings.style') }),
+      segmented(
+        [
+          ['normal', t('settings.style.normal')],
+          ['notebook', t('settings.style.notebook')],
+        ],
+        cfg.style,
+        (v) => setConfig({ style: v }),
+      ),
     ]),
     settingsSection(t('settings.timeAndData'), null, [
       el('label', { class: 'field-label', text: t('settings.clock') }),
@@ -841,6 +886,10 @@ function buildSettings() {
       ),
       el('label', { class: 'field-label', text: t('settings.autoRefresh') }),
       segmented(autoRefreshOptions(), cfg.autoRefreshMs, (v) => setConfig({ autoRefreshMs: v })),
+    ]),
+    settingsSection(t('settings.grades'), t('settings.grades.hint'), [
+      el('label', { class: 'field-label', text: t('grade.scale') }),
+      segmented(GRADING_SCALES.map((scale) => [scale, t(`grade.scale.${scale}`)]), cfg.gradingScale, (v) => setConfig({ gradingScale: v })),
     ]),
     settingsSection(
       t('settings.navigation'),

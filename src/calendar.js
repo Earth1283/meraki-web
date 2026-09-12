@@ -2,6 +2,7 @@ import { el, svgIcon } from './dom.js';
 import { t } from './i18n.js';
 import { iconPaths } from './icons.js';
 import { renderItemBody } from './rows.js';
+import { seededRandom, sketchLine, sketchCircle, sketchBox, sketchGrid, sketchSvg } from './sketch.js';
 
 /** Normalizes any date-ish string (a bare date, or a timestamp) down to its
  * 'YYYY-MM-DD' day so calendar_events, assignments, and reminders can all be
@@ -25,11 +26,21 @@ export function monthCells(year, month, today = new Date()) {
   const startOffset = first.getDay(); // 0 (Sun) - 6 (Sat)
   const gridStart = new Date(year, month, 1 - startOffset);
   const todayIso = isoOf(today);
+  const todayMonth = todayIso.slice(0, 7);
 
   return Array.from({ length: 42 }, (_, i) => {
     const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
     const iso = isoOf(date);
-    return { date, iso, inMonth: date.getMonth() === month, isToday: iso === todayIso };
+    return {
+      date,
+      iso,
+      inMonth: date.getMonth() === month,
+      isToday: iso === todayIso,
+      // Days of today's own month that have already gone by, which the
+      // Notebook style crosses off. Scoped to today's month so paging back
+      // through old months doesn't bury every cell under pencil slashes.
+      isElapsed: iso < todayIso && iso.startsWith(todayMonth),
+    };
   });
 }
 
@@ -56,29 +67,109 @@ function bucketBy(list, dateOf, toItem) {
 }
 
 /** Merges calendar_events, (optionally) assignment due dates, and local
- * reminders into one map of iso date -> ordered items, for a single month's
- * grid. Pure and data-only so it's testable without touching the DOM. */
-export function buildCalendarMonth({ year, month, data, config, reminders, today = new Date() }) {
-  const eventMap = bucketBy(data.calendar, (e) => e.event_date, (e, index) => ({ kind: 'calendarEvent', index, title: e.title, time: extractTime(e.start_time) ?? '00:00' }));
-  const assignmentMap = config.calendarShowAssignments
-    ? bucketBy(data.assignments.filter((a) => a.due_date), (a) => a.due_date, (a, index) => ({ kind: 'assignment', index, title: a.title, time: extractTime(a.due_date) ?? '00:00' }))
-    : new Map();
-  const reminderMap = bucketBy(reminders, (r) => r.date, (r) => ({ kind: 'reminder', reminder: r, title: r.title, time: extractTime(r.date) ?? '00:00' }));
+ * reminders into one map of iso date -> items ordered by time (events, then
+ * assignments, then reminders at equal times). Shared by the month grid and
+ * the list view. Assignments aren't pre-filtered: bucketBy already skips
+ * undated entries, and filtering first would shift the indices that
+ * { kind: 'assignment', index } targets point at. */
+function itemsByDay({ data, config, reminders }) {
+  const maps = [
+    bucketBy(data.calendar, (e) => e.event_date, (e, index) => ({ kind: 'calendarEvent', index, title: e.title, time: extractTime(e.start_time) ?? '00:00' })),
+    config.calendarShowAssignments
+      ? bucketBy(data.assignments, (a) => a.due_date, (a, index) => ({ kind: 'assignment', index, title: a.title, time: extractTime(a.due_date) ?? '00:00' }))
+      : new Map(),
+    bucketBy(reminders, (r) => r.date, (r) => ({ kind: 'reminder', reminder: r, title: r.title, time: extractTime(r.date) ?? '00:00' })),
+  ];
+  const days = new Map();
+  for (const map of maps) {
+    for (const [iso, items] of map) days.set(iso, [...(days.get(iso) ?? []), ...items]);
+  }
+  for (const items of days.values()) items.sort((a, b) => a.time.localeCompare(b.time));
+  return days;
+}
 
-  const cells = monthCells(year, month, today).map((cell) => {
-    const items = [...(eventMap.get(cell.iso) ?? []), ...(assignmentMap.get(cell.iso) ?? []), ...(reminderMap.get(cell.iso) ?? [])];
-    items.sort((a, b) => a.time.localeCompare(b.time));
-    return { ...cell, items };
+/** One month's grid cells with their merged items. Pure and data-only so
+ * it's testable without touching the DOM. */
+export function buildCalendarMonth({ year, month, data, config, reminders, today = new Date() }) {
+  const byDay = itemsByDay({ data, config, reminders });
+  const cells = monthCells(year, month, today).map((cell) => ({ ...cell, items: byDay.get(cell.iso) ?? [] }));
+  return { year, month, cells };
+}
+
+function agendaDayLabel(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+/** The calendar's list view as rowKinds-style rows (rendered by main.js's
+ * renderBody, and the source of keyboard selection via state.js): the same
+ * merged items as the grid, grouped under day headers. Days before today
+ * fold into a collapsible "Earlier" section (collapse.calendarPast, folded
+ * unless set false), a 'now' row marks where today falls, and items due
+ * within the next 7 days are flagged `soon` for Notebook's highlighters. */
+export function calendarAgendaKinds({ data, config, reminders, collapse = {}, today = new Date() }) {
+  const days = [...itemsByDay({ data, config, reminders })].sort(([a], [b]) => a.localeCompare(b));
+  if (days.length === 0) return [];
+
+  const todayIso = isoOf(today);
+  const weekEndIso = isoOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 6));
+  const toRow = (item, flags) => ({
+    type: 'item',
+    target: item.kind === 'reminder' ? { kind: 'reminder', reminder: item.reminder } : { kind: item.kind, index: item.index },
+    ...flags,
   });
 
-  return { year, month, cells };
+  const rows = [];
+  const past = days.filter(([iso]) => iso < todayIso);
+  const upcoming = days.filter(([iso]) => iso >= todayIso);
+  if (past.length > 0) {
+    const collapsed = collapse.calendarPast ?? true;
+    const count = past.reduce((n, [, items]) => n + items.length, 0);
+    rows.push({ type: 'collapsible-header', section: 'calendarPast', label: t('calendar.earlier'), count, collapsed });
+    if (!collapsed) {
+      for (const [iso, items] of past) {
+        rows.push({ type: 'subheader', label: agendaDayLabel(iso) });
+        items.forEach((item) => rows.push(toRow(item, { past: true })));
+      }
+    }
+  }
+  rows.push({ type: 'now' });
+  if (upcoming.length === 0) rows.push({ type: 'placeholder', text: t('calendar.nothingUpcoming') });
+  for (const [iso, items] of upcoming) {
+    const isToday = iso === todayIso;
+    rows.push({ type: 'header', label: isToday ? `${t('calendar.today')} · ${agendaDayLabel(iso)}` : agendaDayLabel(iso), today: isToday });
+    items.forEach((item) => rows.push(toRow(item, { soon: iso <= weekEndIso })));
+  }
+  return rows;
 }
 
 const CHIP_CLASS = { calendarEvent: 'calendar-chip-event', assignment: 'calendar-chip-assignment', reminder: 'calendar-chip-reminder' };
 
 const MAX_VISIBLE_CHIPS = 3;
 
-function dayCell(cell, { isSelected, onSelect, onContextMenu }) {
+// Notebook style marks. Each stroke's wobble is seeded by what it marks (the
+// day, the month) so rebuilding the grid on every render redraws identical
+// strokes instead of jittering.
+function dayNumber(cell, { notebook, drawToday }) {
+  const num = el('span', { class: 'calendar-day-num', text: String(cell.date.getDate()) });
+  if (notebook && cell.isToday) {
+    num.appendChild(sketchSvg([sketchCircle(20, 15, 16.5, 11.5, seededRandom(`today:${cell.iso}`))], { viewBox: [40, 30], draw: drawToday, className: 'sketch-today' }));
+  }
+  return num;
+}
+
+function dayMarks(cell, { isSelected, drawSelection }) {
+  const marks = [];
+  if (cell.isElapsed) {
+    marks.push(sketchSvg([sketchLine(0, 100, 100, 0, seededRandom(`slash:${cell.iso}`), { bow: 6, jitter: 4 })], { viewBox: [100, 100], stretch: true, evenStroke: true, className: 'sketch-slash' }));
+  }
+  if (isSelected) {
+    marks.push(sketchSvg(sketchBox(0, 0, 100, 100, seededRandom(`select:${cell.iso}`), { bow: 1.5, overshoot: 2.5, jitter: 1 }), { viewBox: [100, 100], stretch: true, draw: drawSelection, className: 'sketch-select' }));
+  }
+  return marks;
+}
+
+function dayCell(cell, { isSelected, onSelect, onContextMenu, notebook, drawToday, drawSelection }) {
   const visible = cell.items.slice(0, MAX_VISIBLE_CHIPS);
   const overflow = cell.items.length - visible.length;
 
@@ -100,6 +191,7 @@ function dayCell(cell, { isSelected, onSelect, onContextMenu }) {
         cell.isToday ? 'calendar-day-today' : '',
         isSelected ? 'calendar-day-selected' : '',
       ].filter(Boolean).join(' '),
+      'aria-current': cell.isToday ? 'date' : undefined,
       onclick: () => onSelect(cell.iso),
       oncontextmenu: (e) => {
         e.preventDefault();
@@ -107,7 +199,8 @@ function dayCell(cell, { isSelected, onSelect, onContextMenu }) {
       },
     },
     [
-      el('span', { class: 'calendar-day-num', text: String(cell.date.getDate()) }),
+      ...(notebook ? dayMarks(cell, { isSelected, drawSelection }) : []),
+      dayNumber(cell, { notebook, drawToday }),
       chips.length ? el('div', { class: 'calendar-day-chips' }, chips) : null,
     ],
   );
@@ -182,18 +275,42 @@ function dayPanel(cell, data, { onOpenDetail, onContextMenuItem, onAddReminder }
   return el('div', { class: 'calendar-daypanel' }, [header, el('div', { class: 'row-list' }, rows)]);
 }
 
+// What the previous Notebook-style render drew, so the next one knows which
+// marks are new. Module-level because renderBody() rebuilds the calendar from
+// scratch on every state change.
+let lastMarks = null;
+
+/** Which Notebook-style marks should draw themselves in on this render. The
+ * calendar is rebuilt on every state change (a background refresh, opening a
+ * menu), so a mark only animates when what it points at changed: a freshly
+ * shown view, a different month, or a new selection. Pure, for tests. */
+export function marksToDraw(prev, { fresh, monthKey, selected }) {
+  const monthChanged = fresh || !prev || prev.monthKey !== monthKey;
+  return { month: monthChanged, today: monthChanged, selection: monthChanged || prev.selected !== selected };
+}
+
 /** Builds the full stylized Calendar grid: month header with prev/next/today
  * nav, a weekday-labeled 6-week grid with merged event/assignment/reminder
  * dots per day, and a day panel below listing the selected day's items. */
-export function renderCalendarGrid(state, callbacks) {
+export function renderCalendarGrid(state, callbacks, { fresh = false } = {}) {
   const { onMonthChange, onToday, onSelectDay, onOpenDetail, onDayContextMenu, onRowContextMenu, onAddReminder, onDeleteReminder } = callbacks;
   const { year, month } = state.calendarViewMonth;
   const grid = buildCalendarMonth({ year, month, data: state.data, config: state.config, reminders: state.calendarReminders, today: new Date() });
 
+  const notebook = state.config.style === 'notebook';
+  const monthKey = `${year}-${month}`;
+  const draw = marksToDraw(lastMarks, { fresh, monthKey, selected: state.calendarSelectedDate });
+  lastMarks = notebook ? { monthKey, selected: state.calendarSelectedDate } : null;
+
+  const monthLabelEl = el('h2', { class: 'calendar-month-label', text: monthLabel(year, month) });
+  if (notebook) {
+    monthLabelEl.appendChild(sketchSvg([sketchLine(0, 4, 100, 4, seededRandom(`underline:${monthKey}`), { bow: 1.5, overshoot: 2, jitter: 1.2 })], { viewBox: [100, 8], stretch: true, draw: draw.month, className: 'sketch-underline' }));
+  }
+
   const header = el('div', { class: 'calendar-header' }, [
     el('div', { class: 'calendar-header-left' }, [
       el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('calendar.prevMonth'), title: t('calendar.prevMonth'), onclick: () => onMonthChange(-1) }, [svgIcon(iconPaths('chevronLeft'))]),
-      el('h2', { class: 'calendar-month-label', text: monthLabel(year, month) }),
+      monthLabelEl,
       el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('calendar.nextMonth'), title: t('calendar.nextMonth'), onclick: () => onMonthChange(1) }, [svgIcon(iconPaths('chevronRight'))]),
     ]),
     el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: onToday, text: t('calendar.today') }),
@@ -205,7 +322,13 @@ export function renderCalendarGrid(state, callbacks) {
     isSelected: cell.iso === state.calendarSelectedDate,
     onSelect: onSelectDay,
     onContextMenu: onDayContextMenu,
+    notebook,
+    drawToday: draw.today,
+    drawSelection: draw.selection,
   })));
+  // Rows are equal height (grid-auto-rows: 1fr), so one stretched overlay can
+  // rule the whole 7x6 grid instead of every cell drawing its own edges.
+  if (notebook) cellsEl.appendChild(sketchSvg(sketchGrid(7, 6, seededRandom(`grid:${monthKey}`)), { viewBox: [700, 600], stretch: true, evenStroke: true, className: 'sketch-grid' }));
 
   const selectedCell = grid.cells.find((c) => c.iso === state.calendarSelectedDate) ?? null;
   const panel = dayPanel(selectedCell, state.data, {

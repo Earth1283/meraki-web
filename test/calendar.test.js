@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toIsoDate, isoOf, monthCells, buildCalendarMonth, extractTime } from '../src/calendar.js';
+import { toIsoDate, isoOf, monthCells, buildCalendarMonth, extractTime, marksToDraw, calendarAgendaKinds } from '../src/calendar.js';
 import { i18nReady } from '../src/i18n.js';
 
 await i18nReady;
@@ -86,3 +86,73 @@ test('buildCalendarMonth sorts a day\'s items chronologically by HH:MM, undated 
   assert.deepEqual(day12.items.map((i) => i.title), ['Essay (no time)', 'Morning meeting', 'Afternoon assembly']);
   assert.deepEqual(day12.items.map((i) => i.time), ['00:00', '08:00', '14:00']);
 });
+
+test('monthCells crosses off only the already-gone days of today\'s own month', () => {
+  // April 2026 starts on a Wednesday, so the grid leads with Mar 29-31.
+  const april = Object.fromEntries(monthCells(2026, 3, new Date(2026, 3, 10)).map((c) => [c.iso, c]));
+  assert.equal(april['2026-04-01'].isElapsed, true);
+  assert.equal(april['2026-04-09'].isElapsed, true);
+  assert.equal(april['2026-04-10'].isElapsed, false, 'today is not crossed off yet');
+  assert.equal(april['2026-04-11'].isElapsed, false);
+  assert.equal(april['2026-03-31'].isElapsed, false, 'past days of other months stay clean');
+
+  // May 2026's grid leads with Apr 26-30; today's month still gets crossed off there.
+  const may = Object.fromEntries(monthCells(2026, 4, new Date(2026, 3, 28)).map((c) => [c.iso, c]));
+  assert.equal(may['2026-04-27'].isElapsed, true);
+  assert.equal(may['2026-04-28'].isElapsed, false);
+  assert.equal(may['2026-04-29'].isElapsed, false);
+});
+
+test('marksToDraw only animates notebook marks whose target changed', () => {
+  const at = { fresh: false, monthKey: '2026-3', selected: '2026-04-10' };
+  const all = { month: true, today: true, selection: true };
+  assert.deepEqual(marksToDraw(null, at), all);
+  assert.deepEqual(marksToDraw(at, at), { month: false, today: false, selection: false });
+  assert.deepEqual(marksToDraw(at, { ...at, selected: '2026-04-11' }), { month: false, today: false, selection: true });
+  assert.deepEqual(marksToDraw(at, { ...at, monthKey: '2026-4' }), all);
+  assert.deepEqual(marksToDraw(at, { ...at, fresh: true }), all);
+});
+
+test('calendarAgendaKinds merges events, assignments and reminders under day headers', () => {
+  const today = new Date(2026, 3, 10);
+  const data = dataWith({
+    calendar: [
+      { title: 'Assembly', event_date: '2026-04-08', start_time: '09:00:00' },
+      { title: 'Fair', event_date: '2026-04-10', start_time: '12:00:00' },
+      { title: 'Far off', event_date: '2026-05-01' },
+    ],
+    assignments: [
+      { id: 'undated', title: 'No due date', due_date: null },
+      { id: 'essay', title: 'Essay', due_date: '2026-04-10' },
+    ],
+  });
+  const reminders = [{ id: 'r1', title: 'Bring forms', date: '2026-04-12', note: null }];
+
+  const rows = calendarAgendaKinds({ data, config: CONFIG, reminders, collapse: {}, today });
+  assert.deepEqual(rows.map((r) => r.type), ['collapsible-header', 'now', 'header', 'item', 'item', 'header', 'item', 'header', 'item']);
+  assert.deepEqual(rows[0], { type: 'collapsible-header', section: 'calendarPast', label: rows[0].label, count: 1, collapsed: true });
+  assert.equal(rows[2].today, true);
+  assert.deepEqual(
+    rows.filter((r) => r.type === 'item').map((r) => [r.target.kind, r.target.index ?? r.target.reminder.id, r.soon]),
+    [['assignment', 1, true], ['calendarEvent', 1, true], ['reminder', 'r1', true], ['calendarEvent', 2, false]],
+    'sorted by day then time; the undated assignment keeps index 0 reserved; May is past this week',
+  );
+});
+
+test('calendarAgendaKinds unfolds past days on request and honors calendarShowAssignments', () => {
+  const today = new Date(2026, 3, 10);
+  const data = dataWith({
+    calendar: [{ title: 'Assembly', event_date: '2026-04-08', start_time: '09:00:00' }],
+    assignments: [{ id: 'essay', title: 'Essay', due_date: '2026-04-11' }],
+  });
+  const open = calendarAgendaKinds({ data, config: CONFIG, reminders: [], collapse: { calendarPast: false }, today });
+  assert.deepEqual(open.slice(0, 3).map((r) => r.type), ['collapsible-header', 'subheader', 'item']);
+  assert.deepEqual(open[2], { type: 'item', target: { kind: 'calendarEvent', index: 0 }, past: true });
+
+  const noAssignments = calendarAgendaKinds({ data, config: { calendarShowAssignments: false }, reminders: [], collapse: {}, today });
+  assert.ok(noAssignments.every((r) => r.target?.kind !== 'assignment'));
+  assert.deepEqual(noAssignments.slice(-2).map((r) => r.type), ['now', 'placeholder'], 'nothing upcoming once assignments are hidden');
+
+  assert.deepEqual(calendarAgendaKinds({ data: dataWith(), config: CONFIG, reminders: [], today }), []);
+});
+

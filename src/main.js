@@ -1,9 +1,11 @@
 import { el, clear, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
-import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setCalendarViewMonth, setCalendarSelectedDate, openReminderForm, removeCalendarReminder, addCalendarReminder } from './state.js';
-import { tabTitle, rowKinds, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs } from './rows.js';
+import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setCalendarViewMonth, setCalendarSelectedDate, openReminderForm, removeCalendarReminder, addCalendarReminder, rowKindsForCurrentTab } from './state.js';
+import { tabTitle, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs, emptyState, renderAttendanceTally } from './rows.js';
 import { renderAnalyticsTab, chartModeToggle, mountAnalyticsCharts, disposeAnalyticsCharts } from './analytics.js';
 import { renderCalendarGrid, calendarViewToggle } from './calendar.js';
+import { seededRandom, sketchBox, sketchLine, sketchTick, sketchSvg } from './sketch.js';
+import { GRADING_SCALES, overallGrade } from './grading.js';
 import { iconPaths } from './icons.js';
 import { privacyParagraphs } from './privacy.js';
 import { mountLogin, renderOverlay, renderDetailPanel, showToast, buildLanguageSwitcher } from './overlays.js';
@@ -170,7 +172,17 @@ let loadingChecklistEl = null;
 let loadingStepEls = null;
 let loadingProgressFillEl = null;
 
-function stepIconContent(status) {
+function stepIconContent(step) {
+  const { status } = step;
+  if (state.config.style === 'notebook') {
+    // A hand-drawn checkbox per step. updateLoadingChecklist() only swaps
+    // icons when a step's status changes, so the tick is created, and
+    // draws in, exactly once: on the transition to done.
+    const box = sketchSvg(sketchBox(1, 1, 18, 18, seededRandom(`step-box:${step.id}`), { bow: 0.8, overshoot: 1.5, jitter: 0.6 }), { viewBox: [20, 20], className: 'sketch-step-box' });
+    if (status === 'done') return [box, sketchSvg([sketchTick(3, 1, 16, seededRandom(`step-tick:${step.id}`))], { viewBox: [20, 20], draw: true, className: 'sketch-step-tick' })];
+    if (status === 'active') return [box, el('span', { class: 'spinner spinner-sm' })];
+    return [box];
+  }
   if (status === 'done') return svgIcon(iconPaths('check'));
   if (status === 'active') return el('span', { class: 'spinner spinner-sm' });
   return el('span', { class: 'loading-step-dot' });
@@ -178,7 +190,7 @@ function stepIconContent(status) {
 
 function buildLoadingChecklist() {
   loadingStepEls = state.loadingSteps.map((s) => {
-    const icon = el('span', { class: 'loading-step-icon' }, [stepIconContent(s.status)]);
+    const icon = el('span', { class: 'loading-step-icon' }, stepIconContent(s));
     const label = el('span', { class: 'loading-step-label', text: t(s.labelKey) });
     const li = el('li', { class: `loading-step is-${s.status}` }, [icon, label]);
     return { status: s.status, li, icon, label };
@@ -204,7 +216,7 @@ function updateLoadingChecklist() {
     stepEl.status = s.status;
     stepEl.li.className = `loading-step is-${s.status}`;
     clear(stepEl.icon);
-    stepEl.icon.appendChild(stepIconContent(s.status));
+    stepEl.icon.append(...[].concat(stepIconContent(s)));
   });
   const doneCount = state.loadingSteps.filter((s) => s.status === 'done').length;
   loadingProgressFillEl.style.width = `${(doneCount / state.loadingSteps.length) * 100}%`;
@@ -219,6 +231,22 @@ function updateLoadingChecklist() {
 // low-stakes) but keeps the just-deleted reminder around long enough to
 // re-add verbatim if the toast's Undo is clicked, so the missing confirm
 // dialog doesn't cost real recoverability.
+// Row context menus, plus Delete (with undo) for reminder rows in the
+// calendar list. Reminders live outside state.data, so that action is wired
+// here beside deleteReminderWithUndo rather than in contextmenu.js.
+function rowMenuItems(target) {
+  const items = menuItemsFor(target);
+  if (target.kind === 'reminder') {
+    const at = items.findIndex((item) => item.separator);
+    items.splice(at === -1 ? items.length : at, 0, {
+      icon: 'trash',
+      label: t('calendar.deleteReminderNamed', { title: target.reminder.title }),
+      action: () => deleteReminderWithUndo(target.reminder),
+    });
+  }
+  return items;
+}
+
 function deleteReminderWithUndo(reminder) {
   removeCalendarReminder(reminder.id);
   showToast(t('calendar.reminderDeleted'), 'ok', {
@@ -240,6 +268,20 @@ function dayContextMenuItems(cell) {
   }
   return items;
 }
+
+// The done badge on Overview rows and on the "caught up" placeholder: a green
+// check chip normally, a pen tick in Notebook style.
+function doneCheck(seed, draw) {
+  if (state.config.style !== 'notebook') return el('span', { class: 'row-done-check' }, [svgIcon(iconPaths('check'))]);
+  return el('span', { class: 'row-done-check' }, [
+    sketchSvg([sketchTick(3, 2, 15, seededRandom(`done:${seed}`))], { viewBox: [20, 20], draw, className: 'sketch-done-tick' }),
+  ]);
+}
+
+// The body "view" from the previous renderBody(), so views that animate on
+// arrival (the Notebook calendar's marks) can tell a fresh visit apart from
+// a same-view rebuild.
+let prevBodyView = null;
 
 function renderBody() {
   if (state.loading && !state.hasLoadedOnce) {
@@ -267,6 +309,10 @@ function renderBody() {
   disposeAnalyticsCharts();
   clear(body);
   body.classList.toggle('chat-mode', state.tab === 'messages' && state.chatMode);
+  const notebook = state.config.style === 'notebook';
+  const bodyView = [state.tab, state.chatMode, state.config.calendarView, state.config.style].join(':');
+  const freshView = bodyView !== prevBodyView;
+  prevBodyView = bodyView;
 
   if (state.tab === 'messages' && state.chatMode) {
     renderChat(body);
@@ -308,22 +354,36 @@ function renderBody() {
       onDayContextMenu: (x, y, cell) => openContextMenu(x, y, dayContextMenuItems(cell)),
       onAddReminder: (iso) => openReminderForm(iso),
       onDeleteReminder: deleteReminderWithUndo,
-    }));
+    }, { fresh: freshView }));
     return;
   }
 
   if (state.tab === 'overview') {
-    body.appendChild(renderOverviewStats(overviewSummary(state.data), setTab));
+    const summary = overviewSummary(state.data);
+    body.appendChild(renderOverviewStats(summary, setTab, {
+      notebook,
+      draw: freshView,
+      grade: overallGrade(state.data, state.config.gradingScale, summary.avgGradePct),
+      onPickScale: (x, y) => openContextMenu(x, y, GRADING_SCALES.map((scale) => ({
+        icon: scale === state.config.gradingScale ? 'check' : null,
+        label: t(`grade.scale.${scale}`),
+        action: () => setConfig({ gradingScale: scale }),
+      }))),
+    }));
+  }
+  if (state.tab === 'attendance' && notebook && state.data.attendance.length) {
+    body.appendChild(renderAttendanceTally(state.data.attendance, { draw: freshView }));
   }
 
-  const kinds = rowKinds(state.tab, state.data, new Date(), state.overviewCollapse);
+  const kinds = rowKindsForCurrentTab();
   if (kinds.length === 0) {
-    body.appendChild(el('div', { class: 'empty-state' }, [el('div', { class: 'empty-icon', text: '·' }), el('p', { text: t('state.nothingHere') })]));
+    body.appendChild(emptyState(t('state.nothingHere'), { notebook, draw: freshView }));
     return;
   }
 
   let itemCounter = -1;
-  const list = el('div', { class: 'row-list' });
+  let swipeCount = 0;
+  const list = el('div', { class: notebook && state.tab === 'announcements' ? 'row-list corkboard' : 'row-list' });
   // Rows belonging to the current collapsible section (between a
   // collapsible-header and the next header of any kind) land in this
   // group container instead of directly in `list`, so the reveal
@@ -335,7 +395,25 @@ function renderBody() {
   for (const kind of kinds) {
     if (kind.type === 'header') {
       activeGroup = null;
-      list.appendChild(el('div', { class: 'row-section', text: kind.label }));
+      list.appendChild(
+        kind.today
+          ? el('div', { class: 'row-section row-section-today' }, [el('span', { class: 'row-section-mark', text: kind.label })])
+          : el('div', { class: 'row-section', text: kind.label }),
+      );
+    } else if (kind.type === 'subheader') {
+      (activeGroup ?? list).appendChild(el('div', { class: 'row-section row-subsection', text: kind.label }));
+    } else if (kind.type === 'now') {
+      // The calendar list's "you are here" line between past and upcoming
+      // days. Notebook-only: the plain list already marks today's header.
+      activeGroup = null;
+      if (notebook) {
+        list.appendChild(
+          el('div', { class: 'agenda-now' }, [
+            el('span', { class: 'margin-note', text: t('calendar.youAreHere') }),
+            sketchSvg([sketchLine(0, 3, 100, 3, seededRandom('agenda-now'), { bow: 1, jitter: 0.8 })], { viewBox: [100, 6], stretch: true, evenStroke: true, className: 'sketch-now-line' }),
+          ]),
+        );
+      }
     } else if (kind.type === 'collapsible-header') {
       const wasCollapsed = prevOverviewCollapse[kind.section];
       const justToggled = wasCollapsed !== undefined && wasCollapsed !== kind.collapsed;
@@ -376,7 +454,7 @@ function renderBody() {
       const isGood = kind.tone === 'good';
       (activeGroup ?? list).appendChild(
         el('div', { class: `row-placeholder ${isGood ? 'row-placeholder-good' : ''}` }, [
-          isGood ? el('span', { class: 'row-done-check' }, [svgIcon(iconPaths('check'))]) : null,
+          isGood ? doneCheck('caught-up', freshView) : null,
           el('span', { text: kind.text }),
         ]),
       );
@@ -389,15 +467,19 @@ function renderBody() {
       const rowIndex = itemCounter;
       const isSelected = rowIndex === state.selectedIndex;
       const target = kind.target;
+      // Notebook marks on done rows draw in when the view is fresh or their
+      // collapsed section was just opened, not on every rebuild.
+      const revealing = freshView || !!activeGroup?.classList.contains('reveal-pending');
       const rowBtn = el(
         'button',
         {
-          class: `row-item ${isSelected ? 'selected' : ''} ${kind.done ? 'row-item-done' : ''}`,
+          class: `row-item ${isSelected ? 'selected' : ''} ${kind.done ? 'row-item-done' : ''} ${kind.past ? 'row-item-past' : ''}`,
           type: 'button',
+          'data-kind': target.kind,
           onclick: () => openDetailFor(target, rowIndex),
           oncontextmenu: (e) => {
             e.preventDefault();
-            openContextMenu(e.clientX, e.clientY, menuItemsFor(target));
+            openContextMenu(e.clientX, e.clientY, rowMenuItems(target));
           },
           // The keyboard's menu key (and its Shift+F10 fallback) opens the
           // same context menu mouse right-click does, anchored under the
@@ -406,14 +488,32 @@ function renderBody() {
             if (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10')) return;
             e.preventDefault();
             const rect = e.currentTarget.getBoundingClientRect();
-            openContextMenu(rect.left, rect.bottom, menuItemsFor(target));
+            openContextMenu(rect.left, rect.bottom, rowMenuItems(target));
           },
         },
         [
-          kind.done ? el('span', { class: 'row-done-check' }, [svgIcon(iconPaths('check'))]) : null,
+          kind.done ? doneCheck(`${target.kind}:${target.index}`, revealing) : null,
           renderItemBody(target, state.data, state.ownUserId),
         ],
       );
+      if ((kind.done || kind.past) && notebook) {
+        rowBtn.querySelector('.row-title')?.appendChild(
+          sketchSvg([sketchLine(0, 5, 100, 5, seededRandom(`strike:${target.kind}:${target.index ?? target.reminder?.id}`), { bow: 1.2, overshoot: 3, jitter: 1.5 })], { viewBox: [100, 10], stretch: true, draw: revealing, className: 'sketch-strike' }),
+        );
+      }
+      // Notebook calendar list: this week's items swiped in a highlighter
+      // colored by kind, swiping in one after another on a fresh visit.
+      if (kind.soon && notebook) {
+        const title = rowBtn.querySelector('.row-title');
+        if (title) {
+          title.classList.add('hl-swipe', `hl-${target.kind}`);
+          if (freshView) {
+            title.classList.add('hl-swipe-in');
+            title.style.setProperty('--i', String(swipeCount));
+          }
+          swipeCount += 1;
+        }
+      }
       (activeGroup ?? list).appendChild(rowBtn);
     }
   }
