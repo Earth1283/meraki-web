@@ -4,6 +4,7 @@ import * as api from './api.js';
 import { rowKinds, TAB_IDS } from './rows.js';
 import { PAGE_SIZE, hasMoreRows } from './paging.js';
 import { calendarAgendaKinds } from './calendar.js';
+import { t } from './i18n.js';
 
 const SIDEBAR_KEY = 'meraki-web.sidebarCollapsed';
 function loadSidebarCollapsed() {
@@ -135,6 +136,7 @@ export const state = {
   data: emptyData(),
   ownUserId: '',
   ownStudentId: null,
+  ownStudentName: '',
   loading: true,
   // True once the first refresh() has completed — background refreshes
   // (e.g. the reconciling one after an optimistic write) still flip
@@ -145,7 +147,7 @@ export const state = {
   // Only populated during the first load (see STEP_GROUPS); empty otherwise.
   loadingSteps: [],
   error: null,
-  selectedIndex: 0,
+  selectedIndex: -1,
   // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'turnin' | 'help' | 'settings' | 'detail' | null
   activeOverlay: null,
   // Set by openCompose() to prefill the compose form (e.g. replying to a
@@ -188,7 +190,8 @@ export const state = {
   calendarViewMonth: (() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })(),
   // iso date ('YYYY-MM-DD') of the day selected in the calendar grid, whose
   // items are shown in the day panel below it.
-  calendarSelectedDate: new Date().toISOString().slice(0, 10),
+  calendarSelectedDate: null,
+  mobileCalendarView: null,
   activeThreadPartnerId: null,
   // Overview's "Due this week" split. Not persisted — resets to the
   // intended default (todo open, done tucked away) on every load rather
@@ -230,8 +233,8 @@ export function doLogout() {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   autoRefreshTimer = null;
   Object.assign(state, {
-    tab: 'overview', data: emptyData(), ownUserId: '', ownStudentId: null,
-    loading: true, hasLoadedOnce: false, status: 'Loading…', error: null, selectedIndex: 0,
+    tab: 'overview', data: emptyData(), ownUserId: '', ownStudentId: null, ownStudentName: '',
+    loading: true, hasLoadedOnce: false, status: 'Loading…', error: null, selectedIndex: -1,
     activeOverlay: null, detailTarget: null, detailBackStack: [], whatIf: {}, pages: {},
   });
   notify();
@@ -249,7 +252,17 @@ export function setConfig(patch) {
 }
 
 export function resetConfig() {
+  const previous = structuredClone(state.config);
   state.config = { ...DEFAULT_CONFIG };
+  persistConfig();
+  applyConfigEffects(state.config);
+  restartAutoRefresh();
+  notify();
+  return previous;
+}
+
+export function restoreConfig(config) {
+  state.config = structuredClone(config);
   persistConfig();
   applyConfigEffects(state.config);
   restartAutoRefresh();
@@ -353,7 +366,11 @@ export async function refresh() {
       ]);
       if (heroRes.status === 'fulfilled') state.data.hero = heroRes.value[0] ?? null;
       else record(api.friendlyLoadError('your hero profile', heroRes.reason));
-      if (studentsRes.status === 'fulfilled') state.ownStudentId = studentsRes.value[0]?.id ?? null;
+      if (studentsRes.status === 'fulfilled') {
+        const student = studentsRes.value[0];
+        state.ownStudentId = student?.id ?? null;
+        state.ownStudentName = [student?.first_name, student?.last_name].filter(Boolean).join(' ');
+      }
       else record(api.friendlyLoadError('your student record', studentsRes.reason));
     }
 
@@ -367,7 +384,11 @@ export async function refresh() {
   state.hasLoadedOnce = true;
   state.status = 'Ready.';
   state.loadingSteps = [];
-  state.error = errors.length ? errors.join('  ') : null;
+  state.error = errors.length === 0
+    ? null
+    : errors.length === 1
+      ? errors[0]
+      : t('state.partialLoadError', { n: errors.length });
   const expired = errors.some((e) => e.toLowerCase().includes('log in again'));
   clampSelection();
   notify();
@@ -472,13 +493,14 @@ export function currentItemTargets() {
 
 function clampSelection() {
   const n = currentItemTargets().length;
-  state.selectedIndex = n === 0 ? -1 : Math.min(Math.max(state.selectedIndex, 0), n - 1);
+  if (n === 0 || state.selectedIndex < 0) state.selectedIndex = -1;
+  else state.selectedIndex = Math.min(state.selectedIndex, n - 1);
 }
 
 export function setTab(tabId) {
   state.tab = tabId;
   state.activeOverlay = null;
-  state.selectedIndex = 0;
+  state.selectedIndex = -1;
   state.mobileNavOpen = false;
   clampSelection();
   notify();
@@ -565,6 +587,11 @@ export function setCalendarSelectedDate(iso) {
   notify();
 }
 
+export function setMobileCalendarView(view) {
+  state.mobileCalendarView = view;
+  notify();
+}
+
 export function setActiveThread(partnerId) {
   state.activeThreadPartnerId = partnerId;
   notify();
@@ -573,7 +600,8 @@ export function setActiveThread(partnerId) {
 export function moveSelection(delta) {
   const n = currentItemTargets().length;
   if (n === 0) return;
-  state.selectedIndex = Math.min(Math.max((state.selectedIndex < 0 ? 0 : state.selectedIndex) + delta, 0), n - 1);
+  if (state.selectedIndex < 0) state.selectedIndex = delta < 0 ? n - 1 : 0;
+  else state.selectedIndex = Math.min(Math.max(state.selectedIndex + delta, 0), n - 1);
   notify();
 }
 

@@ -6,7 +6,7 @@ import { state, closeOverlay, openDetailFor, refresh, notify } from './state.js'
 import { showToast } from './toast.js';
 import { sidePanel } from './panels.js';
 import { turnInProblem, turnInWrite, submissionStoragePath } from './submission.js';
-import { formatBytes, submissionForAssignment } from './rows.js';
+import { formatBytes, formatDate, submissionForAssignment } from './rows.js';
 import { t } from './i18n.js';
 
 /** Uploads a new file first (to storage, then its file_uploads row), then
@@ -150,7 +150,7 @@ export function buildTurnInForm() {
     [
       el('p', { class: 'turnin-assignment' }, [
         el('strong', { text: assignment.title }),
-        assignment.due_date ? el('span', { class: 'turnin-due', text: t('field.due', { date: assignment.due_date }) }) : null,
+        assignment.due_date ? el('span', { class: 'turnin-due', text: t('field.due', { date: formatDate(assignment.due_date) }) }) : null,
       ]),
       assignment.description ? el('p', { class: 'detail-body turnin-instructions', text: assignment.description }) : null,
       el('label', { class: 'field-label', text: t('turnin.bodyLabel') }),

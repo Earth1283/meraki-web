@@ -8,7 +8,7 @@ const toastRoot = document.getElementById('toast-root');
 // "Undo" on a destructive-but-recoverable action — so the toast doubles as
 // the confirmation and the recovery path instead of needing a separate
 // "are you sure?" dialog before the action happens.
-export function showToast(text, kind = 'ok', action = null, { flourish = null } = {}) {
+export function showToast(text, kind = 'ok', action = null, { flourish = null, duration = null } = {}) {
   let dismissed = false;
   const dismiss = () => {
     if (dismissed) return;
@@ -28,5 +28,5 @@ export function showToast(text, kind = 'ok', action = null, { flourish = null } 
   ]);
   toastRoot.appendChild(node);
   requestAnimationFrame(() => node.classList.add('in'));
-  setTimeout(dismiss, action ? 5000 : 3200);
+  setTimeout(dismiss, duration ?? (action ? 5000 : 3200));
 }

@@ -3,7 +3,7 @@ import { seededRandom, sketchCircle, sketchFace, sketchSvg } from './sketch.js';
 import { GRADING_SCALES } from './grading.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
-import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, addCalendarReminder, openCompose, openReminderForm } from './state.js';
+import { state, closeOverlay, refresh, doLogout, setTab, openOverlay, openSubDetail, detailGoBack, nextTempId, optimisticInsert, setConfig, resetConfig, restoreConfig, addCalendarReminder, openCompose, openReminderForm } from './state.js';
 import { tabs, TAB_IDS, moodLabels, detailFields, commandLabels, filterLabels, fieldDisplay, classSections, renderItemBody, orderedTabIds } from './rows.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 import { t, LOCALES, getLocale, setLocale } from './i18n.js';
@@ -14,6 +14,7 @@ import { detailSections } from './detail-sections.js';
 import { buildPortfolioForm } from './portfolio.js';
 import { buildTurnInForm } from './turnin.js';
 import { sendMessage } from './messaging.js';
+import { isoOf } from './calendar.js';
 
 const overlayRoot = document.getElementById('overlay-root');
 const detailPanel = document.getElementById('detail-panel');
@@ -37,22 +38,22 @@ export function buildLanguageSwitcher(extraClass = '') {
   return select;
 }
 
-/** Flicking the login sticky note swings it from its tape (.is-swinging in
- * styles.css). Clicks mid-swing are ignored rather than restarting it, which
- * would snap the note back to rest first; so is the click that ends a text
- * selection, so the note doesn't jerk away from someone copying it. */
-function swingNote(note) {
-  if (note.classList.contains('is-swinging') || String(window.getSelection())) return;
-  note.classList.add('is-swinging');
-}
-
-function settleNote(e) {
-  if (e.animationName === 'note-swing') e.currentTarget.classList.remove('is-swinging');
-}
-
 export function mountLogin(root, onLoggedIn) {
-  const emailInput = el('input', { type: 'text', name: 'email', autocomplete: 'username', required: true, placeholder: t('login.emailPlaceholder') });
-  const passwordInput = el('input', { type: 'password', name: 'password', autocomplete: 'current-password', required: true, placeholder: '••••••••' });
+  const emailInput = el('input', { id: 'login-identity', type: 'text', name: 'email', autocomplete: 'username', autocapitalize: 'none', spellcheck: 'false', required: true, placeholder: t('login.emailPlaceholder') });
+  const passwordInput = el('input', { id: 'login-password', type: 'password', name: 'password', autocomplete: 'current-password', required: true, placeholder: '••••••••' });
+  const revealButton = el('button', {
+    class: 'password-reveal',
+    type: 'button',
+    'aria-label': t('login.showPassword'),
+    title: t('login.showPassword'),
+    onclick: () => {
+      const reveal = passwordInput.type === 'password';
+      passwordInput.type = reveal ? 'text' : 'password';
+      revealButton.setAttribute('aria-label', t(reveal ? 'login.hidePassword' : 'login.showPassword'));
+      revealButton.setAttribute('title', t(reveal ? 'login.hidePassword' : 'login.showPassword'));
+      revealButton.replaceChildren(svgIcon(iconPaths(reveal ? 'eyeOff' : 'eye')));
+    },
+  }, [svgIcon(iconPaths('eye'))]);
   const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: true });
   const submitBtn = el('button', { class: 'btn btn-primary btn-block', type: 'submit', text: t('login.submit') });
 
@@ -79,12 +80,16 @@ export function mountLogin(root, onLoggedIn) {
       },
     },
     [
-      el('label', { class: 'field-label', text: t('login.email') }),
+      el('label', { class: 'field-label', for: 'login-identity', text: t('login.identity') }),
       emailInput,
-      el('label', { class: 'field-label', text: t('login.password') }),
-      passwordInput,
+      el('label', { class: 'field-label', for: 'login-password', text: t('login.password') }),
+      el('div', { class: 'password-field' }, [passwordInput, revealButton]),
       errorLine,
       submitBtn,
+      el('p', { class: 'login-help' }, [
+        el('a', { href: api.APP_URL, target: '_blank', rel: 'noopener', text: t('login.signInHelp') }),
+        document.createTextNode(` ${t('login.contactSchool')}`),
+      ]),
     ],
   );
 
@@ -95,11 +100,11 @@ export function mountLogin(root, onLoggedIn) {
       el('div', { class: 'login-card' }, [
         el('h1', { class: 'brand', text: t('brand') }),
         el('p', { class: 'login-sub', text: t('login.subtitle') }),
+        el('div', { class: 'login-trust', role: 'note' }, [
+          el('p', { class: 'login-trust-title', text: t('login.privacyTitle') }),
+          el('p', { class: 'login-trust-body', text: t('login.privacyBody') }),
+        ]),
         form,
-      ]),
-      el('div', { class: 'sticky-note', role: 'note', onclick: (e) => swingNote(e.currentTarget), onanimationend: settleNote }, [
-        el('p', { class: 'sticky-note-title', text: t('login.noteTitle') }),
-        el('p', { class: 'sticky-note-body', text: t('login.noteBody') }),
       ]),
     ]),
   );
@@ -203,7 +208,7 @@ export function renderDetailPanel() {
   lastDetailTargetKey = targetKey;
   clear(detailPanel);
   const { title, fields, body } = detailFields(target, state.data);
-  const fieldNodes = fields.map(([label, value]) => {
+  const fieldNodes = fields.filter(([, value]) => value !== '' && value != null).map(([label, value]) => {
     const display = fieldDisplay(value);
     const empty = display === 'No data';
     return el('div', { class: 'detail-field' }, [
@@ -213,7 +218,7 @@ export function renderDetailPanel() {
   });
 
   let bodyNode = null;
-  if (body !== undefined) {
+  if (body !== undefined && body !== null && body !== '') {
     const display = fieldDisplay(body);
     bodyNode = el('p', { class: `detail-body ${display === 'No data' ? 'empty' : ''}`, text: display });
   }
@@ -224,7 +229,20 @@ export function renderDetailPanel() {
   }
   headerLeft.push(el('h2', { text: fieldDisplay(title) }));
 
-  detailPanel.appendChild(el('div', { class: 'panel-header' }, [el('div', { class: 'panel-header-left' }, headerLeft), closeButton()]));
+  const detailMenu = el('button', {
+    class: 'btn-icon',
+    type: 'button',
+    'aria-label': t('menu.moreActions'),
+    title: t('menu.moreActions'),
+    onclick: (event) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      openContextMenu(rect.right, rect.bottom, menuItemsFor(target));
+    },
+  }, [svgIcon(iconPaths('more'))]);
+  detailPanel.appendChild(el('div', { class: 'panel-header' }, [
+    el('div', { class: 'panel-header-left' }, headerLeft),
+    el('div', { class: 'panel-header-actions' }, [detailMenu, closeButton()]),
+  ]));
   detailPanel.appendChild(el('div', { class: 'detail-fields' }, fieldNodes));
   if (bodyNode) detailPanel.appendChild(bodyNode);
   if (target.kind === 'fileUpload') {
@@ -336,18 +354,19 @@ function buildCompose() {
   const prefill = state.composePrefill;
   const select = el(
     'select',
-    { class: 'field-input' },
-    recipients.map((r) => el('option', { value: r.id, selected: prefill?.recipientId === r.id || undefined }, r.name)),
+    { id: 'compose-recipient', class: 'field-input', required: true },
+    [el('option', { value: '', disabled: true, selected: !prefill?.recipientId, text: t('compose.chooseRecipient') }), ...recipients.map((r) => el('option', { value: r.id, selected: prefill?.recipientId === r.id || undefined }, r.name))],
   );
-  const subject = el('input', { class: 'field-input', type: 'text', maxlength: 200, placeholder: t('compose.subject'), value: prefill?.subject || undefined });
-  const body = el('textarea', { class: 'field-input textarea', rows: 6, placeholder: t('compose.messagePlaceholder') });
+  const subject = el('input', { id: 'compose-subject', class: 'field-input', type: 'text', maxlength: 200, placeholder: t('compose.subject'), value: prefill?.subject || undefined });
+  const body = el('textarea', { id: 'compose-message', class: 'field-input textarea', rows: 6, placeholder: t('compose.messagePlaceholder'), required: true });
+  const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: true });
   const sendBtn = el('button', { class: 'btn btn-primary', type: 'submit', text: t('compose.send') });
   // The official site notifies the recipient after every send; here it's a
   // visible choice, on by default. Hidden for notes to yourself.
   const notifyBox = el('input', { type: 'checkbox', checked: true });
   const notifyRow = el('label', { class: 'check-row' }, [notifyBox, el('span', { text: t('compose.notify') })]);
   const syncNotify = () => {
-    notifyRow.hidden = select.value === state.ownUserId;
+    notifyRow.hidden = !select.value || select.value === state.ownUserId;
   };
   select.addEventListener('change', syncNotify);
   syncNotify();
@@ -358,8 +377,13 @@ function buildCompose() {
       class: 'panel-form',
       onsubmit: (e) => {
         e.preventDefault();
-        if (recipients.length === 0) return;
-        const message = { recipientId: select.value, subject: subject.value, body: body.value, notifyRecipient: !notifyRow.hidden && notifyBox.checked };
+        const messageBody = body.value.trim();
+        if (!select.value || !messageBody) {
+          errorLine.textContent = t('compose.missingFields');
+          errorLine.hidden = false;
+          return;
+        }
+        const message = { recipientId: select.value, subject: subject.value.trim(), body: messageBody, notifyRecipient: !notifyRow.hidden && notifyBox.checked };
 
         // Optimistic: close and confirm immediately, reconcile in the
         // background — see optimisticInsert in state.js.
@@ -369,13 +393,14 @@ function buildCompose() {
       },
     },
     [
-      el('label', { class: 'field-label', text: t('compose.to') }),
+      el('label', { class: 'field-label', for: 'compose-recipient', text: t('compose.to') }),
       select,
-      el('label', { class: 'field-label', text: t('compose.subject') }),
+      el('label', { class: 'field-label', for: 'compose-subject', text: t('compose.subject') }),
       subject,
-      el('label', { class: 'field-label', text: t('compose.message') }),
+      el('label', { class: 'field-label', for: 'compose-message', text: t('compose.message') }),
       body,
       notifyRow,
+      errorLine,
       el('div', { class: 'panel-actions' }, [el('button', { class: 'btn btn-ghost', type: 'button', onclick: closeOverlay, text: t('compose.cancel') }), sendBtn]),
     ],
   );
@@ -444,7 +469,7 @@ function buildCheckin() {
         }
         const moodVal = mood;
         const noteVal = note.value || null;
-        const dateVal = new Date().toISOString().slice(0, 10);
+        const dateVal = isoOf(new Date());
 
         // Optimistic: close and confirm immediately, reconcile in the
         // background — see optimisticInsert in state.js.
@@ -479,7 +504,7 @@ function buildCheckin() {
 // closes immediately rather than going through optimisticInsert's
 // insert-then-reconcile flow.
 function buildReminder() {
-  const prefillDate = state.reminderPrefill || new Date().toISOString().slice(0, 10);
+  const prefillDate = state.reminderPrefill || isoOf(new Date());
   const title = el('input', { class: 'field-input', type: 'text', placeholder: t('reminder.titlePlaceholder'), required: true, maxlength: 120 });
   const date = el('input', { class: 'field-input', type: 'date', value: prefillDate, required: true });
   const note = el('textarea', { class: 'field-input textarea', rows: 3, placeholder: t('reminder.notePlaceholder') });
@@ -619,28 +644,26 @@ function segmented(options, value, onPick) {
   );
 }
 
-function settingsSection(title, hint, children) {
-  const kids = [el('h3', { class: 'settings-section-title', text: title })];
+function settingsSection(title, hint, children, open = false) {
+  const kids = [el('summary', { class: 'settings-section-title', text: title })];
   if (hint) kids.push(el('p', { class: 'settings-hint', text: hint }));
   kids.push(...children);
-  return el('div', { class: 'settings-section' }, kids);
+  return el('details', { class: 'settings-section', open }, kids);
 }
 
 function accentPicker() {
   return el(
     'div',
     { class: 'accent-row' },
-    ACCENTS.map(([id, hex]) =>
-      el('button', {
+    ACCENTS.map(([id, hex]) => {
+      const label = t(`settings.accent.${id}`);
+      return el('button', {
         type: 'button',
-        class: `accent-swatch ${state.config.accent === id ? 'active' : ''}`,
-        style: `--swatch:${hex}`,
-        'aria-label': `${id} accent`,
+        class: `accent-option ${state.config.accent === id ? 'active' : ''}`,
         'aria-pressed': state.config.accent === id,
-        title: id[0].toUpperCase() + id.slice(1),
         onclick: () => setConfig({ accent: id }),
-      }),
-    ),
+      }, [el('span', { class: 'accent-swatch', style: `--swatch:${hex}` }), el('span', { text: label })]);
+    }),
   );
 }
 
@@ -768,7 +791,7 @@ function buildSettings() {
         cfg.style,
         (v) => setConfig({ style: v }),
       ),
-    ]),
+    ], true),
     settingsSection(t('settings.timeAndData'), null, [
       el('label', { class: 'field-label', text: t('settings.clock') }),
       segmented(
@@ -791,26 +814,53 @@ function buildSettings() {
       t('settings.navigation.hint'),
       [
         el('label', { class: 'field-label', text: t('settings.defaultTab') }),
-        segmented(
-          tabs().map((tb) => [tb.id, tb.title]),
-          cfg.defaultTab,
-          (v) => setConfig({ defaultTab: v }),
-        ),
+        el('select', { class: 'field-input settings-default-tab', onchange: (event) => setConfig({ defaultTab: event.target.value }) },
+          tabs().map((tb) => el('option', { value: tb.id, selected: cfg.defaultTab === tb.id }, tb.title))),
         el('div', { class: 'settings-tab-list' }, order.map((id, i) => tabRow(id, i, order.length))),
       ],
     ),
     el('div', { class: 'panel-actions' }, [
-      el('button', { class: 'btn btn-ghost', type: 'button', onclick: () => resetConfig(), text: t('settings.resetDefaults') }),
+      resetButton(),
     ]),
   ]);
   return el('div', { class: 'overlay-right' }, [backdrop(closeOverlay), panel]);
+}
+
+function resetButton() {
+  let armed = false;
+  let armTimer = null;
+  const button = el('button', {
+    class: 'btn btn-ghost reset-button',
+    type: 'button',
+    onclick: () => {
+      if (!armed) {
+        armed = true;
+        button.textContent = t('settings.resetConfirm');
+        button.classList.add('armed');
+        clearTimeout(armTimer);
+        armTimer = setTimeout(() => {
+          armed = false;
+          button.textContent = t('settings.resetDefaults');
+          button.classList.remove('armed');
+        }, 6900);
+        return;
+      }
+      clearTimeout(armTimer);
+      const previous = resetConfig();
+      showToast(t('settings.resetDone'), 'ok', {
+        label: t('action.undo'),
+        onClick: () => restoreConfig(previous),
+      }, { duration: 6900 });
+    },
+    text: t('settings.resetDefaults'),
+  });
+  return button;
 }
 
 function buildHelp() {
   const rows = [
     ['j / ↓, k / ↑', t('help.moveSelection')],
     ['Enter', t('help.openDetail')],
-    ['Tab / Shift+Tab', t('help.switchTab')],
     ['Ctrl/⌘+P', t('help.commandPalette')],
     ['n', t('help.newMessage')],
     ['r', t('help.refresh')],

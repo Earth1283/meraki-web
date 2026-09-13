@@ -1,5 +1,5 @@
 import { el, svgIcon } from './dom.js';
-import { t } from './i18n.js';
+import { t, getDateLocale } from './i18n.js';
 import { iconPaths } from './icons.js';
 import { seededRandom, sketchCircle, sketchSpiral, sketchStar, sketchSvg, sketchTallyGroup, tallyGroups } from './sketch.js';
 import { strikeNumber, strikeSlip } from './slips.js';
@@ -12,6 +12,18 @@ export function moodLabels() {
 }
 
 export const TAB_IDS = ['overview', 'classes', 'grades', 'analytics', 'assignments', 'attendance', 'calendar', 'announcements', 'messages', 'me', 'myrecord', 'privacy'];
+
+export const NAV_GROUPS = [
+  { id: 'home', labelKey: 'nav.group.home', tabs: ['overview'] },
+  { id: 'academics', labelKey: 'nav.group.academics', tabs: ['classes', 'grades', 'analytics', 'assignments'] },
+  { id: 'school', labelKey: 'nav.group.school', tabs: ['attendance', 'calendar', 'announcements'] },
+  { id: 'connect', labelKey: 'nav.group.connect', tabs: ['messages'] },
+  { id: 'account', labelKey: 'nav.group.account', tabs: ['me', 'myrecord', 'privacy'] },
+];
+
+export function navGroupForTab(tabId) {
+  return NAV_GROUPS.find((group) => group.tabs.includes(tabId));
+}
 
 export function tabs() {
   return TAB_IDS.map((id) => ({ id, title: t(`tab.${id}`) }));
@@ -150,10 +162,18 @@ export function pctClass(pct) {
 }
 
 export function statusClass(status) {
-  if (status === 'present') return 'good';
+  if (['present', 'positive', 'submitted', 'collected', 'returned', 'complete', 'completed'].includes(status)) return 'good';
   if (status === 'absent') return 'bad';
-  if (status === 'tardy' || status === 'late') return 'warn';
+  if (['tardy', 'late', 'scheduled', 'pending'].includes(status)) return 'warn';
   return 'dim';
+}
+
+export function humanizeStatus(value) {
+  if (value == null || value === '') return null;
+  const key = `status.${String(value).toLowerCase()}`;
+  const translated = t(key);
+  if (translated !== key) return translated;
+  return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function startOfDay(d) {
@@ -267,9 +287,19 @@ export function submissionForAssessment(data, assessment) {
   );
 }
 
-export function formatDateTime(iso) {
+export function formatDate(iso, { time = false } = {}) {
   if (!iso) return null;
-  return iso.slice(0, 16).replace('T', ' ');
+  const value = String(iso);
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const date = dateOnly ? parseDateOnly(value) : new Date(value);
+  if (!date || Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(getDateLocale(), time && !dateOnly
+    ? { dateStyle: 'medium', timeStyle: 'short' }
+    : { dateStyle: 'medium' }).format(date);
+}
+
+export function formatDateTime(iso) {
+  return formatDate(iso, { time: true });
 }
 
 export function dayKey(iso) {
@@ -280,19 +310,17 @@ export function formatDaySeparator(iso, today = new Date()) {
   const diffDays = Math.round((startOfDay(iso) - startOfDay(today)) / 86400000);
   if (diffDays === 0) return t('chat.today');
   if (diffDays === -1) return t('chat.yesterday');
-  return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(getDateLocale(), { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 export function formatTime12(iso, use24h = false) {
   if (!iso) return '';
   const d = new Date(iso);
-  const m = String(d.getMinutes()).padStart(2, '0');
-  if (use24h) return `${String(d.getHours()).padStart(2, '0')}:${m}`;
-  let h = d.getHours();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h %= 12;
-  if (h === 0) h = 12;
-  return `${h}:${m} ${ampm}`;
+  return new Intl.DateTimeFormat(getDateLocale(), {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: !use24h,
+  }).format(d);
 }
 
 export function formatBytes(n) {
@@ -397,7 +425,7 @@ export function renderItemBody(target, data, ownUserId) {
       const cls = a.classes?.name ?? data.classes.find((c) => c.id === a.class_id)?.name ?? '';
       return itemRow({
         title: a.title,
-        pillNode: pill(a.due_date ? t('field.due', { date: a.due_date }) : null, 'accent'),
+        pillNode: pill(a.due_date ? t('field.due', { date: formatDate(a.due_date) }) : null, 'accent'),
         meta: [cls, a.category, a.points_possible != null ? t('field.pts', { n: a.points_possible }) : null].filter(Boolean).join(' · '),
       });
     }
@@ -406,8 +434,8 @@ export function renderItemBody(target, data, ownUserId) {
       const sc = statusClass(r.status);
       return itemRow({
         leading: dot(sc),
-        title: r.date,
-        pillNode: pill(r.status, sc),
+        title: formatDate(r.date),
+        pillNode: pill(humanizeStatus(r.status), sc),
         meta: r.note ?? '',
       });
     }
@@ -415,7 +443,7 @@ export function renderItemBody(target, data, ownUserId) {
       const e = data.calendar[target.index];
       return itemRow({
         title: e.title,
-        pillNode: pill(e.event_date, 'accent'),
+        pillNode: pill(formatDate(e.event_date), 'accent'),
         meta: [e.category, e.location].filter(Boolean).join(' · '),
       });
     }
@@ -434,7 +462,7 @@ export function renderItemBody(target, data, ownUserId) {
       return itemRow({
         title: a.title,
         titleClass: 'strong',
-        meta: a.created_at,
+        meta: formatDateTime(a.created_at),
         preview: truncate(a.body, 120),
       });
     }
@@ -447,7 +475,7 @@ export function renderItemBody(target, data, ownUserId) {
         title: m.subject ?? t('field.noSubject'),
         titleClass: unread ? 'strong' : 'dim',
         pillNode: unread ? dot('warn') : null,
-        meta: `${outgoing ? t('field.sent') : t('field.received')} · ${m.created_at}`,
+        meta: `${outgoing ? t('field.sent') : t('field.received')} · ${formatDateTime(m.created_at)}`,
         preview: truncate(m.body, 120),
       });
     }
@@ -456,7 +484,7 @@ export function renderItemBody(target, data, ownUserId) {
       return itemRow({
         title: p.title,
         pillNode: pill(p.kind, 'accent2'),
-        meta: t('field.added', { date: p.created_at }),
+        meta: t('field.added', { date: formatDateTime(p.created_at) }),
         preview: truncate(p.description, 120),
       });
     }
@@ -464,7 +492,7 @@ export function renderItemBody(target, data, ownUserId) {
       const c = data.checkins[target.index];
       const label = c.mood ? moodLabels()[c.mood - 1] ?? '-' : '-';
       return itemRow({
-        title: c.date,
+        title: formatDate(c.date),
         pillNode: pill(label, moodClass(c.mood)),
         meta: c.note ?? '',
       });
@@ -473,16 +501,16 @@ export function renderItemBody(target, data, ownUserId) {
       const b = data.behaviorNotes[target.index];
       if (b.kind === 'strike') return strikeSlip(b, strikeNumber(data, target.index));
       return itemRow({
-        title: b.date,
-        pillNode: pill(b.kind, b.kind === 'strike' ? 'bad' : 'warn'),
+        title: formatDate(b.date),
+        pillNode: pill(humanizeStatus(b.kind), statusClass(b.kind)),
         meta: b.notes ?? '',
       });
     }
     case 'detention': {
       const d = data.detentions[target.index];
       return itemRow({
-        title: d.scheduled_date ?? '',
-        pillNode: pill(d.status, 'warn'),
+        title: formatDate(d.scheduled_date) ?? '',
+        pillNode: pill(humanizeStatus(d.status), statusClass(d.status)),
         meta: d.reason ?? '',
       });
     }
@@ -500,14 +528,14 @@ export function renderItemBody(target, data, ownUserId) {
       return itemRow({
         title: a.title,
         pillNode: pill(a.due_at ? t('field.due', { date: formatDateTime(a.due_at) }) : null, 'accent'),
-        meta: [a.kind, a.time_limit_minutes != null ? t('field.min', { n: a.time_limit_minutes }) : null].filter(Boolean).join(' · '),
+        meta: [humanizeStatus(a.kind), a.time_limit_minutes != null ? t('field.min', { n: a.time_limit_minutes }) : null].filter(Boolean).join(' · '),
       });
     }
     case 'discussion': {
       const d = data.discussions[target.index];
       return itemRow({
         title: d.title,
-        pillNode: d.closed ? pill(t('field.closed'), 'dim') : pill(d.due_date ? t('field.due', { date: d.due_date }) : null, 'accent'),
+        pillNode: d.closed ? pill(t('field.closed'), 'dim') : pill(d.due_date ? t('field.due', { date: formatDate(d.due_date) }) : null, 'accent'),
         meta: [d.graded ? `${d.points_possible ?? '-'} ${t('unit.pts')}` : null, d.required_replies ? t('field.repliesRequired', { n: d.required_replies }) : null]
           .filter(Boolean)
           .join(' · '),
@@ -519,7 +547,7 @@ export function renderItemBody(target, data, ownUserId) {
       return itemRow({
         title: f.title || f.file_name,
         pillNode: pill(formatBytes(f.size_bytes), 'accent2'),
-        meta: [f.file_name, f.created_at].filter(Boolean).join(' · '),
+        meta: [f.file_name, formatDateTime(f.created_at)].filter(Boolean).join(' · '),
       });
     }
     default:
@@ -636,7 +664,7 @@ export function renderOverviewStats(summary, onNavigate, { notebook = false, dra
     }),
     statTile({
       label: t('stat.attendanceToday'),
-      value: attendanceToday ? attendanceToday.status : t('stat.noRecord'),
+      value: attendanceToday ? humanizeStatus(attendanceToday.status) : t('stat.noRecord'),
       cls: attendanceToday ? statusClass(attendanceToday.status) : 'dim',
       onClick: () => onNavigate('attendance'),
     }),
@@ -653,7 +681,7 @@ export function renderInfoRow(data) {
   return el('div', { class: 'hero-card' }, [
     el('span', { class: 'hero-label', text: t('hero.class') }),
     el('span', { class: 'hero-value', text: hero?.hero_class ?? '—' }),
-    el('span', { class: 'hero-meta', text: hero?.quest_started_at ? t('hero.started', { date: hero.quest_started_at }) : '' }),
+    el('span', { class: 'hero-meta', text: hero?.quest_started_at ? t('hero.started', { date: formatDate(hero.quest_started_at) }) : '' }),
   ]);
 }
 
@@ -667,7 +695,7 @@ export function detailFields(target, data) {
       const g = data.grades[target.index];
       const a = g.assignments;
       const score = g.points_earned == null && markCode(g.comment) ? t('feedback.markShort', { mark: markCode(g.comment) }) : `${g.points_earned ?? '-'}/${a?.points_possible ?? '-'}`;
-      return { title: a?.title ?? t('field.noAssignment'), fields: [[t('label.score'), score], [t('label.due'), a?.due_date], [t('label.updated'), g.updated_at]] };
+      return { title: a?.title ?? t('field.noAssignment'), fields: [[t('label.score'), score], [t('label.due'), formatDate(a?.due_date)], [t('label.updated'), formatDateTime(g.updated_at)]] };
     }
     case 'assignment': {
       const a = data.assignments[target.index];
@@ -678,59 +706,59 @@ export function detailFields(target, data) {
         title: a.title,
         fields: [
           [t('label.class'), cls],
-          [t('label.due'), a.due_date],
+          [t('label.due'), formatDate(a.due_date)],
           [t('label.points'), a.points_possible],
           [t('label.yourScore'), grade?.points_earned != null ? `${grade.points_earned}/${a.points_possible ?? '-'}` : markCode(grade?.comment) ? t('feedback.markShort', { mark: markCode(grade.comment) }) : null],
           [t('label.category'), a.category],
-          [t('label.submissionMode'), a.submission_mode],
+          [t('label.submissionMode'), humanizeStatus(a.submission_mode)],
           [t('label.submitted'), sub?.submitted_at ? formatDateTime(sub.submitted_at) : null],
-          [t('label.submissionStatus'), sub?.status],
+          [t('label.submissionStatus'), sub?.status ? humanizeStatus(sub.status) : t('work.notStarted')],
         ],
         body: a.description ?? null,
       };
     }
     case 'attendance': {
       const r = data.attendance[target.index];
-      return { title: r.date, fields: [[t('label.status'), r.status], [t('label.note'), r.note]] };
+      return { title: formatDate(r.date), fields: [[t('label.status'), humanizeStatus(r.status)], [t('label.note'), r.note]] };
     }
     case 'calendarEvent': {
       const e = data.calendar[target.index];
       const time = e.start_time || e.end_time ? `${e.start_time ?? '?'}–${e.end_time ?? '?'}` : null;
-      return { title: e.title, fields: [[t('label.date'), e.event_date], [t('label.time'), time], [t('label.location'), e.location]], body: e.description ?? null };
+      return { title: e.title, fields: [[t('label.date'), formatDate(e.event_date)], [t('label.time'), time], [t('label.location'), e.location]], body: e.description ?? null };
     }
     case 'reminder': {
       const r = target.reminder;
-      return { title: r.title, fields: [[t('label.date'), r.date]], body: r.note ?? null };
+      return { title: r.title, fields: [[t('label.date'), formatDate(r.date)]], body: r.note ?? null };
     }
     case 'announcement': {
       const a = data.announcements[target.index];
-      return { title: a.title, fields: [[t('label.posted'), a.created_at]], body: a.body ?? null };
+      return { title: a.title, fields: [[t('label.posted'), formatDateTime(a.created_at)]], body: a.body ?? null };
     }
     case 'message': {
       const m = data.messages[target.index];
-      return { title: m.subject ?? t('field.noSubject'), fields: [[t('label.date'), m.created_at]], body: m.body ?? null };
+      return { title: m.subject ?? t('field.noSubject'), fields: [[t('label.date'), formatDateTime(m.created_at)]], body: m.body ?? null };
     }
     case 'portfolio': {
       const p = data.portfolio[target.index];
-      return { title: p.title, fields: [[t('label.kind'), p.kind], [t('label.added'), p.created_at], [t('label.link'), p.link]], body: p.description ?? null };
+      return { title: p.title, fields: [[t('label.kind'), humanizeStatus(p.kind)], [t('label.added'), formatDateTime(p.created_at)], [t('label.link'), p.link]], body: p.description ?? null };
     }
     case 'checkin': {
       const c = data.checkins[target.index];
-      return { title: c.date, fields: [[t('label.mood'), c.mood ? moodLabels()[c.mood - 1] : null]], body: c.note ?? null };
+      return { title: formatDate(c.date), fields: [[t('label.mood'), c.mood ? moodLabels()[c.mood - 1] : null]], body: c.note ?? null };
     }
     case 'behaviorNote': {
       const b = data.behaviorNotes[target.index];
-      return { title: b.date, fields: [[t('label.kind'), b.kind]], body: b.notes ?? null };
+      return { title: formatDate(b.date), fields: [[t('label.kind'), humanizeStatus(b.kind)]], body: b.notes ?? null };
     }
     case 'detention': {
       const d = data.detentions[target.index];
-      return { title: d.scheduled_date, fields: [[t('label.status'), d.status], [t('label.strikeCount'), d.strike_count], [t('label.reason'), d.reason]], body: d.notes ?? null };
+      return { title: formatDate(d.scheduled_date), fields: [[t('label.status'), humanizeStatus(d.status)], [t('label.strikeCount'), d.strike_count], [t('label.reason'), d.reason]], body: d.notes ?? null };
     }
     case 'reportCard': {
       const r = data.reportCards[target.index];
       const pct = r.grade_pct != null ? r.grade_pct.toFixed(0) : null;
       const grade = r.letter || pct != null ? `${r.letter ?? ''}${pct != null ? ` (${pct}%)` : ''}`.trim() : null;
-      return { title: r.term, fields: [[t('label.grade'), grade], [t('label.updated'), r.updated_at]], body: r.comment ?? null };
+      return { title: r.term, fields: [[t('label.grade'), grade], [t('label.updated'), formatDateTime(r.updated_at)]], body: r.comment ?? null };
     }
     case 'assessment': {
       const a = data.assessments[target.index];
@@ -741,7 +769,7 @@ export function detailFields(target, data) {
         title: a.title,
         fields: [
           [t('label.class'), cls],
-          [t('label.kind'), a.kind],
+          [t('label.kind'), humanizeStatus(a.kind)],
           [t('label.due'), a.due_at ? formatDateTime(a.due_at) : null],
           [t('label.timeLimit'), a.time_limit_minutes != null ? t('field.min', { n: a.time_limit_minutes }) : null],
           [t('label.yourScore'), score],
@@ -757,7 +785,7 @@ export function detailFields(target, data) {
         title: d.title,
         fields: [
           [t('label.class'), cls],
-          [t('label.due'), d.due_date],
+          [t('label.due'), formatDate(d.due_date)],
           [t('label.status'), d.closed ? t('field.closed') : t('label.open')],
           [t('label.requiredReplies'), d.required_replies],
           [t('label.points'), d.graded ? d.points_possible : null],
@@ -775,7 +803,7 @@ export function detailFields(target, data) {
           [t('label.fileName'), f.file_name],
           [t('label.type'), f.mime_type],
           [t('label.size'), formatBytes(f.size_bytes)],
-          [t('label.uploaded'), f.created_at],
+          [t('label.uploaded'), formatDateTime(f.created_at)],
         ],
       };
     }

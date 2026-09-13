@@ -40,6 +40,23 @@ export function mount(root, node) {
   root.appendChild(node);
 }
 
+let fieldId = 0;
+
+export function associateFieldLabels(container) {
+  for (const label of container.querySelectorAll('label.field-label:not([for])')) {
+    const control = label.nextElementSibling;
+    if (!control) continue;
+    fieldId += 1;
+    const id = control.id || `meraki-field-${fieldId}`;
+    control.id = id;
+    if (control.matches('input, textarea, select, button')) label.htmlFor = id;
+    else {
+      label.id = `${id}-label`;
+      control.setAttribute('aria-labelledby', label.id);
+    }
+  }
+}
+
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function focusableIn(container) {

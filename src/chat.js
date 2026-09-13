@@ -143,7 +143,7 @@ function buildThreadView(thread) {
         if (opening) subjectInput.focus();
       },
     },
-    [svgIcon(iconPaths('plus'))],
+    [svgIcon(iconPaths('subject'))],
   );
 
   // The compose panel's "Notify the teacher" choice, here too; not offered

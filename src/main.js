@@ -1,14 +1,14 @@
-import { el, clear, mount, svgIcon } from './dom.js';
+import { el, clear, mount, svgIcon, associateFieldLabels } from './dom.js';
 import * as api from './api.js';
-import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setWhatIf, clearWhatIf, setCalendarViewMonth, setCalendarSelectedDate, openReminderForm, removeCalendarReminder, addCalendarReminder, rowKindsForCurrentTab } from './state.js';
-import { tabTitle, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs, emptyState, renderAttendanceTally } from './rows.js';
+import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setWhatIf, clearWhatIf, setCalendarViewMonth, setCalendarSelectedDate, setMobileCalendarView, openReminderForm, removeCalendarReminder, addCalendarReminder, rowKindsForCurrentTab } from './state.js';
+import { tabTitle, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs, emptyState, renderAttendanceTally, NAV_GROUPS } from './rows.js';
 import { renderAnalyticsTab, chartModeToggle, mountAnalyticsCharts, disposeAnalyticsCharts } from './analytics.js';
-import { renderCalendarGrid, calendarViewToggle } from './calendar.js';
+import { renderCalendarGrid, calendarViewToggle, isoOf } from './calendar.js';
 import { seededRandom, sketchBox, sketchLine, sketchTick, sketchSvg } from './sketch.js';
 import { GRADING_SCALES, overallGrade } from './grading.js';
 import { iconPaths } from './icons.js';
 import { privacyParagraphs } from './privacy.js';
-import { mountLogin, renderOverlay, renderDetailPanel, buildLanguageSwitcher } from './overlays.js';
+import { mountLogin, renderOverlay, renderDetailPanel } from './overlays.js';
 import { showToast } from './toast.js';
 import { renderChat } from './chat.js';
 import { renderLoadMore, disconnectLoadMore } from './loadmore.js';
@@ -51,6 +51,8 @@ function render() {
   renderBody();
   renderDetailPanel();
   renderOverlay();
+  associateFieldLabels(shell);
+  associateFieldLabels(document.getElementById('overlay-root'));
 }
 
 // The tabbar is rebuilt on every render too, so the highlighter swipe on the
@@ -64,6 +66,32 @@ function renderTabbar() {
   lastRenderedTab = state.tab;
   tabbar.classList.toggle('open', state.mobileNavOpen);
   tabbar.classList.toggle('collapsed', state.sidebarCollapsed);
+  const mobileSidebar = window.matchMedia('(max-width: 900px)').matches;
+  tabbar.inert = mobileSidebar && !state.mobileNavOpen;
+  tabbar.setAttribute('aria-hidden', mobileSidebar && !state.mobileNavOpen ? 'true' : 'false');
+  const visible = visibleTabs(state.config);
+  const navigation = NAV_GROUPS.map((group) => {
+    const groupTabs = visible.filter((tab) => group.tabs.includes(tab.id));
+    if (!groupTabs.length) return null;
+    return el('div', { class: 'nav-group', 'data-nav-group': group.id }, [
+      el('div', { class: 'nav-group-label', text: t(group.labelKey) }),
+      ...groupTabs.map((tb) =>
+        el(
+          'button',
+          {
+            class: `nav-item ${state.tab === tb.id ? 'active' : ''} ${state.tab === tb.id && tabJustChanged ? 'just-activated' : ''}`,
+            type: 'button',
+            title: tb.title,
+            'data-nav-group': group.id,
+            'aria-current': state.tab === tb.id ? 'page' : null,
+            onclick: () => setTab(tb.id),
+          },
+          [el('span', { class: 'nav-icon' }, [svgIcon(iconPaths(tb.id))]), el('span', { class: 'nav-label', text: tb.title })],
+        )),
+    ]);
+  }).filter(Boolean);
+  const session = api.getSession();
+  const identity = state.ownStudentName || session?.email?.split('@')[0] || t('account.student');
   mount(
     tabbar,
     el('div', { class: 'tabbar-inner' }, [
@@ -81,24 +109,14 @@ function renderTabbar() {
           [svgIcon(iconPaths(state.sidebarCollapsed ? 'expand' : 'collapse'))],
         ),
       ]),
-      buildLanguageSwitcher('tabbar-lang-switcher'),
-      el(
-        'div',
-        { class: 'nav-list' },
-        visibleTabs(state.config).map((tb) =>
-          el(
-            'button',
-            {
-              class: `nav-item ${state.tab === tb.id ? 'active' : ''} ${state.tab === tb.id && tabJustChanged ? 'just-activated' : ''}`,
-              type: 'button',
-              title: tb.title,
-              'aria-current': state.tab === tb.id ? 'page' : null,
-              onclick: () => setTab(tb.id),
-            },
-            [el('span', { class: 'nav-icon' }, [svgIcon(iconPaths(tb.id))]), el('span', { class: 'nav-label', text: tb.title })],
-          ),
-        ),
-      ),
+      el('div', { class: 'nav-list' }, navigation),
+      el('div', { class: 'account-summary' }, [
+        el('span', { class: 'account-avatar', text: identity.slice(0, 1).toUpperCase() }),
+        el('span', { class: 'account-copy' }, [
+          el('span', { class: 'account-name', text: identity }),
+          session?.email ? el('span', { class: 'account-email', text: session.email }) : null,
+        ]),
+      ]),
     ]),
   );
 
@@ -112,6 +130,15 @@ function renderTabbar() {
   }
 }
 
+function isPhoneLayout() {
+  return window.matchMedia('(max-width: 640px)').matches;
+}
+
+function activeCalendarView() {
+  if (!isPhoneLayout()) return state.config.calendarView;
+  return state.mobileCalendarView ?? 'list';
+}
+
 function renderToolbar() {
   const actions = [];
   if (state.tab === 'messages') {
@@ -119,16 +146,16 @@ function renderToolbar() {
       el(
         'button',
         {
-          class: `btn-icon ${state.chatMode ? 'active-toggle' : ''}`,
+          class: `btn toolbar-view-mode ${state.chatMode ? 'active-toggle' : ''}`,
           type: 'button',
           'aria-label': state.chatMode ? t('toolbar.listView') : t('toolbar.chatView'),
           title: state.chatMode ? t('toolbar.listView') : t('toolbar.chatView'),
           onclick: () => toggleChatMode(),
         },
-        [svgIcon(iconPaths('chat'))],
+        [svgIcon(iconPaths('chat')), el('span', { class: 'toolbar-action-label', text: state.chatMode ? t('toolbar.listLabel') : t('toolbar.chatLabel') })],
       ),
     );
-    actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openCompose(), text: t('toolbar.newMessage') }));
+    actions.push(el('button', { class: 'btn btn-primary toolbar-primary', type: 'button', onclick: () => openCompose(), title: t('toolbar.newMessage') }, [svgIcon(iconPaths('plus')), el('span', { class: 'toolbar-action-label', text: t('toolbar.newMessage') })]));
   }
   if (state.tab === 'me') {
     actions.push(
@@ -140,20 +167,39 @@ function renderToolbar() {
     actions.push(chartModeToggle(state.config, (chartMode) => setConfig({ chartMode })));
   }
   if (state.tab === 'calendar') {
-    actions.push(calendarViewToggle(state.config, (calendarView) => setConfig({ calendarView })));
-    if (state.config.calendarView === 'grid') {
-      actions.push(el('button', { class: 'btn btn-primary', type: 'button', onclick: () => openReminderForm(state.calendarSelectedDate), text: t('calendar.addReminder') }));
+    const view = activeCalendarView();
+    actions.push(calendarViewToggle({ calendarView: view }, (calendarView) => {
+      if (isPhoneLayout()) setMobileCalendarView(calendarView);
+      else setConfig({ calendarView });
+    }));
+    if (view === 'list') {
+      actions.push(el('button', { class: 'btn btn-primary toolbar-primary', type: 'button', onclick: () => openReminderForm(), title: t('calendar.addReminder') }, [svgIcon(iconPaths('plus')), el('span', { class: 'toolbar-action-label', text: t('calendar.addReminder') })]));
     }
   }
   actions.push(
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.refresh'), title: t('toolbar.refresh'), onclick: () => refresh() }, [svgIcon(iconPaths('refresh'))]),
+    el('span', { class: 'toolbar-divider', 'aria-hidden': 'true' }),
+    el('button', { class: 'btn-icon toolbar-desktop-action', type: 'button', 'aria-label': t('toolbar.refresh'), title: t('toolbar.refresh'), onclick: () => refresh() }, [svgIcon(iconPaths('refresh'))]),
     el(
       'button',
-      { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.settings'), title: t('toolbar.settings'), onclick: () => openOverlay('settings') },
+      { class: 'btn-icon toolbar-desktop-action', type: 'button', 'aria-label': t('toolbar.settings'), title: t('toolbar.settings'), onclick: () => openOverlay('settings') },
       [svgIcon(iconPaths('settings'))],
     ),
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.help'), title: t('toolbar.help'), onclick: () => openOverlay('help') }, [svgIcon(iconPaths('help'))]),
-    el('button', { class: 'btn-icon', type: 'button', 'aria-label': t('toolbar.logout'), title: t('toolbar.logout'), onclick: () => doLogout() }, [svgIcon(iconPaths('logout'))]),
+    el('button', {
+      class: 'btn-icon',
+      type: 'button',
+      'aria-label': t('toolbar.more'),
+      title: t('toolbar.more'),
+      onclick: (event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        openContextMenu(rect.right, rect.bottom, [
+          { icon: 'refresh', label: t('toolbar.refresh'), action: refresh },
+          { icon: 'settings', label: t('toolbar.settings'), action: () => openOverlay('settings') },
+          { icon: 'help', label: t('toolbar.help'), action: () => openOverlay('help') },
+          { separator: true },
+          { icon: 'logout', label: t('toolbar.logout'), action: doLogout },
+        ]);
+      },
+    }, [svgIcon(iconPaths('more'))]),
   );
 
   mount(
@@ -349,13 +395,13 @@ function renderBody() {
     return;
   }
 
-  if (state.tab === 'calendar' && state.config.calendarView === 'grid') {
+  if (state.tab === 'calendar' && activeCalendarView() === 'grid') {
     body.appendChild(renderCalendarGrid(state, {
       onMonthChange: (delta) => setCalendarViewMonth(state.calendarViewMonth.year, state.calendarViewMonth.month + delta),
       onToday: () => {
         const now = new Date();
         setCalendarViewMonth(now.getFullYear(), now.getMonth());
-        setCalendarSelectedDate(now.toISOString().slice(0, 10));
+        setCalendarSelectedDate(isoOf(now));
       },
       onSelectDay: (iso) => setCalendarSelectedDate(iso),
       onOpenDetail: (target) => openDetailFor(target),
@@ -506,6 +552,20 @@ function renderBody() {
           renderItemBody(target, state.data, state.ownUserId),
         ],
       );
+      const menuButton = el(
+        'button',
+        {
+          class: 'btn-icon row-actions-button',
+          type: 'button',
+          'aria-label': t('menu.actionsFor', { title: rowBtn.querySelector('.row-title')?.textContent ?? tabTitle(state.tab) }),
+          title: t('menu.moreActions'),
+          onclick: (event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            openContextMenu(rect.right, rect.bottom, rowMenuItems(target));
+          },
+        },
+        [svgIcon(iconPaths('more'))],
+      );
       if ((kind.done || kind.past) && notebook) {
         rowBtn.querySelector('.row-title')?.appendChild(
           sketchSvg([sketchLine(0, 5, 100, 5, seededRandom(`strike:${target.kind}:${target.index ?? target.reminder?.id}`), { bow: 1.2, overshoot: 3, jitter: 1.5 })], { viewBox: [100, 10], stretch: true, draw: revealing, className: 'sketch-strike' }),
@@ -524,7 +584,7 @@ function renderBody() {
           swipeCount += 1;
         }
       }
-      (activeGroup ?? list).appendChild(rowBtn);
+      (activeGroup ?? list).appendChild(el('div', { class: 'row-entry' }, [rowBtn, menuButton]));
     }
   }
   body.appendChild(list);
@@ -571,6 +631,7 @@ function renderPrivacy() {
 subscribe(render);
 onLocaleChange(render);
 installGlobalKeyboard();
+window.matchMedia('(max-width: 640px)').addEventListener('change', render);
 
 if (isLoggedIn()) {
   afterLogin().catch((err) => showToast(err.message, 'bad'));

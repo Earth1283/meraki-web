@@ -301,7 +301,7 @@ export function friendlyLoadError(label, err) {
     return 'Your session expired. Please log in again.';
   }
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
-    return `Couldn't reach Meraki while loading ${label}. Check your connection, then retry.`;
+    return "Couldn't reach Meraki. Check your connection, then retry.";
   }
   return `Couldn't load ${label}. Try refreshing.`;
 }

@@ -34,7 +34,7 @@ test('an expired/failed refresh maps to a re-login message', () => {
 test('a browser network failure maps to a connectivity message', () => {
   const msg = friendlyLoadError('grades', new Error('Failed to fetch'));
   assert.match(msg, /couldn't reach meraki/i);
-  assert.match(msg, /grades/);
+  assert.match(msg, /connection/i);
 });
 
 test('anything else maps to a generic retry message naming the label', () => {

@@ -50,6 +50,10 @@ export function getLocale() {
   return currentLocale;
 }
 
+export function getDateLocale() {
+  return BASE_OF[currentLocale] ?? currentLocale;
+}
+
 export function setLocale(code) {
   if (!LOCALES.some((l) => l.code === code) || code === currentLocale) return;
   currentLocale = code;

@@ -1,5 +1,5 @@
 import { el, svgIcon } from './dom.js';
-import { t } from './i18n.js';
+import { t, getDateLocale } from './i18n.js';
 import { iconPaths } from './icons.js';
 import { renderItemBody } from './rows.js';
 import { seededRandom, sketchLine, sketchCircle, sketchBox, sketchGrid, sketchSvg } from './sketch.js';
@@ -18,17 +18,16 @@ export function isoOf(date) {
   return `${y}-${m}-${d}`;
 }
 
-/** A fixed 6x7 grid of days covering `month`, padded with the tail of the
- * previous month and the head of the next so the grid never resizes as the
- * user navigates between short and long months. */
 export function monthCells(year, month, today = new Date()) {
   const first = new Date(year, month, 1);
-  const startOffset = first.getDay(); // 0 (Sun) - 6 (Sat)
+  const startOffset = first.getDay();
   const gridStart = new Date(year, month, 1 - startOffset);
   const todayIso = isoOf(today);
   const todayMonth = todayIso.slice(0, 7);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cellCount = Math.ceil((startOffset + daysInMonth) / 7) * 7;
 
-  return Array.from({ length: 42 }, (_, i) => {
+  return Array.from({ length: cellCount }, (_, i) => {
     const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
     const iso = isoOf(date);
     return {
@@ -44,11 +43,6 @@ export function monthCells(year, month, today = new Date()) {
   });
 }
 
-/** Pulls a 24h "HH:MM" out of whatever date/time-ish value an item carries —
- * a calendar_event's separate start_time ("14:30:00"), or a timestamp
- * embedded in a date column ("2026-02-12T09:00:00Z") — falling back to
- * '00:00' for the (common) case of a bare date with no time at all, so
- * every item sorts and displays consistently regardless of source. */
 export function extractTime(raw) {
   if (!raw) return null;
   const match = String(raw).match(/T?(\d{2}:\d{2})/);
@@ -74,17 +68,17 @@ function bucketBy(list, dateOf, toItem) {
  * { kind: 'assignment', index } targets point at. */
 function itemsByDay({ data, config, reminders }) {
   const maps = [
-    bucketBy(data.calendar, (e) => e.event_date, (e, index) => ({ kind: 'calendarEvent', index, title: e.title, time: extractTime(e.start_time) ?? '00:00' })),
+    bucketBy(data.calendar, (e) => e.event_date, (e, index) => ({ kind: 'calendarEvent', index, title: e.title, time: extractTime(e.start_time) })),
     config.calendarShowAssignments
-      ? bucketBy(data.assignments, (a) => a.due_date, (a, index) => ({ kind: 'assignment', index, title: a.title, time: extractTime(a.due_date) ?? '00:00' }))
+      ? bucketBy(data.assignments, (a) => a.due_date, (a, index) => ({ kind: 'assignment', index, title: a.title, time: extractTime(a.due_date) }))
       : new Map(),
-    bucketBy(reminders, (r) => r.date, (r) => ({ kind: 'reminder', reminder: r, title: r.title, time: extractTime(r.date) ?? '00:00' })),
+    bucketBy(reminders, (r) => r.date, (r) => ({ kind: 'reminder', reminder: r, title: r.title, time: extractTime(r.date) })),
   ];
   const days = new Map();
   for (const map of maps) {
     for (const [iso, items] of map) days.set(iso, [...(days.get(iso) ?? []), ...items]);
   }
-  for (const items of days.values()) items.sort((a, b) => a.time.localeCompare(b.time));
+  for (const items of days.values()) items.sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
   return days;
 }
 
@@ -98,7 +92,7 @@ export function buildCalendarMonth({ year, month, data, config, reminders, today
 
 function agendaDayLabel(iso) {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return new Date(y, m - 1, d).toLocaleDateString(getDateLocale(), { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 /** The calendar's list view as rowKinds-style rows (rendered by main.js's
@@ -160,9 +154,6 @@ function dayNumber(cell, { notebook, drawToday }) {
 
 function dayMarks(cell, { isSelected, drawSelection }) {
   const marks = [];
-  if (cell.isElapsed) {
-    marks.push(sketchSvg([sketchLine(0, 100, 100, 0, seededRandom(`slash:${cell.iso}`), { bow: 6, jitter: 4 })], { viewBox: [100, 100], stretch: true, evenStroke: true, className: 'sketch-slash' }));
-  }
   if (isSelected) {
     marks.push(sketchSvg(sketchBox(0, 0, 100, 100, seededRandom(`select:${cell.iso}`), { bow: 1.5, overshoot: 2.5, jitter: 1 }), { viewBox: [100, 100], stretch: true, draw: drawSelection, className: 'sketch-select' }));
   }
@@ -174,8 +165,8 @@ function dayCell(cell, { isSelected, onSelect, onContextMenu, notebook, drawToda
   const overflow = cell.items.length - visible.length;
 
   const chips = visible.map((item) =>
-    el('div', { class: `calendar-chip ${CHIP_CLASS[item.kind]}`, title: `${item.time} ${item.title}` }, [
-      el('span', { class: 'calendar-chip-time', text: item.time }),
+    el('div', { class: `calendar-chip ${CHIP_CLASS[item.kind]}`, title: [item.time, item.title].filter(Boolean).join(' ') }, [
+      item.time ? el('span', { class: 'calendar-chip-time', text: item.time }) : null,
       el('span', { class: 'calendar-chip-title', text: item.title }),
     ]),
   );
@@ -192,6 +183,7 @@ function dayCell(cell, { isSelected, onSelect, onContextMenu, notebook, drawToda
         isSelected ? 'calendar-day-selected' : '',
       ].filter(Boolean).join(' '),
       'aria-current': cell.isToday ? 'date' : undefined,
+      'aria-label': [cell.date.toLocaleDateString(getDateLocale(), { dateStyle: 'full' }), ...cell.items.map((item) => [item.time, item.title].filter(Boolean).join(' '))].join('. '),
       onclick: () => onSelect(cell.iso),
       oncontextmenu: (e) => {
         e.preventDefault();
@@ -213,18 +205,18 @@ function weekdayLabels() {
   const base = new Date(2023, 0, 1); // a Sunday
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
-    return d.toLocaleDateString(undefined, { weekday: 'short' });
+    return d.toLocaleDateString(getDateLocale(), { weekday: 'short' });
   });
 }
 
 function monthLabel(year, month) {
-  return new Date(year, month, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  return new Date(year, month, 1).toLocaleDateString(getDateLocale(), { month: 'long', year: 'numeric' });
 }
 
 function dayPanel(cell, data, { onOpenDetail, onContextMenuItem, onAddReminder }) {
   if (!cell) return el('div', { class: 'calendar-daypanel-empty', text: t('calendar.pickDay') });
 
-  const label = cell.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const label = cell.date.toLocaleDateString(getDateLocale(), { weekday: 'long', month: 'long', day: 'numeric' });
   const header = el('div', { class: 'calendar-daypanel-header' }, [
     el('h3', { class: 'calendar-daypanel-title', text: label }),
     el(
@@ -326,9 +318,10 @@ export function renderCalendarGrid(state, callbacks, { fresh = false } = {}) {
     drawToday: draw.today,
     drawSelection: draw.selection,
   })));
-  // Rows are equal height (grid-auto-rows: 1fr), so one stretched overlay can
-  // rule the whole 7x6 grid instead of every cell drawing its own edges.
-  if (notebook) cellsEl.appendChild(sketchSvg(sketchGrid(7, 6, seededRandom(`grid:${monthKey}`)), { viewBox: [700, 600], stretch: true, evenStroke: true, className: 'sketch-grid' }));
+  if (notebook) {
+    const weeks = grid.cells.length / 7;
+    cellsEl.appendChild(sketchSvg(sketchGrid(7, weeks, seededRandom(`grid:${monthKey}`)), { viewBox: [700, weeks * 100], stretch: true, evenStroke: true, className: 'sketch-grid' }));
+  }
 
   const selectedCell = grid.cells.find((c) => c.iso === state.calendarSelectedDate) ?? null;
   const panel = dayPanel(selectedCell, state.data, {

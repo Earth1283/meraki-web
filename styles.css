@@ -1,11 +1,3 @@
-/* ==========================================================================
-   Meraki — "ink & highlighter"
-   Navy ballpoint ink on cool paper. The highlighter is the one loud thing:
-   it only ever marks what needs your attention or what you've selected
-   (the active tab, overdue work, today, a picked option). Everything else
-   stays quiet so those marks carry meaning.
-   ========================================================================== */
-
 :root {
   color-scheme: light;
 
@@ -216,10 +208,6 @@
   --scrim: rgba(5, 8, 18, 0.6);
 }
 
-/* --- Highlighter color (Settings → Appearance → Accent) ---
-   Only the marker hue and its text-strength tone change per accent; the
-   soft wash and the dark-mode mark are derived from --hl above with
-   color-mix, so each color is one line per theme. */
 :root.accent-yellow { --hl: #ffe45e; --accent: #86620a; }
 :root.accent-green { --hl: #b5f09b; --accent: #237a34; }
 :root.accent-blue { --hl: #a8dcff; --accent: #1f5fbf; }
@@ -245,7 +233,6 @@
 :root[data-theme='dark'].accent-orange { --accent: #ffb870; }
 :root[data-theme='dark'].accent-pink { --accent: #ff9fd0; }
 
-/* --- Density (Settings → Appearance) --- */
 .density-compact #body { padding: 12px 24px 32px; }
 .density-compact .row-item { padding: 8px 12px; }
 .density-compact .row-title { font-size: 0.92rem; }
@@ -254,8 +241,6 @@
 .density-compact .stat-tile { padding: 10px 14px; }
 .density-compact .stat-value { font-size: 1.7rem; }
 .density-compact .row-section { padding: 14px 12px 4px; }
-
-/* --- Base --- */
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -300,10 +285,6 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
   stroke-linejoin: round;
 }
 
-/* --- The highlighter mark ---
-   A marker stroke laid behind the lower two-thirds of the text, with angled
-   ends, sized in em so the same rule works on a nav label and a 5rem
-   wordmark. Only used where something needs attention or is selected. */
 .nav-item.active .nav-label,
 .row-section-mark,
 .style-notebook .hl-swipe,
@@ -328,8 +309,6 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
   from { background-size: 0% var(--mark-h); }
   to { background-size: 100% var(--mark-h); }
 }
-
-/* --- App shell --- */
 
 #shell {
   display: grid;
@@ -510,11 +489,6 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 
 .btn-icon.active-toggle { background: var(--hl-soft); color: var(--text-primary); }
 
-/* --- Chat mode (Messages tab, just for fun) ---
-   A Discord pastiche scoped to this one subtree via a local CSS-variable
-   override. The highlighter tokens are re-pointed at blurple too, since
-   the ones inherited from :root were already resolved against the page's
-   own marker color. */
 #body.chat-mode {
   padding: 0;
   overflow: hidden;
@@ -680,8 +654,6 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 .chat-plus-btn:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.08); }
 .chat-plus-btn.active { color: var(--accent); background: var(--accent-soft); }
 
-/* --- Buttons --- */
-
 .btn {
   display: inline-flex;
   align-items: center;
@@ -717,11 +689,6 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 .btn-icon:hover { background: var(--bg-subtle); color: var(--text-primary); }
 
 .btn-sm { padding: 5px 11px; font-size: 0.8125rem; flex-shrink: 0; }
-
-/* --- Lists ---
-   Rows sit on ruled lines like a notebook page rather than floating as
-   cards: an inset rule between neighbors, which steps aside for the hover
-   and selection washes so those read as one clean shape. */
 
 .row-list { display: flex; flex-direction: column; }
 
@@ -883,11 +850,6 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 .text-bad { color: var(--bad-text); }
 .text-dim { color: var(--text-muted); }
 
-/* --- Overview stat strip ---
-   One ruled strip, like a row of a report card, instead of five floating
-   tiles. Each cell draws its own top/left rule as an outer shadow so the
-   rules still line up when the strip wraps onto two rows; the container
-   clips the ones that land on its outer edge. */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -964,8 +926,6 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 }
 .hero-meta { font-size: 0.8125rem; color: var(--text-muted); }
 
-/* --- Analytics --- */
-
 .analytics-tab { display: flex; flex-direction: column; gap: 14px; }
 
 .analytics-grid {
@@ -1034,11 +994,6 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 .analytics-target-input { width: 72px; padding: 6px 8px; }
 .analytics-status-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 160px; }
 .analytics-status { font-size: 0.875rem; font-weight: 600; }
-
-/* --- Calendar grid ---
-   A planner page: one ruled 7x6 sheet rather than 42 separate cards. Cells
-   draw their own top/left rules (same trick as the stat strip) so the
-   selected-day outline can sit inside a cell without shifting the grid. */
 
 .calendar-shell { display: flex; flex-direction: column; gap: 12px; touch-action: pan-y; }
 
@@ -1148,13 +1103,6 @@ button.row-item.selected:hover { background: var(--hl-soft); }
   .calendar-weekdays > span { padding: 0 5px; font-size: 0.72rem; }
   .calendar-month-label { min-width: 0; font-size: 1.125rem; }
 }
-
-/* --- Notebook style (Settings → Appearance → Style) ---
-   Hand-drawn marks from src/sketch.js layered over the normal layout; see
-   NOTEBOOK_STYLE.md. Marks and headings may look handwritten, data text
-   never does. Pen ink draws structure; the highlighter still only marks
-   what matters. In the dark theme the pen becomes chalk (#sketch-chalk in
-   index.html). */
 
 .sketch {
   position: absolute;
@@ -1365,8 +1313,6 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 .agenda-now .margin-note { flex: none; }
 .sketch-now-line { position: static; flex: 1; min-width: 0; width: 100%; height: 6px; stroke: var(--sketch-ink-blue); stroke-width: 1.6; }
 
-/* --- States --- */
-
 .loading-state, .empty-state {
   display: flex;
   flex-direction: column;
@@ -1479,12 +1425,6 @@ button.row-item.selected:hover { background: var(--hl-soft); }
   font-size: 0.875rem;
   box-shadow: inset 3px 0 0 var(--bad);
 }
-
-/* --- Login ---
-   A ruled notebook page: blue lines, the red margin rule, and the wordmark
-   written just right of the margin. The page-load moment is the
-   highlighter swiping under it, with the sticky note slapped on as the
-   swipe finishes. */
 
 .login-screen {
   --margin-x: clamp(28px, 11vw, 168px);
@@ -1642,8 +1582,6 @@ select.field-input {
   margin-top: 8px;
 }
 
-/* --- Overlays --- */
-
 .overlay-backdrop {
   position: fixed;
   inset: 0;
@@ -1758,8 +1696,6 @@ select.field-input {
 .mood-btn:hover { background: var(--bg-subtle); color: var(--text-primary); }
 .mood-btn.active { background: var(--hl); border-color: transparent; color: var(--on-hl); }
 
-/* --- Settings panel --- */
-
 .settings-section { padding: 18px 0; border-top: 1px solid var(--border); }
 .panel-header + .settings-section { border-top: none; padding-top: 0; }
 .settings-section-title {
@@ -1821,8 +1757,6 @@ select.field-input {
 .settings-tab-actions .btn-icon:disabled { opacity: 0.3; cursor: default; }
 .settings-tab-actions .icon { width: 15px; height: 15px; }
 
-/* --- Command palette --- */
-
 .palette-panel {
   position: relative;
   z-index: 1;
@@ -1852,8 +1786,6 @@ select.field-input {
 .palette-item:hover { background: var(--bg-subtle); }
 .palette-item.active { background: var(--hl-soft); }
 .palette-empty { padding: 16px 14px; color: var(--text-muted); font-size: 0.9rem; }
-
-/* --- Context menu --- */
 
 .context-menu {
   position: fixed;
@@ -1889,8 +1821,6 @@ select.field-input {
 .context-menu-hint { font-size: 0.78rem; line-height: 1.35; color: var(--text-muted); }
 .context-menu-sep { height: 1px; margin: 5px 6px; background: var(--border); }
 
-/* --- Keyboard help --- */
-
 .help-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
 .help-row { display: flex; align-items: center; gap: 14px; font-size: 0.9rem; color: var(--text-primary); }
 .help-row kbd {
@@ -1908,8 +1838,6 @@ select.field-input {
   font-variant-numeric: tabular-nums;
 }
 .help-note { color: var(--text-secondary); font-size: 0.875rem; }
-
-/* --- Toasts --- */
 
 #toast-root {
   position: fixed;
@@ -1957,8 +1885,6 @@ select.field-input {
 }
 .toast-action:hover { text-decoration-color: currentColor; }
 
-/* --- Data & Privacy --- */
-
 .privacy { max-width: 72ch; padding-top: 4px; }
 .privacy-para { margin-bottom: 22px; font-size: 0.9375rem; color: var(--text-primary); }
 .privacy-para p { line-height: 1.65; color: var(--text-secondary); margin-bottom: 0.2em; }
@@ -1977,8 +1903,6 @@ select.field-input {
 .privacy-row { display: flex; gap: 14px; padding: 7px 0; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
 .privacy-row-label { font-weight: 650; color: var(--text-primary); flex: none; min-width: 140px; }
 .privacy-row-desc { color: var(--text-secondary); }
-
-/* --- Responsive --- */
 
 @media (max-width: 900px) {
   #shell { display: block; height: 100%; }
@@ -2069,8 +1993,6 @@ select.field-input {
   .detail-field { grid-template-columns: 1fr; gap: 1px; }
 }
 
-/* --- Accessibility --- */
-
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .row-item:focus-visible, .calendar-day:focus-visible { outline-offset: -2px; }
 
@@ -2080,4 +2002,275 @@ select.field-input {
     animation-delay: 0ms !important;
     transition-duration: 1ms !important;
   }
+}
+
+:root:not(.style-notebook) .nav-item.active .nav-label,
+:root:not(.style-notebook) .stat-value.text-accent,
+:root:not(.style-notebook) .stat-value.text-bad,
+:root:not(.style-notebook) .hero-value {
+  background-image: none;
+  padding-inline: 0;
+  margin-inline: 0;
+}
+:root:not(.style-notebook) .nav-item.active .nav-label { color: inherit; }
+:root:not(.style-notebook) .calendar-day-today .calendar-day-num {
+  background: var(--info-soft);
+  color: var(--info-text);
+}
+:root:not(.style-notebook) .segmented-item.active,
+:root:not(.style-notebook) .mood-btn.active {
+  background: var(--text-primary);
+  color: var(--bg);
+}
+
+:root:not(.style-notebook) .toolbar-title,
+:root:not(.style-notebook) .row-section,
+:root:not(.style-notebook) .stat-value,
+:root:not(.style-notebook) .calendar-month-label,
+:root:not(.style-notebook) .calendar-daypanel-title,
+:root:not(.style-notebook) .panel-header h2,
+:root:not(.style-notebook) .settings-section-title,
+:root:not(.style-notebook) .privacy-heading {
+  font-variation-settings: var(--linear);
+}
+
+.nav-list { gap: 12px; }
+.nav-group { --group-color: var(--info-text); display: flex; flex-direction: column; gap: 2px; }
+.nav-group[data-nav-group='academics'] { --group-color: #7551b9; }
+.nav-group[data-nav-group='school'] { --group-color: #ad650f; }
+.nav-group[data-nav-group='connect'] { --group-color: #24784c; }
+.nav-group[data-nav-group='account'] { --group-color: #a74372; }
+.nav-group-label {
+  padding: 0 12px 3px;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.nav-item { min-height: 44px; position: relative; }
+.nav-item[data-nav-group] .nav-icon { color: color-mix(in srgb, var(--group-color) 78%, var(--text-muted)); }
+.nav-item.active { background: color-mix(in srgb, var(--group-color) 11%, var(--bg-subtle)); }
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--group-color);
+}
+
+.account-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-primary);
+  color: var(--bg);
+  font-weight: 750;
+}
+.account-copy { display: flex; flex-direction: column; min-width: 0; }
+.account-name, .account-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-name { color: var(--text-primary); font-size: 0.8125rem; font-weight: 700; }
+.account-email { color: var(--text-muted); font-size: 0.6875rem; }
+#tabbar.collapsed .nav-group-label,
+#tabbar.collapsed .account-copy { display: none; }
+#tabbar.collapsed .account-summary { justify-content: center; padding-inline: 0; }
+
+.btn-icon { width: 40px; height: 40px; }
+.toolbar-view-mode { background: var(--bg-subtle); color: var(--text-secondary); }
+.toolbar-view-mode.active-toggle { background: #5865f2; color: #fff; }
+.toolbar-divider { width: 1px; height: 24px; margin: 0 5px; background: var(--border); }
+
+#body > .row-list,
+#body > .attendance-tally,
+#body > .banner-error { width: min(100%, 1080px); }
+#body > .row-list { width: min(100%, 960px); }
+#body > .stat-grid { width: min(100%, 1080px); }
+#body > .analytics-shell,
+#body > .calendar-shell { width: min(100%, 1240px); }
+
+.row-entry { position: relative; width: 100%; }
+.row-entry + .row-entry .row-item::before { opacity: 1; }
+.row-entry:hover + .row-entry .row-item::before,
+.row-entry:focus-within + .row-entry .row-item::before { opacity: 0; }
+.row-entry > .row-item { padding-right: 54px; }
+.row-actions-button {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 7px;
+  width: 36px;
+  height: 36px;
+  translate: 0 -50%;
+  opacity: 0.55;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.row-entry:hover .row-actions-button,
+.row-entry:focus-within .row-actions-button { opacity: 1; }
+
+:root:not(.style-notebook) .row-item.selected,
+:root:not(.style-notebook) button.row-item.selected:hover {
+  background: var(--info-soft);
+  box-shadow: inset 3px 0 0 var(--info-text);
+}
+
+.grade-scale-chip { min-height: 32px; padding: 5px 9px; }
+.context-menu-item { min-height: 40px; }
+.btn { min-height: 40px; }
+.panel-header-actions { display: flex; align-items: center; gap: 2px; margin: -2px -8px 0 0; }
+.panel-header-actions > .btn-icon { margin: 0; }
+
+.login-screen { padding-right: clamp(24px, 8vw, 120px); }
+.login-card { max-width: 400px; }
+.login-trust {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--good);
+  border-radius: var(--radius-btn);
+  background: color-mix(in srgb, var(--good-soft) 55%, var(--bg));
+}
+.login-trust-title { margin: 0 0 3px; color: var(--text-primary); font-size: 0.875rem; font-weight: 700; }
+.login-trust-body { margin: 0; color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.45; }
+.password-field { position: relative; display: flex; }
+.password-field input { width: 100%; padding-right: 46px; }
+.password-reveal {
+  position: absolute;
+  inset: 50% 4px auto auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  translate: 0 -50%;
+  border-radius: 7px;
+  color: var(--text-muted);
+}
+.password-reveal:hover { color: var(--text-primary); background: var(--bg-subtle); }
+.login-help { margin: 14px 0 0; color: var(--text-muted); font-size: 0.8125rem; text-align: center; }
+.login-help a { color: var(--info-text); font-weight: 650; }
+
+.settings-panel .panel-header {
+  position: sticky;
+  z-index: 3;
+  top: -22px;
+  margin: -22px -28px 4px;
+  padding: 22px 28px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.settings-section { padding: 6px 0; }
+.settings-section[open] { padding-bottom: 16px; }
+.panel-header + .settings-section { border-top: none; }
+.settings-section-title {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  cursor: pointer;
+  list-style-position: inside;
+}
+.settings-section[open] .settings-section-title { margin-bottom: 6px; }
+.settings-default-tab { width: 100%; margin-top: 6px; }
+.accent-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-left: 0; }
+.accent-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-align: left;
+}
+.accent-option:hover { background: var(--bg-subtle); color: var(--text-primary); }
+.accent-option.active { border-color: var(--text-primary); color: var(--text-primary); font-weight: 650; }
+.accent-option .accent-swatch { display: inline-block; flex: none; }
+.accent-swatch.active { box-shadow: none; }
+.settings-tab-row { min-height: 48px; padding-block: 2px; }
+.settings-tab-actions .btn-icon { width: 40px; height: 40px; }
+.reset-button.armed { border-color: var(--bad); background: var(--bad-soft); color: var(--bad-text); }
+
+.style-notebook .corkboard > .row-entry > .row-item {
+  position: relative;
+  border-radius: 2px;
+  padding: 20px 52px 14px 16px;
+  background: var(--bg-card);
+  box-shadow: var(--sticky-shadow);
+  rotate: -0.8deg;
+  transition: translate 0.18s ease, box-shadow 0.18s ease;
+}
+.style-notebook .corkboard > .row-entry:nth-child(3n + 2) > .row-item { rotate: 0.9deg; }
+.style-notebook .corkboard > .row-entry:nth-child(3n) > .row-item { rotate: -0.3deg; }
+.style-notebook .corkboard > .row-entry:hover > .row-item { translate: 0 -2px; box-shadow: var(--sticky-shadow-lift); }
+.style-notebook .corkboard > .row-entry > .row-item.selected { box-shadow: var(--sticky-shadow), 0 0 0 2px var(--sketch-ink-blue); }
+.style-notebook .corkboard > .row-entry > .row-item::before { display: none; }
+.style-notebook .corkboard > .row-entry > .row-item::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 72px;
+  height: 20px;
+  translate: -50% 0;
+  rotate: -3deg;
+  background: var(--sticky-tape);
+}
+
+.chat-plus-btn { border-radius: 9px; }
+
+@media (max-width: 900px) {
+  .nav-group-label { display: none; }
+  .nav-list { gap: 2px; }
+  .toolbar-inner { padding-inline: 12px; }
+  .toolbar-left { flex: 1 1 auto; }
+  .toolbar-actions { min-width: 0; }
+  .toolbar-actions .btn-icon,
+  .hamburger-btn { width: 44px; height: 44px; }
+  .toolbar-desktop-action,
+  .toolbar-divider { display: none; }
+  .side-panel .panel-header { min-height: 52px; }
+  .row-actions-button { width: 40px; height: 40px; opacity: 1; }
+  .context-menu-item { min-height: 44px; }
+}
+
+@media (max-width: 640px) {
+  .toolbar-title { min-width: 48px; font-size: 1.125rem; }
+  .toolbar-action-label { display: none; }
+  .toolbar-actions .btn { width: 44px; height: 44px; justify-content: center; padding: 0; margin: 0; }
+  .stat-tile-group:last-child { grid-column: 1 / -1; }
+  .row-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .row-top { flex-wrap: wrap; }
+  .row-top > .row-title:first-child { flex-basis: 100%; }
+  .row-top > .row-title:first-child + .pill { margin-left: 0; }
+  .row-item { min-height: 52px; }
+  .calendar-header .btn-icon { width: 44px; height: 44px; }
+  .calendar-day-chips { flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 2px 3px; }
+  .calendar-chip:not(.calendar-chip-more) { width: 8px; height: 8px; flex: none; padding: 0; border-radius: 50%; }
+  .calendar-chip-title, .calendar-chip-time { display: none; }
+  .calendar-chip-more { font-size: 0.625rem; line-height: 1; padding: 0; }
+  .btn, .banner-error .btn-sm { min-height: 44px; }
+  .settings-panel .panel-header { top: -18px; margin: -18px -20px 4px; padding: 18px 20px 12px; }
+  .detail-field { grid-template-columns: minmax(86px, 34%) 1fr; gap: 8px; padding-block: 7px; }
+}
+
+@media (max-width: 360px) {
+  .toolbar-inner { gap: 3px; padding-inline: 8px; }
+  .toolbar-left { gap: 2px; }
+  .toolbar-title { font-size: 1rem; }
+  .toolbar-actions { gap: 0; }
 }

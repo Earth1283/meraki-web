@@ -311,8 +311,10 @@ test('formatBytes scales through B/KB/MB', () => {
   assert.equal(formatBytes(null), null);
 });
 
-test('formatDateTime trims an ISO timestamp to minute precision', () => {
-  assert.equal(formatDateTime('2026-09-06T03:01:29.437Z'), '2026-09-06 03:01');
+test('formatDateTime uses the selected locale and local time zone', () => {
+  const iso = '2026-09-06T03:01:29.437Z';
+  const expected = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
+  assert.equal(formatDateTime(iso), expected);
   assert.equal(formatDateTime(null), null);
 });
 
@@ -331,8 +333,8 @@ test('detailFields for an assignment includes submission status when one exists'
     assignmentSubmissions: [{ id: 's1', assignment_id: 'a1', status: 'late', submitted_at: '2026-09-05T10:00:00Z' }],
   });
   const { fields } = detailFields({ kind: 'assignment', index: 0 }, data);
-  assert.deepEqual(fields.find(([label]) => label === 'Submission status'), ['Submission status', 'late']);
-  assert.deepEqual(fields.find(([label]) => label === 'Submission mode'), ['Submission mode', 'online_upload']);
+  assert.deepEqual(fields.find(([label]) => label === 'Submission status'), ['Submission status', 'Late']);
+  assert.deepEqual(fields.find(([label]) => label === 'Submission mode'), ['Submission mode', 'Online Upload']);
 });
 
 test('detailFields for an assessment resolves its score via submissionForAssessment', () => {

@@ -18,9 +18,8 @@ export function installGlobalKeyboard() {
       if (state.activeOverlay !== 'detail') trapTabKey(e, overlayRoot);
       return;
     }
-    if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-      // Esc blurs the focused field (e.g. the chat composer) so j/k/Tab
-      // shortcuts work again without forcing a mouse click elsewhere.
+    const activeControl = document.activeElement?.closest?.('input, textarea, select, button, a[href]');
+    if (activeControl && !activeControl.classList.contains('row-item') && !activeControl.classList.contains('chat-thread-item')) {
       if (e.key === 'Escape') document.activeElement.blur();
       return;
     }
@@ -60,15 +59,6 @@ export function installGlobalKeyboard() {
         if (chatModeActive) break;
         openDetailForSelection();
         break;
-      case 'Tab': {
-        e.preventDefault();
-        const tabs = visibleTabs(state.config);
-        if (tabs.length === 0) break;
-        const idx = tabs.findIndex((t) => t.id === state.tab);
-        const dir = e.shiftKey ? -1 : 1;
-        setTab(tabs[(Math.max(idx, 0) + dir + tabs.length) % tabs.length].id);
-        break;
-      }
       case 'n':
         if (state.tab === 'messages') openCompose();
         else if (state.tab === 'me') openOverlay('checkin');

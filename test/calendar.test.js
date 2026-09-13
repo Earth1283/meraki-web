@@ -30,10 +30,11 @@ test('isoOf formats a local Date as YYYY-MM-DD', () => {
   assert.equal(isoOf(new Date(2026, 2, 5)), '2026-03-05');
 });
 
-test('monthCells always returns a fixed 6x7 grid padded into neighboring months', () => {
+test('monthCells uses only the complete weeks needed by the month', () => {
   const cells = monthCells(2026, 1, new Date(2026, 1, 10)); // Feb 2026
-  assert.equal(cells.length, 42);
-  assert.ok(cells.some((c) => !c.inMonth), 'grid should pad with adjacent-month days');
+  assert.equal(cells.length, 28);
+  assert.equal(monthCells(2026, 2).length, 35);
+  assert.equal(monthCells(2026, 7).length, 42);
   assert.equal(cells.filter((c) => c.isToday).length, 1);
   assert.equal(cells.find((c) => c.isToday).iso, '2026-02-10');
 });
@@ -84,7 +85,7 @@ test('buildCalendarMonth sorts a day\'s items chronologically by HH:MM, undated 
   const grid = buildCalendarMonth({ year: 2026, month: 1, data, config: CONFIG, reminders: [], today: new Date(2026, 1, 1) });
   const day12 = grid.cells.find((c) => c.iso === '2026-02-12');
   assert.deepEqual(day12.items.map((i) => i.title), ['Essay (no time)', 'Morning meeting', 'Afternoon assembly']);
-  assert.deepEqual(day12.items.map((i) => i.time), ['00:00', '08:00', '14:00']);
+  assert.deepEqual(day12.items.map((i) => i.time), [null, '08:00', '14:00']);
 });
 
 test('monthCells crosses off only the already-gone days of today\'s own month', () => {
@@ -155,4 +156,3 @@ test('calendarAgendaKinds unfolds past days on request and honors calendarShowAs
 
   assert.deepEqual(calendarAgendaKinds({ data: dataWith(), config: CONFIG, reminders: [], today }), []);
 });
-
