@@ -1,4 +1,9 @@
 export const DATA_AND_PRIVACY = `\
+TL;DR: this is the same school account and the same real database as the \
+official site — just a different window onto it. Nothing here is hidden, \
+anonymous, or a bypass of anything. The rest of this page spells out exactly \
+what each tab reads and writes, for anyone who wants the specifics.
+
 This client talks directly to Meraki's Supabase backend (the same database \
 the school website reads and writes) over its REST API — it does not open a \
 browser or click through their pages. Here's exactly what each tab touches:
@@ -34,10 +39,10 @@ WRITES (real rows, visible to staff exactly like the website)
   Log in         -> inserts a login_events row, exactly as the site does
                     every time you sign in.
 
-Transparency goes both ways: staff also keep records about you that the
-official site doesn't put front and center. This client surfaces the ones
-your own account can read (nothing you couldn't already pull yourself,
-just easier to find):
+Transparency goes both ways: staff also keep records about you that the \
+official site doesn't put front and center. This client surfaces the ones \
+your own account can read (nothing you couldn't already pull yourself, just \
+easier to find):
 
 WHAT STAFF RECORD ABOUT YOU (read-only, see the 'My Record' tab)
   behavior_notes -> notes/strikes logged against you, including automated
@@ -46,38 +51,41 @@ WHAT STAFF RECORD ABOUT YOU (read-only, see the 'My Record' tab)
   report_cards   -> per-class term grade, letter, and teacher comment
   attendance     -> already shown on its own tab: daily status + notes
 
-None of this is hidden by design on their end particularly — it's just
+None of this is hidden by design on their end particularly — it's just \
 buried in a slow, clunky UI. This tab exists so you don't have to dig.
 
-This app does not grant anonymity, extra permissions, or a bypass of school
-policy — it only changes the interface sitting on top of the same account
-and the same data. Anything sent or logged here is exactly as real as if
-it were typed into the official website.
+This app does not grant anonymity, extra permissions, or a bypass of school \
+policy — it only changes the interface sitting on top of the same account \
+and the same data. Anything sent or logged here is exactly as real as if it \
+were typed into the official website.
 
-One technical note: because this reads/writes via the API directly instead
-of driving the actual web page, it does not trigger the site's client-side
-bot/script detection (which watches for scripted clicks and keystrokes in
-the browser DOM). That detector already flagged this project's own test
-account during development — logged as a behavior_notes 'strike', cleared
-only because the school's admins were informed in advance and had signed
+One technical note: because this reads/writes via the API directly instead \
+of driving the actual web page, it does not trigger the site's client-side \
+bot/script detection (which watches for scripted clicks and keystrokes in \
+the browser DOM). That detector already flagged this project's own test \
+account during development — logged as a behavior_notes 'strike', cleared \
+only because the school's admins were informed in advance and had signed \
 off on this being a sanctioned security assessment.
 
-If you don't have that same explicit sign-off, assume none of it transfers
-to you: using an unofficial client against a school system can still be a
-policy or academic-integrity issue on its own terms, independent of
-whether any particular detector happens to notice.
+If you don't have that same explicit sign-off, assume none of it transfers \
+to you: using an unofficial client against a school system can still be a \
+policy or academic-integrity issue on its own terms, independent of whether \
+any particular detector happens to notice.
 
-If you're using the self-hosted web version of this client: your email and
-password go straight from your browser to Meraki's own Supabase project,
-the same place the official site sends them. The server hosting this page
-only ever serves the static files you're looking at right now — it never
-sees your password, your session token, or anything you type. Quiz
-questions and "Notify the teacher" go to Meraki's own app server
-(meraki-education.app) with your session token, the same way the
-official site calls it.
+If you're using the self-hosted web version of this client: your email and \
+password go straight from your browser to Meraki's own Supabase project, \
+the same place the official site sends them. The server hosting this page \
+only ever serves the static files you're looking at right now — it never \
+sees your password, your session token, or anything you type. Quiz \
+questions and "Notify the teacher" go to Meraki's own app server \
+(meraki-education.app) with your session token, the same way the official \
+site calls it.
 `;
 
 function classifyParagraph(firstLine) {
+  if (firstLine.startsWith('TL;DR:')) {
+    return { cls: 'priv-tldr', prefix: null };
+  }
   if (
     firstLine === 'READS ONLY' ||
     firstLine.startsWith('WRITES (') ||

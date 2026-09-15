@@ -195,6 +195,7 @@ function renderToolbar() {
           { icon: 'refresh', label: t('toolbar.refresh'), action: refresh },
           { icon: 'settings', label: t('toolbar.settings'), action: () => openOverlay('settings') },
           { icon: 'help', label: t('toolbar.help'), action: () => openOverlay('help') },
+          { icon: 'book', label: t('toolbar.resources'), action: () => openOverlay('resources') },
           { separator: true },
           { icon: 'logout', label: t('toolbar.logout'), action: doLogout },
         ]);

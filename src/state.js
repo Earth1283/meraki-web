@@ -148,7 +148,7 @@ export const state = {
   loadingSteps: [],
   error: null,
   selectedIndex: -1,
-  // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'turnin' | 'help' | 'settings' | 'detail' | null
+  // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'turnin' | 'help' | 'resources' | 'settings' | 'detail' | null
   activeOverlay: null,
   // Set by openCompose() to prefill the compose form (e.g. replying to a
   // message from the context menu); consumed once by buildCompose().

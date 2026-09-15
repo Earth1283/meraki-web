@@ -13,6 +13,7 @@ import { downloadFileUpload } from './files.js';
 import { detailSections } from './detail-sections.js';
 import { buildPortfolioForm } from './portfolio.js';
 import { buildTurnInForm } from './turnin.js';
+import { buildResources } from './resources.js';
 import { sendMessage } from './messaging.js';
 import { isoOf } from './calendar.js';
 
@@ -172,6 +173,9 @@ export function renderOverlay() {
     case 'help':
       overlayRoot.appendChild(buildHelp());
       break;
+    case 'resources':
+      overlayRoot.appendChild(buildResources());
+      break;
     case 'settings':
       overlayRoot.appendChild(buildSettings());
       break;
@@ -185,7 +189,7 @@ export function renderOverlay() {
   // justOpened so a settings change (which re-renders the same 'settings'
   // overlay via setConfig -> notify()) doesn't yank focus back to the top
   // every time.
-  if (justOpened && ['checkin', 'help', 'settings'].includes(current)) {
+  if (justOpened && ['checkin', 'help', 'resources', 'settings'].includes(current)) {
     queueMicrotask(() => focusFirstIn(overlayRoot));
   }
 

@@ -1895,8 +1895,10 @@ select.field-input {
   color: var(--text-primary) !important;
   margin-bottom: 8px !important;
 }
-.priv-warn, .priv-note { padding-left: 16px; box-shadow: inset 3px 0 0 var(--bad); }
+.priv-tldr, .priv-warn, .priv-note { padding-left: 16px; box-shadow: inset 3px 0 0 var(--bad); }
+.priv-tldr { box-shadow: inset 3px 0 0 var(--accent); }
 .priv-note { box-shadow: inset 3px 0 0 var(--warn); }
+.priv-tldr p { font-weight: 600; color: var(--text-primary); }
 .priv-warn p { font-weight: 600; color: var(--bad-text); }
 .priv-note p { color: var(--warn-text); }
 .priv-accent2 p { color: var(--good-text); }
