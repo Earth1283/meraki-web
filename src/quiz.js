@@ -5,28 +5,68 @@ import { el } from './dom.js';
 import { pill } from './rows.js';
 import { t } from './i18n.js';
 
+/** A quiz's questions in the order the official site shows them. */
+export function sortQuestions(questions) {
+  return [...questions].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+}
+
+// Taking a quiz (quiztake.js): the pure rules live here, alongside the rest
+// of this file's quiz logic, so they're testable without a browser the same
+// way submission.js holds turnin.js's rules.
+
+/** Whether a "Take Quiz" button belongs on an assessment's detail at all:
+ * published, and not already submitted (once there's a submission, the
+ * detail panel shows the review above instead). */
+export function canTakeQuiz(assessment, submission) {
+  return !!assessment?.published && !submission;
+}
+
+/** { [questionId]: choiceIndex } -> the wire shape submitAssessmentAnswers
+ * wants, one entry per question actually answered. A question left blank is
+ * simply left out rather than sent as some guessed "no answer" value. */
+export function answerPayload(answers) {
+  return Object.entries(answers)
+    .filter(([, choice]) => choice != null)
+    .map(([questionId, choice]) => ({ questionId, choice: Number(choice) }));
+}
+
+export function answeredCount(answers) {
+  return answerPayload(answers).length;
+}
+
+/** startedAt plus the assessment's time limit, or null for an untimed one. */
+export function quizDeadline(startedAt, timeLimitMinutes) {
+  return timeLimitMinutes == null ? null : startedAt + timeLimitMinutes * 60000;
+}
+
+/** A countdown in mm:ss, floored at 0:00 rather than going negative. */
+export function formatCountdown(msRemaining) {
+  const total = Math.max(0, Math.ceil(msRemaining / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 /** A submitted quiz's questions paired with your recorded answers, in
  * question order. `choice` is the 0-based option you picked; `isCorrect`
  * stays null until it's graded. The questions carry no answer key, so a
  * wrong answer can't show which option was right. */
 export function quizReview(questions, answers) {
   const byQuestion = new Map(answers.map((a) => [a.question_id, a]));
-  return [...questions]
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-    .map((q, i) => {
-      const answer = byQuestion.get(q.id) ?? null;
-      return {
-        n: i + 1,
-        prompt: q.prompt ?? '',
-        options: Array.isArray(q.options) ? q.options.map(String) : [],
-        points: q.points ?? null,
-        answered: answer !== null,
-        choice: Number.isInteger(answer?.response?.choice) ? answer.response.choice : null,
-        isCorrect: answer?.is_correct ?? null,
-        pointsAwarded: answer?.points_awarded ?? null,
-        feedback: answer?.feedback || null,
-      };
-    });
+  return sortQuestions(questions).map((q, i) => {
+    const answer = byQuestion.get(q.id) ?? null;
+    return {
+      n: i + 1,
+      prompt: q.prompt ?? '',
+      options: Array.isArray(q.options) ? q.options.map(String) : [],
+      points: q.points ?? null,
+      answered: answer !== null,
+      choice: Number.isInteger(answer?.response?.choice) ? answer.response.choice : null,
+      isCorrect: answer?.is_correct ?? null,
+      pointsAwarded: answer?.points_awarded ?? null,
+      feedback: answer?.feedback || null,
+    };
+  });
 }
 
 function answerStatus(isCorrect, answered = true) {

@@ -17,3 +17,24 @@
 .quiz-option.chosen.bad { background: var(--bad-soft); box-shadow: inset 0 0 0 1px var(--bad); }
 .quiz-option.chosen.bad .quiz-option-mark { color: var(--bad-text); }
 .quiz-feedback { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--border-strong); font-size: 0.875rem; color: var(--text-secondary); white-space: pre-wrap; }
+
+/* Taking a quiz (quiztake.js) — same option look as the review above, but
+ * clickable, plus a question pager and an optional countdown. */
+.take-quiz-cta .row-placeholder { padding-left: 0; }
+.quiz-timer { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.quiz-timer-low { color: var(--bad-text); }
+.take-quiz-instructions { color: var(--text-secondary); }
+.quiz-take-pager { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.quiz-take-dot {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; border: none;
+  background: var(--bg-subtle); box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text-muted); font-size: 0.75rem; font-weight: 700; cursor: pointer;
+}
+.quiz-take-dot.answered { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); color: var(--text-primary); }
+.quiz-take-dot.active { box-shadow: inset 0 0 0 2px var(--text-primary); }
+.quiz-take-question { margin-bottom: 8px; }
+.quiz-take-options { display: flex; flex-direction: column; gap: 6px; }
+.quiz-option-btn { border: none; background: none; text-align: left; cursor: pointer; font: inherit; }
+.quiz-option-btn:hover { background: var(--bg-subtle); }
+.quiz-option-btn.chosen { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.take-quiz-progress { font-size: 0.8125rem; color: var(--text-muted); }

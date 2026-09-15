@@ -13,6 +13,7 @@ import { downloadFileUpload } from './files.js';
 import { detailSections } from './detail-sections.js';
 import { buildPortfolioForm } from './portfolio.js';
 import { buildTurnInForm } from './turnin.js';
+import { buildTakeQuizForm } from './quiztake.js';
 import { buildResources } from './resources.js';
 import { sendMessage } from './messaging.js';
 import { isoOf } from './calendar.js';
@@ -170,6 +171,9 @@ export function renderOverlay() {
     case 'turnin':
       overlayRoot.appendChild(buildTurnInForm());
       break;
+    case 'quiz':
+      overlayRoot.appendChild(buildTakeQuizForm());
+      break;
     case 'help':
       overlayRoot.appendChild(buildHelp());
       break;
@@ -189,7 +193,7 @@ export function renderOverlay() {
   // justOpened so a settings change (which re-renders the same 'settings'
   // overlay via setConfig -> notify()) doesn't yank focus back to the top
   // every time.
-  if (justOpened && ['checkin', 'help', 'resources', 'settings'].includes(current)) {
+  if (justOpened && ['checkin', 'help', 'resources', 'settings', 'quiz'].includes(current)) {
     queueMicrotask(() => focusFirstIn(overlayRoot));
   }
 

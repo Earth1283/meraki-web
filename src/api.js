@@ -12,6 +12,7 @@ export const SUPABASE_ANON_KEY = 'sb_publishable_A46q6yNO7bKHJO4WqrqCkQ_4K8nO2TY
 export const APP_URL = 'https://meraki-education.app';
 const SERVER_FNS = {
   assessmentWithQuestions: '7cb06537c536f77255905af66a89d7c4dfa691e83a9096078709110c3a571da9',
+  submitAssessment: '7d62ba3d6bcbca16b644ea201e5915ef5652106aac524f5331494e48dd9657cf',
   notifyMessage: 'b6d92294f634873df182796b77a7b3ee247ce7573b4b9c02e05d0ef5f5b82216',
 };
 
@@ -268,10 +269,10 @@ async function callServerFn(id, data) {
 }
 
 // assessment_questions itself is unreadable for students (RLS returns it
-// empty), but Meraki's app hands a quiz's questions to whoever opens it. Only
-// call this for quizzes you've already submitted: it's the same call the site
-// makes when a quiz is opened, and whether that also starts the quiz's timer
-// isn't known. The questions carry no answer key.
+// empty), but Meraki's app hands a quiz's questions to whoever opens it —
+// repeatedly, in captured traffic, with no new submission row appearing in
+// between, so it's read-only and doesn't itself start anything server-side.
+// The questions carry no answer key.
 export async function getAssessmentQuestions(assessmentId) {
   const result = await callServerFn(SERVER_FNS.assessmentWithQuestions, { assessmentId });
   return Array.isArray(result?.questions) ? result.questions : [];
@@ -281,6 +282,25 @@ export async function getAssessmentQuestions(assessmentId) {
 // rest of this app's tables are.
 export async function getAssessmentAnswers(submissionId) {
   return getTable('assessment_answers', `select=id,question_id,response,is_correct,points_awarded,feedback,created_at&submission_id=eq.${submissionId}&order=created_at.asc`);
+}
+
+// Submits a quiz's answers the way the official site does: one call, graded
+// server-side. `answers` is [{ questionId, choice }] — only multiple-choice
+// responses have been observed in captured traffic, so that's all this
+// sends; a question of some other kind is simply left unanswered rather than
+// guessing at a response shape that's never been seen. Resolves to whatever
+// the site hands back for the parts it could grade immediately.
+export async function submitAssessmentAnswers(assessmentId, answers) {
+  const result = await callServerFn(SERVER_FNS.submitAssessment, {
+    assessmentId,
+    answers: answers.map(({ questionId, choice }) => ({ questionId, response: { choice } })),
+  });
+  return {
+    submissionId: result?.submissionId ?? null,
+    autoScore: result?.autoScore ?? null,
+    totalPoints: result?.totalPoints ?? null,
+    needsReview: !!result?.needsReview,
+  };
 }
 
 // What a teacher marked up on a turned-in submission, in reading order.

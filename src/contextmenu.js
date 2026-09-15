@@ -6,11 +6,12 @@
 // items, the one kind of row a student can remove).
 import { el, svgIcon, clear } from './dom.js';
 import { iconPaths } from './icons.js';
-import { state, openDetailFor, setTab, openCompose } from './state.js';
-import { detailFields } from './rows.js';
+import { state, openDetailFor, setTab, openCompose, openTakeQuiz } from './state.js';
+import { detailFields, submissionForAssessment } from './rows.js';
 import { showToast } from './toast.js';
 import { downloadFileUpload } from './files.js';
 import { deletePortfolioItem } from './portfolio.js';
+import { canTakeQuiz } from './quiz.js';
 import { t } from './i18n.js';
 
 const root = document.getElementById('contextmenu-root');
@@ -104,6 +105,9 @@ export function menuItemsFor(target) {
       if (classIndex !== -1) items.push({ icon: 'classes', label: t('menu.viewClass'), action: () => goToClass(classIndex) });
       if (target.kind === 'fileUpload') {
         items.push({ icon: 'download', label: t('menu.download'), action: () => downloadFileUpload(item) });
+      }
+      if (target.kind === 'assessment' && canTakeQuiz(item, submissionForAssessment(data, item))) {
+        items.push({ icon: 'quiz', label: t('quiz.start'), action: () => openTakeQuiz(item.id) });
       }
       break;
     }

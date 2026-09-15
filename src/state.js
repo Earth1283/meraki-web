@@ -148,7 +148,7 @@ export const state = {
   loadingSteps: [],
   error: null,
   selectedIndex: -1,
-  // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'turnin' | 'help' | 'resources' | 'settings' | 'detail' | null
+  // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'turnin' | 'quiz' | 'help' | 'resources' | 'settings' | 'detail' | null
   activeOverlay: null,
   // Set by openCompose() to prefill the compose form (e.g. replying to a
   // message from the context menu); consumed once by buildCompose().
@@ -162,6 +162,10 @@ export const state = {
   turnInAssignmentId: null,
   turnInFocus: false,
   turnInReturn: null,
+  // Set by openTakeQuiz(): the assessment the take-quiz overlay is for, and
+  // the detail view to go back to once it's submitted.
+  quizAssessmentId: null,
+  quizReturn: null,
   detailTarget: null,
   // Stack of targets to return to, most-recent last — lets openSubDetail
   // nest arbitrarily deep (e.g. class -> assignment -> further drill-down)
@@ -293,7 +297,7 @@ const TABLES = [
   ['fileUploads', 'file_uploads', 'select=id,title,file_name,mime_type,size_bytes,storage_path,audience,created_at,uploaded_by,class_id,classes(name)&order=created_at.desc&limit=69', 'class files'],
   ['enrollments', 'enrollments', 'select=id,student_id,class_id,students(id,first_name,last_name,grade_level,student_number)&order=class_id.asc', 'class rosters'],
   ['assignmentSubmissions', 'assignment_submissions', 'select=id,assignment_id,submitted_at,status,body,teacher_note,file_upload_id,file_uploads(id,file_name,storage_path)&order=submitted_at.desc', 'assignment submissions'],
-  ['assessmentSubmissions', 'assessment_submissions', 'select=id,auto_score,manual_score,total_points,submitted_at,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc', 'assessment submissions'],
+  ['assessmentSubmissions', 'assessment_submissions', 'select=id,assessment_id,auto_score,manual_score,total_points,submitted_at,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc', 'assessment submissions'],
 ];
 
 // refresh() awaits these in order (each group's fields still fetched in
@@ -677,5 +681,14 @@ export function openTurnIn(assignmentId) {
   state.turnInFocus = true;
   state.turnInReturn = state.activeOverlay === 'detail' ? state.detailTarget : null;
   state.activeOverlay = 'turnin';
+  notify();
+}
+
+/** Opens the take-quiz overlay for an assessment (see quiztake.js), coming
+ * back to the detail view it was opened from once it's submitted. */
+export function openTakeQuiz(assessmentId) {
+  state.quizAssessmentId = assessmentId;
+  state.quizReturn = state.activeOverlay === 'detail' ? state.detailTarget : null;
+  state.activeOverlay = 'quiz';
   notify();
 }

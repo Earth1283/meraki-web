@@ -274,15 +274,21 @@ export function gradeForAssignment(data, assignmentId) {
   return data.grades.find((g) => g.assignment_id === assignmentId) ?? null;
 }
 
-// assessment_submissions has no assignment_id/assessment_id scalar in the
-// schema we've observed, only the embedded assessments(title, class_id) —
-// so this matches on that pair. Best-effort: a title collision within the
-// same class would misattribute a score, but that's a display quirk, not a
-// data-integrity risk (read-only, never written back).
+// assessment_submissions does carry an assessment_id column (confirmed by a
+// captured request filtering on it directly), matched first. The
+// class_id+title pair is kept as a fallback for a submission fetched before
+// assessment_id was ever selected for it (this app's older cached rows) —
+// best-effort: a title collision within the same class would misattribute a
+// score there, but that's a display quirk, not a data-integrity risk
+// (read-only, never written back).
 export function submissionForAssessment(data, assessment) {
+  if (assessment?.id != null) {
+    const byId = data.assessmentSubmissions.find((s) => s.assessment_id === assessment.id);
+    if (byId) return byId;
+  }
   return (
     data.assessmentSubmissions.find(
-      (s) => s.assessments?.class_id === assessment.class_id && s.assessments?.title === assessment.title,
+      (s) => s.assessment_id == null && s.assessments?.class_id === assessment.class_id && s.assessments?.title === assessment.title,
     ) ?? null
   );
 }

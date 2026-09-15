@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { friendlyLoadError, login, insertRow, deleteRow, updateRow, uploadFile, getSubmissionAnnotations, getAssessmentQuestions, notifyMessageRecipient, getTablePage, parseContentRangeTotal, APP_URL } from '../src/api.js';
+import { friendlyLoadError, login, insertRow, deleteRow, updateRow, uploadFile, getSubmissionAnnotations, getAssessmentQuestions, submitAssessmentAnswers, notifyMessageRecipient, getTablePage, parseContentRangeTotal, APP_URL } from '../src/api.js';
+import { decodeSeroval } from '../src/serverfn.js';
 
 const TOKENS = { access_token: 'a', refresh_token: 'r', user: { id: 'u1' } };
 
@@ -141,6 +142,20 @@ test("getAssessmentQuestions calls Meraki's app and decodes the questions", asyn
   assert.equal(call.init.headers['x-tsr-serverfn'], 'true');
   assert.equal(call.init.headers.Authorization, 'Bearer a');
   assert.deepEqual(call.body.t.p.v[0].p, { k: ['assessmentId'], v: [{ t: 1, s: 'quiz-1' }] });
+});
+
+test("submitAssessmentAnswers calls Meraki's app and decodes the score, sending one response.choice per answer", async (t) => {
+  const resultNode = {
+    t: 10, i: 1, o: 0,
+    p: { k: ['submissionId', 'autoScore', 'totalPoints', 'needsReview'], v: [{ t: 1, s: 'sub-1' }, { t: 0, s: 4 }, { t: 0, s: 4 }, { t: 2, s: 3 }] },
+  };
+  const calls = mockFetch(t, (url) => (url.startsWith(APP_URL) ? { json: async () => serverFnResponse(resultNode) } : {}));
+  await login('jstudent', 'hunter2');
+  const result = await submitAssessmentAnswers('quiz-1', [{ questionId: 'q1', choice: 1 }]);
+  assert.deepEqual(result, { submissionId: 'sub-1', autoScore: 4, totalPoints: 4, needsReview: false });
+  const call = calls.at(-1);
+  assert.match(call.url, /^https:\/\/meraki-education\.app\/_serverFn\/7d62ba3d/);
+  assert.deepEqual(decodeSeroval(call.body.t).data, { assessmentId: 'quiz-1', answers: [{ questionId: 'q1', response: { choice: 1 } }] });
 });
 
 test('notifyMessageRecipient reports whether Meraki says a notification went out', async (t) => {
