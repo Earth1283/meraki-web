@@ -1,0 +1,312 @@
+:root {
+  color-scheme: light;
+
+  /* Paper & ink */
+  --bg: #ffffff;
+  --bg-subtle: #f2f4f8;
+  --bg-card: #ffffff;
+  --border: #e3e7ef;
+  --border-strong: #c9d0dd;
+  --text-primary: #1b2540;
+  --text-secondary: #525c77;
+  --text-muted: #6d758b;
+  --ruled: #e7ecf4;
+  --margin-rule: rgba(222, 92, 104, 0.42);
+  --focus: #3355e0;
+  /* The login page's sticky note — always yellow paper with dark ink,
+     independent of the highlighter accent. */
+  --sticky-paper: #fff0a0;
+  --sticky-tape: rgba(201, 208, 221, 0.55);
+  --sticky-shadow: 0 1px 1px rgba(27, 37, 64, 0.08), 0 12px 20px -10px rgba(27, 37, 64, 0.35);
+  --sticky-shadow-lift: 0 2px 3px rgba(27, 37, 64, 0.08), 0 22px 32px -14px rgba(27, 37, 64, 0.42);
+
+  /* Highlighter — swapped per Settings → Accent (see the accent-* classes).
+     --hl is the solid marker color, --mark is how it's laid behind text
+     (solid on paper, translucent on the dark ink pad so light text stays
+     readable), --accent is a text-strength tone of the same hue. */
+  --hl: #ffe45e;
+  --hl-soft: color-mix(in srgb, var(--hl) 30%, transparent);
+  --mark: var(--hl);
+  --mark-h: 0.64em;
+  --mark-y: 72%;
+  --mark-text: var(--text-primary);
+  --mark-text-bad: var(--bad-text);
+  --on-hl: #1b2540;
+  --accent: #86620a;
+  --accent-soft: var(--hl-soft);
+
+  /* Pen — primary actions are written in ink, not highlighter */
+  --accent-solid: #1b2540;
+  --accent-solid-hover: #2e3c63;
+  --accent-text: #ffffff;
+
+  --good: #1f9150;
+  --good-soft: rgba(31, 145, 80, 0.12);
+  --good-text: #17703d;
+  --warn: #c7700f;
+  --warn-soft: rgba(230, 140, 20, 0.16);
+  --warn-text: #9c5500;
+  --bad: #d23b2e;
+  --bad-soft: rgba(210, 59, 46, 0.11);
+  --bad-text: #b02a1f;
+  --bad-mark: rgba(255, 112, 96, 0.42);
+  /* School calendar events: a cool pen-blue so they never read as either
+     the highlighter or an amber due date. */
+  --info-soft: rgba(51, 85, 224, 0.1);
+  --info-text: #2d49b8;
+
+  --radius-sm: 6px;
+  --radius-btn: 9px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+  --shadow-pop: 0 1px 2px rgba(27, 37, 64, 0.06), 0 12px 32px -8px rgba(27, 37, 64, 0.2);
+  --shadow-modal: 0 24px 60px -16px rgba(27, 37, 64, 0.3);
+  --scrim: rgba(22, 29, 50, 0.34);
+
+  --font-ui: 'Recursive', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  /* Notebook style: handwritten headings (ZCOOL KuaiLe covers the CJK that
+     Recursive lacks) and the pen that sketch marks are drawn with. In the
+     dark theme the pen turns to chalk via --sketch-filter. */
+  --font-hand: 'Recursive', 'ZCOOL KuaiLe', system-ui, sans-serif;
+  --sketch-ink: var(--text-primary);
+  --sketch-grid: color-mix(in srgb, var(--text-primary) 36%, transparent);
+  /* Colored pens: red ink crosses off past days, blue ink marks today. The
+     dark theme swaps both for chalk tones (coral, sky blue). */
+  --sketch-ink-red: #c62f25;
+  --sketch-ink-blue: #1d3a9e;
+  --sketch-filter: none;
+  /* Today's number under its blue circle: a marker swipe on paper. */
+  --sketch-today-bg: linear-gradient(var(--mark), var(--mark)) no-repeat 0 var(--mark-y) / 100% var(--mark-h);
+  /* Notebook paper objects: the announcements corkboard and detention slips. */
+  --cork: #c9a47b;
+  --cork-speck: rgba(92, 58, 28, 0.38);
+  --cork-fleck: rgba(255, 242, 216, 0.4);
+  --slip-paper: #ffe1e9;
+  /* Notebook calendar list: highlighter colors per item kind. Solid pastel
+     markers, so the dark theme's opaque, dark-text marks can use them too. */
+  --hl-event: #a8dcff;
+  --hl-assignment: #ffc78a;
+  --hl-reminder: #b5f09b;
+  /* Recursive's Casual axis: 1 reads like a marker, 0 like a plain sans. */
+  --casual: 'CASL' 1;
+  --linear: 'CASL' 0;
+}
+
+/* The base :root above is the light palette. This block applies the dark
+   "ink pad" whenever the OS prefers dark AND the user hasn't explicitly
+   forced light mode in Settings (data-theme="light"); the block below it
+   applies the same palette unconditionally when the user has forced dark,
+   regardless of what the OS prefers. Between the two, data-theme (set by
+   state.js's applyConfigEffects) always wins over prefers-color-scheme. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #121829;
+    --bg-subtle: #181f35;
+    --bg-card: #171e33;
+    --border: #262f4b;
+    --border-strong: #3a4570;
+    --text-primary: #e8ecf6;
+    --text-secondary: #aab3c9;
+    --text-muted: #838ca6;
+    --ruled: #1b2340;
+    --margin-rule: rgba(255, 128, 140, 0.3);
+    --focus: #8fb0ff;
+    --sticky-paper: #efd76e;
+    --sticky-tape: rgba(232, 236, 246, 0.22);
+    --sticky-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 14px 24px -10px rgba(0, 0, 0, 0.7);
+    --sticky-shadow-lift: 0 2px 3px rgba(0, 0, 0, 0.35), 0 24px 36px -14px rgba(0, 0, 0, 0.85);
+    --sketch-filter: url(#sketch-chalk);
+    --sketch-ink-red: #ff8a80;
+    --sketch-ink-blue: #7cc8ff;
+    --cork: #4d3b2b;
+    --cork-speck: rgba(0, 0, 0, 0.4);
+    --cork-fleck: rgba(255, 228, 196, 0.1);
+    --slip-paper: #3b2533;
+    /* The dark mark is a solid full-height block, which would swallow the
+       chalk circle, so today is just sky-blue chalk. */
+    --sketch-today-bg: none;
+    --hl-soft: color-mix(in srgb, var(--hl) 12%, transparent);
+    /* A translucent marker over navy turns olive, so on the ink pad the
+       mark is a solid full-height stroke with dark ink text on top. */
+    --mark: var(--hl);
+    --mark-h: 100%;
+    --mark-y: 50%;
+    --mark-text: var(--on-hl);
+    --mark-text-bad: var(--on-hl);
+    --accent: #ffd95c;
+    --accent-solid: #e8ecf6;
+    --accent-solid-hover: #ffffff;
+    --accent-text: #121829;
+    --good: #5fd98f;
+    --good-soft: rgba(95, 217, 143, 0.14);
+    --good-text: #6fe09c;
+    --warn: #f6b34c;
+    --warn-soft: rgba(246, 179, 76, 0.15);
+    --warn-text: #f8bf66;
+    --bad: #ff8577;
+    --bad-soft: rgba(255, 133, 119, 0.14);
+    --bad-text: #ff968a;
+    --bad-mark: #ff9c90;
+    --info-soft: rgba(143, 176, 255, 0.15);
+    --info-text: #b3c6ff;
+    --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 36px -8px rgba(0, 0, 0, 0.55);
+    --shadow-modal: 0 24px 60px -12px rgba(0, 0, 0, 0.6);
+    --scrim: rgba(5, 8, 18, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #121829;
+  --bg-subtle: #181f35;
+  --bg-card: #171e33;
+  --border: #262f4b;
+  --border-strong: #3a4570;
+  --text-primary: #e8ecf6;
+  --text-secondary: #aab3c9;
+  --text-muted: #838ca6;
+  --ruled: #1b2340;
+  --margin-rule: rgba(255, 128, 140, 0.3);
+  --focus: #8fb0ff;
+  --sticky-paper: #efd76e;
+  --sticky-tape: rgba(232, 236, 246, 0.22);
+  --sticky-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 14px 24px -10px rgba(0, 0, 0, 0.7);
+  --sticky-shadow-lift: 0 2px 3px rgba(0, 0, 0, 0.35), 0 24px 36px -14px rgba(0, 0, 0, 0.85);
+  --sketch-filter: url(#sketch-chalk);
+  --sketch-ink-red: #ff8a80;
+  --sketch-ink-blue: #7cc8ff;
+  --cork: #4d3b2b;
+  --cork-speck: rgba(0, 0, 0, 0.4);
+  --cork-fleck: rgba(255, 228, 196, 0.1);
+  --slip-paper: #3b2533;
+  --sketch-today-bg: none;
+  --hl-soft: color-mix(in srgb, var(--hl) 12%, transparent);
+  --mark: var(--hl);
+  --mark-h: 100%;
+  --mark-y: 50%;
+  --mark-text: var(--on-hl);
+  --mark-text-bad: var(--on-hl);
+  --accent: #ffd95c;
+  --accent-solid: #e8ecf6;
+  --accent-solid-hover: #ffffff;
+  --accent-text: #121829;
+  --good: #5fd98f;
+  --good-soft: rgba(95, 217, 143, 0.14);
+  --good-text: #6fe09c;
+  --warn: #f6b34c;
+  --warn-soft: rgba(246, 179, 76, 0.15);
+  --warn-text: #f8bf66;
+  --bad: #ff8577;
+  --bad-soft: rgba(255, 133, 119, 0.14);
+  --bad-text: #ff968a;
+  --bad-mark: #ff9c90;
+  --info-soft: rgba(143, 176, 255, 0.15);
+  --info-text: #b3c6ff;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 36px -8px rgba(0, 0, 0, 0.55);
+  --shadow-modal: 0 24px 60px -12px rgba(0, 0, 0, 0.6);
+  --scrim: rgba(5, 8, 18, 0.6);
+}
+
+:root.accent-yellow { --hl: #ffe45e; --accent: #86620a; }
+:root.accent-green { --hl: #b5f09b; --accent: #237a34; }
+:root.accent-blue { --hl: #a8dcff; --accent: #1f5fbf; }
+:root.accent-purple { --hl: #d8c5ff; --accent: #6a3dc6; }
+:root.accent-red { --hl: #ffb4a8; --accent: #b3372b; }
+:root.accent-orange { --hl: #ffc78a; --accent: #9a4b05; }
+:root.accent-pink { --hl: #ffb8dc; --accent: #ad2b6f; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']).accent-yellow { --accent: #ffd95c; }
+  :root:not([data-theme='light']).accent-green { --accent: #8ee59a; }
+  :root:not([data-theme='light']).accent-blue { --accent: #8cc8ff; }
+  :root:not([data-theme='light']).accent-purple { --accent: #c9b0ff; }
+  :root:not([data-theme='light']).accent-red { --accent: #ff9c90; }
+  :root:not([data-theme='light']).accent-orange { --accent: #ffb870; }
+  :root:not([data-theme='light']).accent-pink { --accent: #ff9fd0; }
+}
+:root[data-theme='dark'].accent-yellow { --accent: #ffd95c; }
+:root[data-theme='dark'].accent-green { --accent: #8ee59a; }
+:root[data-theme='dark'].accent-blue { --accent: #8cc8ff; }
+:root[data-theme='dark'].accent-purple { --accent: #c9b0ff; }
+:root[data-theme='dark'].accent-red { --accent: #ff9c90; }
+:root[data-theme='dark'].accent-orange { --accent: #ffb870; }
+:root[data-theme='dark'].accent-pink { --accent: #ff9fd0; }
+
+.density-compact #body { padding: 12px 24px 32px; }
+.density-compact .row-item { padding: 8px 12px; }
+.density-compact .row-title { font-size: 0.92rem; }
+.density-compact .row-meta, .density-compact .row-preview { font-size: 0.76rem; margin-top: 1px; }
+.density-compact .stat-grid { margin-bottom: 12px; }
+.density-compact .stat-tile { padding: 10px 14px; }
+.density-compact .stat-value { font-size: 1.7rem; }
+.density-compact .row-section { padding: 14px 12px 4px; }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-variation-settings: var(--linear);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.btn:active, .btn-icon:active, .segmented-item:active, .mood-btn:active, .chat-plus-btn:active { transform: scale(0.97); }
+
+p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
+
+::selection { background: var(--hl); color: var(--on-hl); }
+
+#app { height: 100%; }
+#login-screen { height: 100%; overflow-y: auto; }
+
+.icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-item.active .nav-label,
+.row-section-mark,
+.style-notebook .hl-swipe,
+.stat-value.text-accent,
+.stat-value.text-bad,
+.hero-value,
+.brand {
+  background-image: linear-gradient(98deg, transparent 0.06em, var(--mark-color, var(--mark)) 0.2em, var(--mark-color, var(--mark)) calc(100% - 0.28em), transparent calc(100% - 0.04em));
+  background-repeat: no-repeat;
+  background-size: 100% var(--mark-h);
+  background-position: 0 var(--mark-y);
+  padding-inline: 0.26em;
+  margin-inline: -0.26em;
+  border-radius: 0.1em 0.28em 0.12em 0.24em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  color: var(--mark-text);
+}
+.stat-value.text-bad { --mark-color: var(--bad-mark); color: var(--mark-text-bad); }
+
+@keyframes mark-swipe {
+  from { background-size: 0% var(--mark-h); }
+  to { background-size: 100% var(--mark-h); }
+}
+

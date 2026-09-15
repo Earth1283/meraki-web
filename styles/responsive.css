@@ -1,0 +1,130 @@
+@media (max-width: 900px) {
+  #shell { display: block; height: 100%; }
+  #content-col { height: 100%; }
+
+  .hamburger-btn { display: inline-flex; }
+  .hamburger-btn:hover { background: var(--bg-subtle); color: var(--text-primary); }
+  .sidebar-toggle { display: none; }
+
+  #tabbar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 78vw;
+    max-width: 300px;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  #tabbar.open { transform: translateX(0); box-shadow: var(--shadow-modal); }
+
+  .tabbar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: var(--scrim);
+  }
+
+  .toolbar-inner { padding: 10px 16px; min-height: 60px; gap: 8px; }
+  .toolbar-title { font-size: 1.375rem; }
+  .toolbar-actions .btn { margin-inline: 2px 4px; padding: 8px 11px; }
+  .toolbar-actions .btn-icon { width: 34px; height: 34px; }
+  #body { padding: 12px 12px 32px; }
+
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-tile { padding: 12px 14px; }
+  .stat-value { font-size: 1.75rem; }
+
+  .side-panel, .palette-panel { width: 100%; max-width: 100%; }
+  .palette-panel { max-width: calc(100% - 24px); }
+  .overlay-right { align-items: flex-end; }
+  .side-panel {
+    height: 88vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+    padding: 18px 20px 28px;
+    animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes slide-up { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* Not enough width for a labeled thread list too — collapse it to an
+     avatar-only rail, Discord's own mobile compromise. */
+  .chat-thread-list { width: 64px; padding: 10px 6px; }
+  .chat-thread-item { justify-content: center; padding: 6px; position: relative; }
+  .chat-thread-name { display: none; }
+  .chat-unread-dot { position: absolute; margin-left: 0; transform: translate(10px, -10px); }
+
+  /* No room for a third grid column on mobile — the detail panel falls back
+     to a full-screen sheet, same as the other overlays. */
+  #detail-panel:not([hidden]) {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    height: 88vh;
+    z-index: 40;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+    box-shadow: var(--shadow-modal);
+    padding: 18px 20px 32px;
+    animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .detail-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: var(--scrim);
+  }
+
+  .privacy-row { flex-direction: column; gap: 2px; }
+  .privacy-row-label { min-width: 0; }
+}
+
+@media (max-width: 520px) {
+  .login-screen { align-items: flex-start; align-content: flex-start; padding-top: 96px; padding-right: 20px; }
+  .sticky-note { --tilt: -1.5deg; }
+  .detail-field { grid-template-columns: 1fr; gap: 1px; }
+}
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.row-item:focus-visible, .calendar-day:focus-visible { outline-offset: -2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+:root:not(.style-notebook) .nav-item.active .nav-label,
+:root:not(.style-notebook) .stat-value.text-accent,
+:root:not(.style-notebook) .stat-value.text-bad,
+:root:not(.style-notebook) .hero-value {
+  background-image: none;
+  padding-inline: 0;
+  margin-inline: 0;
+}
+:root:not(.style-notebook) .nav-item.active .nav-label { color: inherit; }
+:root:not(.style-notebook) .calendar-day-today .calendar-day-num {
+  background: var(--info-soft);
+  color: var(--info-text);
+}
+:root:not(.style-notebook) .segmented-item.active,
+:root:not(.style-notebook) .mood-btn.active {
+  background: var(--text-primary);
+  color: var(--bg);
+}
+
+:root:not(.style-notebook) .toolbar-title,
+:root:not(.style-notebook) .row-section,
+:root:not(.style-notebook) .stat-value,
+:root:not(.style-notebook) .calendar-month-label,
+:root:not(.style-notebook) .calendar-daypanel-title,
+:root:not(.style-notebook) .panel-header h2,
+:root:not(.style-notebook) .settings-section-title,
+:root:not(.style-notebook) .privacy-heading {
+  font-variation-settings: var(--linear);
+}
+

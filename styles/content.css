@@ -1,0 +1,341 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.btn .icon { width: 16px; height: 16px; stroke-width: 2; }
+
+.btn-primary { background: var(--accent-solid); color: var(--accent-text); }
+.btn-primary:hover { background: var(--accent-solid-hover); }
+.btn-primary:disabled { opacity: 0.6; cursor: default; }
+
+.btn-ghost { background: var(--bg); color: var(--text-primary); border: 1px solid var(--border-strong); }
+.btn-ghost:hover { background: var(--bg-subtle); }
+
+.btn-block { width: 100%; justify-content: center; }
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-btn);
+  color: var(--text-secondary);
+}
+.btn-icon:hover { background: var(--bg-subtle); color: var(--text-primary); }
+
+.btn-sm { padding: 5px 11px; font-size: 0.8125rem; flex-shrink: 0; }
+
+.row-list { display: flex; flex-direction: column; }
+
+.row-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variation-settings: var(--casual);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding: 22px 14px 6px;
+  text-align: left;
+}
+
+.row-placeholder { padding: 10px 14px; color: var(--text-muted); font-size: 0.9rem; }
+.row-placeholder-good { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); }
+
+.row-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 13px 14px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+}
+.row-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: var(--border);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.row-item + .row-item::before { opacity: 1; }
+.row-item:hover::before,
+.row-item:hover + .row-item::before,
+.row-item.selected::before,
+.row-item.selected + .row-item::before { opacity: 0; }
+
+button.row-item:hover { background: var(--bg-subtle); }
+.row-item.selected,
+button.row-item.selected:hover { background: var(--hl-soft); }
+
+.row-item-done { display: flex; align-items: center; gap: 12px; }
+.row-item-done .row-item-inner { flex: 1; min-width: 0; opacity: 0.7; }
+.row-item-done .row-title { text-decoration: line-through; text-decoration-color: var(--text-muted); text-decoration-thickness: 1.5px; }
+.row-done-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--good-soft);
+  color: var(--good);
+}
+.row-done-check .icon { width: 13px; height: 13px; stroke-width: 2.8; }
+
+.row-section-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  border-radius: 8px;
+}
+.row-section-toggle:hover { color: var(--text-secondary); }
+.row-section-chevron { display: inline-flex; flex: none; color: var(--text-muted); margin-left: -2px; }
+.row-section-chevron .icon { width: 15px; height: 15px; stroke-width: 2.4; }
+
+/* Disclosure triangle: right when collapsed, rotates down when expanded.
+   The base .icon points down, so "collapsed" rotates it back to pointing
+   right — expanding is what turns it, matching how folder/tree disclosure
+   triangles read everywhere else. */
+.row-section-chevron-icon { transition: transform 0.18s ease; transform: rotate(0deg); }
+.row-section-chevron-icon.collapsed { transform: rotate(-90deg); }
+
+/* Calendar list: day headers inside the folded "Earlier" section, and past
+   items faded back. Today's header text gets the highlighter
+   (.row-section-mark, with the other marker-stroke rules). */
+.row-subsection { padding-top: 8px; font-size: 0.8125rem; }
+.row-item-past .row-item-inner { opacity: 0.6; }
+
+/* Freshly-expanded section content fades/slides in — see the comment on
+   prevOverviewCollapse in main.js for why this needs the mount-then-flip
+   two-step instead of a plain class-toggle transition. */
+.section-items.reveal-pending { opacity: 0; transform: translateY(-6px); transition: opacity 0.2s ease, transform 0.2s ease; }
+.section-items.reveal-pending.reveal-in { opacity: 1; transform: translateY(0); }
+
+.row-item-inner { min-width: 0; }
+.row-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.row-top > .pill:last-child, .row-top > .dot:last-child { margin-left: auto; }
+
+.row-title {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.35;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.row-title.dim { color: var(--text-secondary); font-weight: 500; }
+.row-title.strong { font-weight: 700; }
+
+.row-meta { color: var(--text-secondary); font-size: 0.8125rem; margin-top: 3px; }
+.row-preview {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80ch;
+}
+
+.pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: var(--bg);
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+/* Due dates and periods are information, not alarms — they stay in ink so
+   the highlighter keeps meaning "look here". */
+.pill.accent { color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.pill.accent2, .pill.good { background: var(--good-soft); color: var(--good-text); box-shadow: none; }
+.pill.warn { background: var(--warn-soft); color: var(--warn-text); box-shadow: none; }
+.pill.bad { background: var(--bad-soft); color: var(--bad-text); box-shadow: none; }
+.pill.dim { color: var(--text-muted); }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-muted); }
+.dot.good { background: var(--good); }
+.dot.warn { background: var(--warn); }
+.dot.bad { background: var(--bad); }
+
+.glyph { font-size: 1rem; flex: none; }
+.glyph.accent { color: var(--accent); }
+.glyph.accent2 { color: var(--good); }
+
+.text-accent { color: var(--accent); }
+.text-good { color: var(--good-text); }
+.text-warn { color: var(--warn-text); }
+.text-bad { color: var(--bad-text); }
+.text-dim { color: var(--text-muted); }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  margin: 4px 0 14px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 16px 18px 14px;
+  background: var(--bg);
+  box-shadow: -1px -1px 0 var(--border);
+  text-align: left;
+}
+.stat-tile:hover { background: var(--bg-subtle); }
+
+.stat-value {
+  font-variation-settings: var(--casual);
+  font-size: 2.25rem;
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value.text-accent, .stat-value.text-bad { padding-inline: 0.32em; margin-inline: -0.32em; }
+.stat-label { font-size: 0.8125rem; color: var(--text-secondary); font-weight: 500; }
+.stat-sub { margin-top: -3px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Overall grade: the tile plus its grading-scale chip, laid over the
+   tile's top-right corner (see gradeTile in rows.js). */
+.stat-tile-group { position: relative; display: flex; min-width: 0; }
+.stat-tile-group > .stat-tile { flex: 1; }
+.grade-scale-chip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 5px 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.grade-scale-chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.grade-scale-chip .icon { width: 12px; height: 12px; }
+
+.hero-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  margin: 4px 0 6px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+}
+.hero-label { font-size: 0.8125rem; color: var(--text-secondary); }
+.hero-value {
+  align-self: flex-start;
+  font-variation-settings: var(--casual);
+  font-size: 1.625rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+.hero-meta { font-size: 0.8125rem; color: var(--text-muted); }
+
+.analytics-tab { display: flex; flex-direction: column; gap: 14px; }
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.analytics-card {
+  padding: 18px 20px;
+  border-radius: var(--radius-card);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.analytics-card > .field-label:first-child {
+  margin-top: 0;
+  font-variation-settings: var(--casual);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.analytics-card-header { display: flex; align-items: flex-start; gap: 10px; }
+.analytics-card-title { flex: 1; min-width: 0; }
+.analytics-card-header > .pill:last-child { margin-left: auto; font-size: 0.875rem; padding: 3px 9px; }
+
+.analytics-card-section { display: flex; flex-direction: column; gap: 8px; }
+.analytics-card-section > .field-label { margin-top: 0; }
+
+.analytics-empty-note { font-size: 0.8125rem; color: var(--text-muted); padding: 4px 0; }
+
+.analytics-sparkline { width: 100%; height: 48px; color: var(--text-primary); overflow: visible; }
+.analytics-sparkline polyline { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+
+.analytics-echart { width: 100%; height: 120px; }
+.analytics-echart-bar { height: auto; }
+.analytics-chart-error { display: flex; align-items: center; justify-content: center; font-size: 0.8125rem; color: var(--text-muted); }
+
+/* Simple-mode substitute for the bar charts above: a labeled fill meter
+   per row, so category/comparison views stay just as readable without
+   ECharts loaded. */
+.analytics-meter-list { display: flex; flex-direction: column; gap: 12px; }
+.analytics-meter-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 0.875rem; margin-bottom: 5px; }
+.analytics-meter-label { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.analytics-meter-pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+.analytics-meter-track { height: 6px; border-radius: 3px; background: var(--bg-subtle); box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; }
+.analytics-meter-fill { height: 100%; border-radius: 3px; }
+.analytics-meter-fill.fill-good { background: var(--good); }
+.analytics-meter-fill.fill-warn { background: var(--warn); }
+.analytics-meter-fill.fill-bad { background: var(--bad); }
+.analytics-meter-fill.fill-dim { background: var(--text-muted); }
+
+.analytics-target-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.analytics-target-row .field-label { margin-top: 0; }
+.analytics-target-input { width: 72px; padding: 6px 8px; }
+.analytics-status-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 160px; }
+.analytics-status { font-size: 0.875rem; font-weight: 600; }
+

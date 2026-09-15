@@ -1,0 +1,268 @@
+.loading-state, .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 80px 20px;
+  color: var(--text-muted);
+}
+
+.empty-icon { font-size: 2rem; }
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--text-primary);
+  animation: spin 800ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* The first-load checklist is drawn as literal checkboxes: an empty box
+   while pending, and a highlighter-filled box with a drawn tick once done. */
+.loading-checklist { padding: 72px 20px; gap: 24px; min-height: 100%; }
+
+.loading-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 280px;
+}
+
+.loading-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  transition: color 200ms ease;
+}
+.loading-step.is-active,
+.loading-step.is-done { color: var(--text-primary); }
+
+.loading-step-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+}
+.loading-step.is-done .loading-step-icon { background: var(--hl); }
+
+.loading-step-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border-strong);
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.loading-step-icon .icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--on-hl);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 26;
+  stroke-dashoffset: 26;
+  animation: draw-check 500ms ease forwards;
+}
+@keyframes draw-check { to { stroke-dashoffset: 0; } }
+
+.loading-progress {
+  width: 100%;
+  max-width: 280px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.loading-progress-fill {
+  height: 100%;
+  background: var(--text-primary);
+  transition: width 250ms ease;
+}
+
+.banner-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--bad-soft);
+  color: var(--bad-text);
+  font-size: 0.875rem;
+  box-shadow: inset 3px 0 0 var(--bad);
+}
+
+.login-screen {
+  --margin-x: clamp(28px, 11vw, 168px);
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  gap: 48px clamp(40px, 7vw, 112px);
+  padding: 88px 24px 72px calc(var(--margin-x) + clamp(22px, 5vw, 80px));
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(to right, transparent calc(var(--margin-x) - 1px), var(--margin-rule) calc(var(--margin-x) - 1px), var(--margin-rule) var(--margin-x), transparent var(--margin-x)),
+    repeating-linear-gradient(to bottom, transparent 0 35px, var(--ruled) 35px 36px);
+}
+
+.login-lang-switcher {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  margin: 0;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+}
+
+.brand {
+  display: inline-block;
+  font-variation-settings: var(--casual);
+  font-size: clamp(3.5rem, 8vw, 5.75rem);
+  font-weight: 850;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin: 0 0 14px;
+  animation: mark-swipe 720ms cubic-bezier(0.3, 0.7, 0.2, 1) 280ms both;
+}
+.login-sub { color: var(--text-secondary); margin: 0 0 26px; font-size: 1.0625rem; }
+
+.login-form { display: flex; flex-direction: column; gap: 6px; }
+
+.field-label { display: block; font-size: 0.8125rem; color: var(--text-secondary); font-weight: 600; margin-top: 12px; }
+.panel-form > .field-label:first-child { margin-top: 0; }
+
+.field-input, .login-form input {
+  padding: 10px 12px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-primary);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field-input::placeholder, .login-form input::placeholder { color: var(--text-muted); opacity: 1; }
+.field-input:focus, .login-form input:focus {
+  outline: none;
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 3px var(--hl-soft);
+}
+select.field-input {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 34px;
+  background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237d869c' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center / 12px;
+}
+
+.textarea { resize: vertical; line-height: 1.5; }
+
+.login-form .btn { margin-top: 20px; padding: 11px 18px; font-size: 0.9375rem; }
+
+/* Stuck to the notebook page beside the form (wraps below it when narrow),
+   taped at the top and written in the marker cut of Recursive. It sticks
+   on after the wordmark swipe, lifts and peels a corner on hover, and
+   swings from its tape when clicked (see mountLogin).
+   Motion uses the individual rotate/translate/scale properties rather
+   than `transform`, so the stick-on and swing animations and the hover
+   transition each own one axis instead of clobbering each other. */
+.sticky-note {
+  --tilt: 2.5deg;
+  position: relative;
+  flex: 0 0 auto;
+  width: 236px;
+  padding: 26px 22px 24px;
+  background: var(--sticky-paper);
+  color: var(--on-hl);
+  font-variation-settings: var(--casual);
+  border-radius: 2px 2px 3px 3px;
+  box-shadow: var(--sticky-shadow);
+  rotate: var(--tilt);
+  transform-origin: 50% 0;
+  transition:
+    rotate 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    translate 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 240ms ease;
+  --note-stick: note-stick 480ms cubic-bezier(0.2, 0.8, 0.2, 1) 820ms backwards;
+  animation: var(--note-stick);
+}
+/* note-stick stays in the list: dropping it while swinging would make the
+   browser treat it as a brand-new animation once the class comes off,
+   replaying the whole stick-on (invisible for 820ms) after every swing. */
+.sticky-note.is-swinging { animation: var(--note-stick), note-swing 1000ms ease-in-out; }
+
+/* The peeled corner: the note's underside folding up over the page. */
+.sticky-note::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 26px;
+  height: 26px;
+  background: linear-gradient(to top left, var(--bg) 50%, color-mix(in srgb, var(--sticky-paper) 78%, #000) 50%, var(--sticky-paper) 100%);
+  scale: 0;
+  transform-origin: 100% 100%;
+  transition: scale 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (hover: hover) {
+  .sticky-note:hover { --tilt: 0.5deg; translate: 0 -4px; box-shadow: var(--sticky-shadow-lift); }
+  .sticky-note:hover::after { scale: 1; }
+}
+
+@keyframes note-stick {
+  from { opacity: 0; scale: 1.1; translate: 0 -14px; }
+  55% { opacity: 1; }
+  75% { scale: 0.985; translate: 0 0; }
+  to { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+/* A damped pendulum around whatever the resting tilt currently is. */
+@keyframes note-swing {
+  0% { rotate: var(--tilt); }
+  16% { rotate: calc(var(--tilt) + 8deg); }
+  38% { rotate: calc(var(--tilt) - 5deg); }
+  58% { rotate: calc(var(--tilt) + 2.5deg); }
+  78% { rotate: calc(var(--tilt) - 1deg); }
+  100% { rotate: var(--tilt); }
+}
+.sticky-note::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 88px;
+  height: 24px;
+  background: var(--sticky-tape);
+  transform: translateX(-50%) rotate(-3deg);
+}
+.sticky-note-title { margin: 0 0 6px; font-size: 1.25rem; font-weight: 850; line-height: 1.2; color: inherit; }
+.sticky-note-body { margin: 0; font-size: 0.9375rem; font-weight: 500; line-height: 1.45; color: inherit; }
+
+.form-error {
+  color: var(--bad-text);
+  font-size: 0.875rem;
+  margin-top: 8px;
+}
