@@ -100,6 +100,8 @@
   "login.unreachable": "Meraki t'a posé un lapin. Vérifie le wifi et reviens supplier.",
   "login.noteTitle": "T'as survécu.",
   "login.noteBody": "Ce client alternatif existe pour que tu ne revoies jamais l'interface « officielle » de Meraki. Elle ne peut plus te faire de mal ici. Ne te retourne pas.",
+  "login.dataNoticeTitle": "On te voit. 👀",
+  "login.dataNoticeBody": "Mytho. On ne voit rien du tout 🙈 : tout part chez Meraki, pas chez nous — on n'a même pas de base de données. Va te plaindre là-bas.",
   "settings.style.notebook": "Gribouillé en cours",
   "calendar.youAreHere": "T'es ici (désolé)",
   "grade.gpaEstimate": "GPA {gpa} (au pif)",

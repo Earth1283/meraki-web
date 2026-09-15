@@ -100,6 +100,8 @@
   "login.unreachable": "Meraki has ghosted you. Check your wifi and grovel again.",
   "login.noteTitle": "You made it out.",
   "login.noteBody": "This alt client exists so you never have to see the \"official\" Meraki UI again. It can't hurt you here. Don't look back.",
+  "login.dataNoticeTitle": "We see you. 👀",
+  "login.dataNoticeBody": "Just kidding — we see nothing. 🙈 It all goes to Meraki's database, not ours, because we don't have one. Take it up with them.",
   "settings.style.notebook": "Doodled in class",
   "calendar.youAreHere": "You are here (sorry)",
   "grade.gpaEstimate": "GPA {gpa} (vibes-based)",

@@ -237,6 +237,8 @@
   "login.contactSchool": "请尝试 Meraki 官方登录页或联系学校。",
   "login.privacyTitle": "登录信息只留在此浏览器中",
   "login.privacyBody": "此独立客户端会将登录信息直接发送到 Meraki 的认证服务。托管本页面的服务器不会收到这些信息。",
+  "login.dataNoticeTitle": "好奇心作祟？👀",
+  "login.dataNoticeBody": "放心吧：你输入的一切都直接飞进 Meraki 自己的数据库，跟那个丑到没朋友的官方网站用的是同一个。我们连服务器都没有，想偷看都没地方偷看。🤷",
   "login.noteTitle": "悄悄说一句",
   "login.noteBody": "这是一个非官方的替代客户端，专为逃离 Meraki“官方”网页界面的种种恐怖而生。同一个学校账号，少受很多罪。",
   "compose.title": "新建消息",

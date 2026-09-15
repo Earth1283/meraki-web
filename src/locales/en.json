@@ -237,6 +237,8 @@
   "login.contactSchool": "Try the official Meraki sign-in or contact your school.",
   "login.privacyTitle": "Your credentials stay in this browser",
   "login.privacyBody": "This independent client sends them directly to Meraki's authentication service. The server hosting this page never receives them.",
+  "login.dataNoticeTitle": "Nosy much? 👀",
+  "login.dataNoticeBody": "Relax — everything you type flies straight to Meraki's own database, the same one the clunky official site already uses. We don't run a server of our own to snoop from, even if we wanted to. 🤷",
   "login.noteTitle": "Psst.",
   "login.noteBody": "This is an unofficial alt client, built to escape the horrors of the \"official\" Meraki web UI. Same school account, far fewer horrors.",
   "compose.title": "New message",

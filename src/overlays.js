@@ -38,6 +38,20 @@ export function buildLanguageSwitcher(extraClass = '') {
   return select;
 }
 
+/** Flicking the login page's data-privacy sticky note swings it from its
+ * tape (.is-swinging in styles.css). Clicks mid-swing are ignored rather
+ * than restarting it, which would snap the note back to rest first; so is
+ * the click that ends a text selection, so the note doesn't jerk away from
+ * someone copying it. */
+function swingNote(note) {
+  if (note.classList.contains('is-swinging') || String(window.getSelection())) return;
+  note.classList.add('is-swinging');
+}
+
+function settleNote(e) {
+  if (e.animationName === 'note-swing') e.currentTarget.classList.remove('is-swinging');
+}
+
 export function mountLogin(root, onLoggedIn) {
   const emailInput = el('input', { id: 'login-identity', type: 'text', name: 'email', autocomplete: 'username', autocapitalize: 'none', spellcheck: 'false', required: true, placeholder: t('login.emailPlaceholder') });
   const passwordInput = el('input', { id: 'login-password', type: 'password', name: 'password', autocomplete: 'current-password', required: true, placeholder: '••••••••' });
@@ -106,6 +120,14 @@ export function mountLogin(root, onLoggedIn) {
         ]),
         form,
       ]),
+      el(
+        'div',
+        { class: 'sticky-note', role: 'note', onclick: (e) => swingNote(e.currentTarget), onanimationend: settleNote },
+        [
+          el('p', { class: 'sticky-note-title', text: t('login.dataNoticeTitle') }),
+          el('p', { class: 'sticky-note-body', text: t('login.dataNoticeBody') }),
+        ],
+      ),
     ]),
   );
   emailInput.focus();

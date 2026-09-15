@@ -100,6 +100,8 @@
   "login.unreachable": "Meraki 已读不回。检查网络后再来求它一次。",
   "login.noteTitle": "逃出生天",
   "login.noteBody": "有了这个替代客户端，你再也不用看 Meraki“官方”界面的脸色了。它在这里伤不到你。千万别回头。",
+  "login.dataNoticeTitle": "我们看到你了。👀",
+  "login.dataNoticeBody": "开玩笑的，我们啥也看不到。🙈 数据全去 Meraki 那儿了，我们连数据库都没有，有意见找他们。",
   "settings.style.notebook": "上课偷偷画的",
   "calendar.youAreHere": "你在这里（节哀）",
   "grade.gpaEstimate": "GPA {gpa}（玄学估算）",

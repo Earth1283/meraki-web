@@ -237,6 +237,8 @@
   "login.contactSchool": "Essayez la connexion officielle de Meraki ou contactez votre école.",
   "login.privacyTitle": "Vos identifiants restent dans ce navigateur",
   "login.privacyBody": "Ce client indépendant les envoie directement au service d'authentification de Meraki. Le serveur qui héberge cette page ne les reçoit jamais.",
+  "login.dataNoticeTitle": "Curieux·se ? 👀",
+  "login.dataNoticeBody": "Détends-toi : tout ce que tu tapes file droit vers la base de données de Meraki, la même que celle du site officiel (juste moins moche). On n'a même pas de serveur pour fouiner, même si on le voulait. 🤷",
   "login.noteTitle": "Psst.",
   "login.noteBody": "Ceci est un client alternatif non officiel, conçu pour échapper aux horreurs de l'interface web « officielle » de Meraki. Même compte scolaire, beaucoup moins d'horreurs.",
   "compose.title": "Nouveau message",
