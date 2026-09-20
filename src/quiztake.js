@@ -11,7 +11,7 @@ import { lazyFetch } from './lazy.js';
 import { showToast } from './toast.js';
 import { sidePanel } from './panels.js';
 import { submissionForAssessment } from './rows.js';
-import { sortQuestions, answerPayload, answeredCount, quizDeadline, formatCountdown } from './quiz.js';
+import { sortQuestions, answerPayload, answeredCount, effectiveDeadline, formatCountdown, canTakeQuiz, quizAvailability, formatQuizWindow, QUIZ_AVAILABILITY } from './quiz.js';
 import { t } from './i18n.js';
 
 // What's been picked so far, per assessment. Kept until submitted (or
@@ -82,15 +82,25 @@ function attachCountdown(span, deadline, onExpire) {
 }
 
 /** A "Take Quiz" prompt for an assessment's detail panel, once it's clear
- * there's no submission yet (see detail-sections.js). */
+ * there's no submission yet (see detail-sections.js, which only renders this
+ * once canTakeQuiz says the quiz is actually open). */
+/** The "you haven't taken this yet" section. A quiz that isn't open right
+ * now still gets a section saying why and when — dropping it entirely would
+ * leave the panel silent about a quiz the student can plainly see. */
 export function renderTakeQuizCta(assessment) {
+  const availability = quizAvailability(assessment, null);
+  const takeable = canTakeQuiz(assessment, null);
+  const windowHint = formatQuizWindow(availability);
   const hint = assessment.time_limit_minutes != null ? t('quiz.timeLimitHint', { n: assessment.time_limit_minutes }) : t('quiz.noTimeLimitHint');
   return el('div', { class: 'detail-section take-quiz-cta' }, [
-    el('div', { class: 'row-section' }, t('quiz.notStarted')),
-    el('p', { class: 'row-placeholder', text: hint }),
-    el('div', { class: 'panel-actions panel-actions-start' }, [
-      el('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openTakeQuiz(assessment.id), text: t('quiz.start') }),
-    ]),
+    el('div', { class: 'row-section' }, takeable ? t('quiz.notStarted') : t('quiz.unavailable')),
+    takeable ? el('p', { class: 'row-placeholder', text: hint }) : null,
+    windowHint ? el('p', { class: `row-placeholder ${availability.state === QUIZ_AVAILABILITY.CLOSING_SOON ? 'quiz-window-warn' : ''}`, text: windowHint }) : null,
+    takeable
+      ? el('div', { class: 'panel-actions panel-actions-start' }, [
+          el('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openTakeQuiz(assessment.id), text: t('quiz.start') }),
+        ])
+      : null,
   ]);
 }
 
@@ -133,11 +143,21 @@ export function buildTakeQuizForm() {
   const assessment = state.data.assessments.find((a) => a.id === state.quizAssessmentId);
   if (!assessment) return sidePanel(t('quiz.title'), el('p', { class: 'form-error', text: t('quiz.missing') }));
 
-  if (submissionForAssessment(state.data, assessment)) {
+  const submission = submissionForAssessment(state.data, assessment);
+  if (submission) {
     // Reopened after a background refresh landed the submission (e.g. the
     // timer expired and auto-submitted while this panel was closed) — the
     // detail panel's review section covers it from here.
     return sidePanel(t('quiz.title'), el('p', { class: 'form-error', text: t('quiz.alreadySubmitted') }));
+  }
+
+  const availability = quizAvailability(assessment, submission);
+  if (!canTakeQuiz(assessment, submission)) {
+    // Defensive: the CTA that opens this panel is itself gated on
+    // canTakeQuiz, but the window can still close between that render and
+    // this one (a background refresh, or the assessment just never having
+    // opened yet if this panel was reached some other way).
+    return sidePanel(t('quiz.title'), el('p', { class: 'form-error', text: formatQuizWindow(availability) }));
   }
 
   const questions = lazyFetch(`questions:${assessment.id}`, () => api.getAssessmentQuestions(assessment.id));
@@ -151,7 +171,7 @@ export function buildTakeQuizForm() {
   const question = ordered[attempt.index];
   const isLast = attempt.index === ordered.length - 1;
 
-  const timerNode = assessment.time_limit_minutes != null ? el('span', { class: 'quiz-timer', text: '--:--' }) : null;
+  const timerNode = assessment.time_limit_minutes != null || availability.closesAt != null ? el('span', { class: 'quiz-timer', text: '--:--' }) : null;
 
   const prevBtn = el('button', {
     class: 'btn btn-ghost',
@@ -213,7 +233,7 @@ export function buildTakeQuizForm() {
   );
 
   if (timerNode) {
-    const deadline = quizDeadline(attempt.startedAt, assessment.time_limit_minutes);
+    const deadline = effectiveDeadline(attempt.startedAt, assessment.time_limit_minutes, availability.closesAt);
     queueMicrotask(() => attachCountdown(timerNode, deadline, () => submit(assessment, attempt, { auto: true })));
   }
 

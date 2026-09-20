@@ -3,7 +3,7 @@
 import * as api from './api.js';
 import { rowKinds, TAB_IDS } from './rows.js';
 import { PAGE_SIZE, hasMoreRows } from './paging.js';
-import { calendarAgendaKinds } from './calendar.js';
+import { calendarAgendaKinds, ownClassesAndGrade } from './calendar.js';
 import { t } from './i18n.js';
 
 const SIDEBAR_KEY = 'meraki-web.sidebarCollapsed';
@@ -54,6 +54,7 @@ export const DEFAULT_CONFIG = {
   chartMode: 'simple', // 'simple' (hand-rolled inline SVG) | 'echarts' (lazy-loaded ECharts)
   calendarView: 'grid', // 'grid' (stylized month view) | 'list' (flat row list)
   calendarShowAssignments: true, // overlay assignment due_dates onto the calendar grid
+  calendarOnlyMine: false, // hide calendar_events aimed at other classes or grade levels
   gradingScale: 'standard', // 'standard' (school profile table) | 'legacy' (tens digit = letter, ones digit = +/-), see grading.js
 };
 
@@ -210,6 +211,7 @@ function emptyData() {
     hero: null, behaviorNotes: [], detentions: [], reportCards: [],
     assessments: [], discussions: [], fileUploads: [], enrollments: [],
     assignmentSubmissions: [], assessmentSubmissions: [],
+    standards: [], assignmentStandards: [], loginEvents: [], activity: [],
   };
 }
 
@@ -280,23 +282,25 @@ export function restoreConfig(config) {
 const PAGED_FIELDS = ['grades', 'attendance', 'assignmentSubmissions', 'assessmentSubmissions'];
 
 const TABLES = [
-  ['classes', 'classes', 'select=id,name,subject,period,room,term,teacher_id,teacher_name,weights&order=period.asc', 'your classes'],
-  ['assignments', 'assignments', 'select=id,title,category,due_date,points_possible,description,submission_mode,class_id,classes(name)&order=due_date.asc', 'assignments'],
+  ['classes', 'classes', 'select=id,name,subject,period,room,term,teacher_id,teacher_name,weights,grade_level,timezone&order=period.asc', 'your classes'],
+  ['assignments', 'assignments', 'select=id,title,category,due_date,points_possible,description,submission_mode,rubric_id,created_at,class_id,classes(name)&order=due_date.asc', 'assignments'],
   ['grades', 'grades', 'select=id,points_earned,comment,updated_at,assignment_id,assignments(title,points_possible,due_date,class_id)&order=updated_at.desc', 'grades'],
-  ['attendance', 'attendance', 'select=id,date,status,note&order=date.desc', 'attendance'],
-  ['calendar', 'calendar_events', 'select=id,title,description,event_date,start_time,end_time,location,category&order=event_date.asc&limit=69', 'the calendar'],
-  ['announcements', 'announcements', 'select=id,title,body,created_at&order=created_at.desc&limit=69', 'announcements'],
+  ['attendance', 'attendance', 'select=id,date,status,note,class_id&order=date.desc', 'attendance'],
+  ['calendar', 'calendar_events', 'select=id,title,description,event_date,start_time,end_time,location,category,color,audience,audiences,class_id,class_ids,grade_level&order=event_date.asc&limit=69', 'the calendar'],
+  ['announcements', 'announcements', 'select=id,title,body,created_at,audience,author_id&order=created_at.desc&limit=69', 'announcements'],
   ['messages', 'messages', 'select=id,subject,body,created_at,read,sender_id,recipient_id&order=created_at.desc&limit=69', 'messages'],
   ['portfolio', 'portfolio_items', 'select=id,title,description,link,kind,created_at&order=created_at.desc', 'your portfolio'],
-  ['checkins', 'checkins', 'select=id,mood,note,date&order=date.desc&limit=69', 'check-ins'],
-  ['behaviorNotes', 'behavior_notes', 'select=id,kind,notes,date,students(first_name,last_name)&order=date.desc&limit=69', 'behavior notes'],
-  ['detentions', 'detentions', 'select=id,reason,strike_count,scheduled_date,status,notes&order=scheduled_date.desc', 'detentions'],
+  ['checkins', 'checkins', 'select=id,mood,note,date,created_at&order=date.desc&limit=69', 'check-ins'],
+  ['behaviorNotes', 'behavior_notes', 'select=id,kind,reason,notes,date,scored_zero,assignment_id,assignments(title),students(first_name,last_name)&order=date.desc&limit=69', 'behavior notes'],
+  ['detentions', 'detentions', 'select=id,reason,strike_count,scheduled_date,status,notes,created_at,students(first_name,last_name,guardian_email)&order=scheduled_date.desc', 'detentions'],
   ['reportCards', 'report_cards', 'select=id,class_id,term,grade_pct,letter,comment,published,updated_at&order=updated_at.desc', 'report cards'],
-  ['assessments', 'assessments', 'select=id,title,kind,instructions,due_at,time_limit_minutes,published,grammar_check_enabled,assignment_id,class_id,classes(name)&order=due_at.desc&limit=69', 'assessments'],
+  ['assessments', 'assessments', 'select=id,title,kind,instructions,due_at,available_from,closes_at,time_limit_minutes,published,grammar_check_enabled,assignment_id,class_id,classes(name)&order=due_at.desc&limit=69', 'assessments'],
   ['discussions', 'discussions', 'select=id,title,prompt,due_date,required_replies,graded,points_possible,closed,assignment_id,class_id,classes(name),created_at&order=created_at.desc&limit=69', 'discussions'],
   ['fileUploads', 'file_uploads', 'select=id,title,file_name,mime_type,size_bytes,storage_path,audience,created_at,uploaded_by,class_id,classes(name)&order=created_at.desc&limit=69', 'class files'],
   ['enrollments', 'enrollments', 'select=id,student_id,class_id,students(id,first_name,last_name,grade_level,student_number)&order=class_id.asc', 'class rosters'],
   ['assignmentSubmissions', 'assignment_submissions', 'select=id,assignment_id,submitted_at,status,body,teacher_note,file_upload_id,file_uploads(id,file_name,storage_path)&order=submitted_at.desc', 'assignment submissions'],
+  ['standards', 'standards', 'select=id,code,description,subject,grade_level&order=code.asc', 'the standards list'],
+  ['assignmentStandards', 'assignment_standards', 'select=id,standard_id,assignment_id,assignments(title,class_id)', 'assignment standards'],
   ['assessmentSubmissions', 'assessment_submissions', 'select=id,assessment_id,auto_score,manual_score,total_points,submitted_at,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc', 'assessment submissions'],
 ];
 
@@ -310,7 +314,7 @@ const STEP_GROUPS = [
   {
     id: 'academics',
     labelKey: 'loading.step.academics',
-    fields: ['assignments', 'grades', 'reportCards', 'assessments', 'assignmentSubmissions', 'assessmentSubmissions'],
+    fields: ['assignments', 'grades', 'reportCards', 'assessments', 'assignmentSubmissions', 'assessmentSubmissions', 'standards', 'assignmentStandards'],
   },
   { id: 'comms', labelKey: 'loading.step.comms', fields: ['announcements', 'messages', 'discussions'] },
   { id: 'extras', labelKey: 'loading.step.extras', fields: ['portfolio', 'checkins', 'behaviorNotes', 'detentions', 'fileUploads'] },
@@ -364,10 +368,18 @@ export async function refresh() {
     });
 
     if (group.id === 'extras') {
-      const [heroRes, studentsRes] = await Promise.allSettled([
+      // The activity feed comes from Meraki's own app rather than Supabase, so
+      // a Meraki deploy can retire it (see api.js) — it fails to an empty feed
+      // and never contributes a load error, unlike the tables beside it.
+      const [heroRes, studentsRes, activityRes, loginsRes] = await Promise.allSettled([
         api.getTable('hero_profiles', 'select=hero_class,quest_started_at,class_changes'),
         api.getTable('students', 'select=id,first_name,last_name,grade_level'),
+        api.getActivityFeed(),
+        state.ownUserId ? api.getLoginHistory(state.ownUserId) : Promise.resolve([]),
       ]);
+      state.data.activity = activityRes.status === 'fulfilled' ? activityRes.value : [];
+      if (loginsRes.status === 'fulfilled') state.data.loginEvents = loginsRes.value;
+      else record(api.friendlyLoadError('your sign-in history', loginsRes.reason));
       if (heroRes.status === 'fulfilled') state.data.hero = heroRes.value[0] ?? null;
       else record(api.friendlyLoadError('your hero profile', heroRes.reason));
       if (studentsRes.status === 'fulfilled') {
@@ -478,7 +490,7 @@ export function rowKindsForCurrentTab() {
   // reminders (which rowKinds' per-tab data doesn't have), so calendar.js
   // builds it.
   if (state.tab === 'calendar') {
-    return calendarAgendaKinds({ data: state.data, config: state.config, reminders: state.calendarReminders, collapse: state.overviewCollapse, today: new Date() });
+    return calendarAgendaKinds({ data: state.data, config: state.config, reminders: state.calendarReminders, viewer: ownClassesAndGrade(state.data, state.ownStudentId), collapse: state.overviewCollapse, today: new Date() });
   }
   return rowKinds(state.tab, state.data, new Date(), state.overviewCollapse);
 }

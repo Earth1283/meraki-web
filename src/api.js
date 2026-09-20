@@ -14,6 +14,7 @@ const SERVER_FNS = {
   assessmentWithQuestions: '7cb06537c536f77255905af66a89d7c4dfa691e83a9096078709110c3a571da9',
   submitAssessment: '7d62ba3d6bcbca16b644ea201e5915ef5652106aac524f5331494e48dd9657cf',
   notifyMessage: 'b6d92294f634873df182796b77a7b3ee247ce7573b4b9c02e05d0ef5f5b82216',
+  activityFeed: '5be8a2da4b23158c74ac7dace718c1a9991a24c1596ce3152d5fc329da82d0f1',
 };
 
 const SESSION_KEY = 'meraki-web.session';
@@ -266,6 +267,41 @@ async function callServerFn(id, data) {
     throw new Error(`server function error: ${detail}`);
   }
   return result;
+}
+
+// The feed one takes no argument at all, so it's a GET with nothing but the
+// marker header — no seroval body to encode, though the reply is still a
+// seroval tree like every other server function's.
+async function callServerFnGet(id) {
+  const resp = await authedRequest(`${APP_URL}/_serverFn/${id}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json', 'x-tsr-serverfn': 'true' },
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`server function failed (${resp.status}): ${text.slice(0, 200)}`);
+  }
+  const { result, error } = decodeServerFnResponse(await resp.json());
+  if (error != null) {
+    const detail = typeof error === 'object' ? error.message ?? JSON.stringify(error) : String(error);
+    throw new Error(`server function error: ${detail}`);
+  }
+  return result;
+}
+
+/** Meraki's own cross-cutting activity feed — the one its dashboard shows,
+ * already joined across grades, submissions and announcements in a way no
+ * single REST query reproduces. Items are
+ * { id, kind, classId, className, title, subtitle, body, at, studentName }. */
+export async function getActivityFeed() {
+  const result = await callServerFnGet(SERVER_FNS.activityFeed);
+  return Array.isArray(result) ? result : [];
+}
+
+/** Your own sign-in trail — the same login_events rows this client appends
+ * to on every login (see login()), which nothing here read back until now. */
+export async function getLoginHistory(userId, { limit = 100 } = {}) {
+  return getTable('login_events', `select=id,signed_in_at&user_id=eq.${encodeURIComponent(userId)}&order=signed_in_at.desc&limit=${limit}`);
 }
 
 // assessment_questions itself is unreadable for students (RLS returns it

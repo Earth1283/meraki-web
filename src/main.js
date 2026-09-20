@@ -3,11 +3,12 @@ import * as api from './api.js';
 import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setWhatIf, clearWhatIf, setCalendarViewMonth, setCalendarSelectedDate, setMobileCalendarView, openReminderForm, removeCalendarReminder, addCalendarReminder, rowKindsForCurrentTab } from './state.js';
 import { tabTitle, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs, emptyState, renderAttendanceTally, NAV_GROUPS } from './rows.js';
 import { renderAnalyticsTab, chartModeToggle, mountAnalyticsCharts, disposeAnalyticsCharts } from './analytics.js';
-import { renderCalendarGrid, calendarViewToggle, isoOf } from './calendar.js';
+import { renderCalendarGrid, calendarViewToggle, calendarOnlyMineToggle, isoOf } from './calendar.js';
 import { seededRandom, sketchBox, sketchLine, sketchTick, sketchSvg } from './sketch.js';
 import { GRADING_SCALES, overallGrade } from './grading.js';
 import { iconPaths } from './icons.js';
-import { privacyParagraphs } from './privacy.js';
+import { renderPrivacyTab } from './privacy.js';
+import { renderActivityFeed } from './activity.js';
 import { mountLogin, renderOverlay, renderDetailPanel } from './overlays.js';
 import { showToast } from './toast.js';
 import { renderChat } from './chat.js';
@@ -172,6 +173,7 @@ function renderToolbar() {
       if (isPhoneLayout()) setMobileCalendarView(calendarView);
       else setConfig({ calendarView });
     }));
+    actions.push(calendarOnlyMineToggle(state.config, (calendarOnlyMine) => setConfig({ calendarOnlyMine })));
     if (view === 'list') {
       actions.push(el('button', { class: 'btn btn-primary toolbar-primary', type: 'button', onclick: () => openReminderForm(), title: t('calendar.addReminder') }, [svgIcon(iconPaths('plus')), el('span', { class: 'toolbar-action-label', text: t('calendar.addReminder') })]));
     }
@@ -385,7 +387,7 @@ function renderBody() {
   }
 
   if (state.tab === 'privacy') {
-    body.appendChild(renderPrivacy());
+    body.appendChild(renderPrivacyTab(state.data.loginEvents));
     return;
   }
 
@@ -427,6 +429,7 @@ function renderBody() {
         action: () => setConfig({ gradingScale: scale }),
       }))),
     }));
+    body.appendChild(renderActivityFeed(state.data.activity, state.data.loginEvents));
   }
   if (state.tab === 'attendance' && notebook && state.data.attendance.length) {
     body.appendChild(renderAttendanceTally(state.data.attendance, { draw: freshView }));
@@ -612,22 +615,6 @@ function isDarkTheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-function renderPrivacy() {
-  const container = el('div', { class: 'privacy' });
-  for (const para of privacyParagraphs()) {
-    const p = el('div', { class: `privacy-para ${para.cls}` });
-    para.lines.forEach((line, i) => {
-      if (line.label !== undefined) {
-        p.appendChild(el('div', { class: 'privacy-row' }, [el('span', { class: 'privacy-row-label', text: line.label }), el('span', { class: 'privacy-row-desc', text: line.desc })]));
-      } else {
-        const isHeading = i === 0 && para.cls === 'priv-section';
-        p.appendChild(el('p', { class: isHeading ? 'privacy-heading' : undefined, text: line.text }));
-      }
-    });
-    container.appendChild(p);
-  }
-  return container;
-}
 
 subscribe(render);
 onLocaleChange(render);

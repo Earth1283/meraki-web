@@ -1,3 +1,25 @@
+/* A school's own calendar_events.color, kept separate from --accent (the
+   viewer's own UI accent) so a teal/amber the school picked never fights
+   whatever highlighter color the student picked in Settings. Values chosen
+   for contrast against --info-soft (the calendarEvent chip's own tint) in
+   both themes; --event-accent falls back to transparent wherever no known
+   color applies, so an unrecognized or absent color leaves the chip/row
+   looking exactly as it did before this feature. */
+:root {
+  --event-color-teal: #0f8f86;
+  --event-color-amber: #b3690a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --event-color-teal: #4fd8cc;
+    --event-color-amber: #ffb955;
+  }
+}
+:root[data-theme='dark'] {
+  --event-color-teal: #4fd8cc;
+  --event-color-amber: #ffb955;
+}
+
 .calendar-shell { display: flex; flex-direction: column; gap: 12px; touch-action: pan-y; }
 
 .calendar-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -83,6 +105,12 @@
 .calendar-chip-reminder { background: var(--good-soft); color: var(--good-text); }
 .calendar-chip-more { color: var(--text-muted); font-weight: 600; padding: 0 6px; }
 
+/* The school's per-event color rides as a left stripe on the existing
+   kind-tinted chip, rather than replacing it — an assignment (warn-soft) and
+   a colored school event (info-soft + stripe) still read as different kinds
+   at a glance. */
+.calendar-chip.calendar-chip-colored { padding-left: 9px; box-shadow: inset 2px 0 0 0 var(--event-accent, transparent); }
+
 /* Kept for the day panel's reminder rows, which still use a plain dot next
    to the title instead of a full HH:MM chip (a reminder there already has
    its own row and doesn't need the compactness a grid cell needs). */
@@ -97,6 +125,9 @@
 .calendar-reminder-row { display: flex; align-items: flex-start; gap: 8px; }
 .calendar-reminder-row .row-item-inner { flex: 1; min-width: 0; }
 .calendar-reminder-delete { flex: none; margin: -6px -6px -6px 0; }
+
+.row-item.calendar-row-colored { padding-left: 17px; box-shadow: inset 3px 0 0 0 var(--event-accent, transparent); }
+.calendar-target-badge { margin-top: 2px; font-size: 0.75rem; color: var(--text-muted); }
 
 @media (max-width: 640px) {
   .calendar-day { min-height: 68px; padding: 5px 3px; }

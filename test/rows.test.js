@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  rowKinds, detailFields, commandLabels, filterLabels, moodLabels, tabs, TAB_IDS, daysUntil, overviewSummary, fieldDisplay,
+  rowKinds, detailFields, moodLabels, tabs, TAB_IDS, daysUntil, overviewSummary, fieldDisplay,
   classSections, submissionForAssignment, submissionForAssessment, formatBytes, formatDateTime,
   messageThreads, partnerName, initials, dayKey, formatDaySeparator, formatTime12,
   orderedTabIds, visibleTabs,
@@ -23,6 +23,7 @@ function emptyData(overrides = {}) {
     hero: null, behaviorNotes: [], detentions: [], reportCards: [],
     assessments: [], discussions: [], fileUploads: [], enrollments: [],
     assignmentSubmissions: [], assessmentSubmissions: [],
+    standards: [], assignmentStandards: [], loginEvents: [], activity: [],
     ...overrides,
   };
 }
@@ -249,25 +250,6 @@ test('moodLabels() is ordered worst to best and 1-indexed by mood value', () => 
   assert.equal(labels[labels.length - 1], 'Great');
 });
 
-test('commandLabels has one entry per tab plus refresh, settings, and logout', () => {
-  const labels = commandLabels();
-  assert.equal(labels.length, TAB_IDS.length + 3);
-  assert.ok(labels.includes('Log out'));
-  assert.ok(labels.includes('Refresh data'));
-  assert.ok(labels.includes('Open settings'));
-});
-
-test('filterLabels matches case-insensitively by substring', () => {
-  const labels = commandLabels();
-  const found = filterLabels(labels, 'GRADES');
-  assert.deepEqual(found, ['Go to Grades']);
-});
-
-test('filterLabels returns everything for an empty query', () => {
-  const labels = commandLabels();
-  assert.deepEqual(filterLabels(labels, ''), labels);
-});
-
 test('classSections scopes every table to just the requested class_id', () => {
   const data = emptyData({
     assignments: [{ id: 'a1', class_id: 'c1' }, { id: 'a2', class_id: 'c2' }],
@@ -318,13 +300,23 @@ test('formatDateTime uses the selected locale and local time zone', () => {
   assert.equal(formatDateTime(null), null);
 });
 
-test('detailFields surfaces class sub-sections are handled separately (class fields stay just the basics)', () => {
+test('detailFields for a class lists its own attributes, leaving sub-sections to classSections', () => {
   const data = emptyData({
     classes: [{ id: 'c1', name: 'AP Biology', subject: 'Science', period: '3', room: '204', term: 'Fall', teacher_name: 'Dr. Alvarez' }],
   });
   const { title, fields } = detailFields({ kind: 'class', index: 0 }, data);
+  const populated = fields.filter(([, value]) => value != null).map(([, value]) => value);
   assert.equal(title, 'AP Biology');
-  assert.equal(fields.length, 5);
+  assert.deepEqual(populated, ['Science', '3', '204', 'Fall', 'Dr. Alvarez']);
+});
+
+test('detailFields for a class carries grade level and the class timezone when the school sets them', () => {
+  const data = emptyData({
+    classes: [{ id: 'c1', name: 'AP Biology', grade_level: 9, timezone: 'Asia/Shanghai' }],
+  });
+  const { fields } = detailFields({ kind: 'class', index: 0 }, data);
+  const populated = fields.filter(([, value]) => value != null).map(([, value]) => value);
+  assert.deepEqual(populated, [9, 'Asia/Shanghai']);
 });
 
 test('detailFields for an assignment includes submission status when one exists', () => {
@@ -461,4 +453,58 @@ test('detailFields shows the mark in place of a score for a grade scored with on
   });
   assert.deepEqual(detailFields({ kind: 'assignment', index: 0 }, data).fields.find(([label]) => label === 'Your score'), ['Your score', 'Mark EX']);
   assert.deepEqual(detailFields({ kind: 'grade', index: 0 }, data).fields.find(([label]) => label === 'Score'), ['Score', 'Mark EX']);
+});
+
+function labelled(fields) {
+  return Object.fromEntries(fields.filter(([, value]) => value != null));
+}
+
+test('detailFields for a behavior note surfaces the reason, the work it is tied to, and a zeroed grade', async () => {
+  const data = emptyData({
+    behaviorNotes: [{ id: 'b1', kind: 'missing_work', date: '2026-09-06', reason: 'Not turned in', notes: 'Third time this term', scored_zero: true, assignment_id: 'a1', assignments: { title: 'Harrison Bergeron' } }],
+  });
+  const { fields, body } = detailFields({ kind: 'behaviorNote', index: 0 }, data);
+  const shown = labelled(fields);
+  assert.equal(shown['Reason'], 'Not turned in');
+  assert.equal(shown['Linked work'], 'Harrison Bergeron');
+  assert.equal(shown['Scored zero'], 'Yes');
+  assert.equal(body, 'Third time this term');
+});
+
+test('detailFields leaves scored zero off a note that did not zero the grade', () => {
+  const data = emptyData({ behaviorNotes: [{ id: 'b1', kind: 'positive', date: '2026-09-06', scored_zero: false }] });
+  const shown = labelled(detailFields({ kind: 'behaviorNote', index: 0 }, data).fields);
+  assert.equal('Scored zero' in shown, false);
+  assert.equal('Linked work' in shown, false);
+});
+
+test('detailFields for a detention shows when it was issued and who was contacted', () => {
+  const data = emptyData({
+    detentions: [{ id: 'd1', scheduled_date: '2026-09-12', status: 'scheduled', strike_count: 3, reason: 'Third strike', created_at: '2026-09-06T03:01:29.437Z', students: { guardian_email: 'parent@example.com' } }],
+  });
+  const shown = labelled(detailFields({ kind: 'detention', index: 0 }, data).fields);
+  assert.equal(shown['Guardian contact'], 'parent@example.com');
+  assert.equal(shown['Issued'], formatDateTime('2026-09-06T03:01:29.437Z'));
+});
+
+test('detailFields for an announcement names its audience only when the school set one', () => {
+  const withAudience = emptyData({ announcements: [{ id: 'n1', title: 'Snow day', created_at: '2026-09-06T03:01:29.437Z', audience: 'everyone' }] });
+  assert.equal(labelled(detailFields({ kind: 'announcement', index: 0 }, withAudience).fields)['Audience'], 'Everyone');
+  const without = emptyData({ announcements: [{ id: 'n1', title: 'Snow day', created_at: '2026-09-06T03:01:29.437Z', audience: null }] });
+  assert.equal('Audience' in labelled(detailFields({ kind: 'announcement', index: 0 }, without).fields), false);
+});
+
+test('detailFields for an attendance record names the class it was taken in', () => {
+  const data = emptyData({
+    classes: [{ id: 'c1', name: 'AP Biology' }],
+    attendance: [{ id: 'r1', date: '2026-09-06', status: 'present', class_id: 'c1' }],
+  });
+  assert.equal(labelled(detailFields({ kind: 'attendance', index: 0 }, data).fields)['Class'], 'AP Biology');
+});
+
+test('detailFields flags an assignment that has a rubric attached', () => {
+  const withRubric = emptyData({ assignments: [{ id: 'a1', title: 'Essay', rubric_id: 'r1' }] });
+  assert.equal(labelled(detailFields({ kind: 'assignment', index: 0 }, withRubric).fields)['Rubric'], 'Attached');
+  const without = emptyData({ assignments: [{ id: 'a1', title: 'Essay', rubric_id: null }] });
+  assert.equal('Rubric' in labelled(detailFields({ kind: 'assignment', index: 0 }, without).fields), false);
 });

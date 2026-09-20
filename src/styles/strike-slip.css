@@ -55,3 +55,15 @@ button.row-item:hover > .strike-slip { transform: rotate(-0.4deg); box-shadow: 0
 .style-notebook .slip-line-value { font-family: var(--font-hand); font-variation-settings: var(--casual); font-size: 0.9rem; color: var(--sketch-ink-blue); }
 .style-notebook .slip-stamp { border-color: var(--sketch-ink-red); color: var(--sketch-ink-red); }
 .style-notebook .row-item.selected > .strike-slip { box-shadow: 0 0 0 2px var(--sketch-ink-blue); }
+.slip-zero {
+  margin-top: 10px;
+  padding: 4px 8px;
+  border: 1.5px dashed var(--bad);
+  border-radius: 4px;
+  color: var(--bad-text);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+}

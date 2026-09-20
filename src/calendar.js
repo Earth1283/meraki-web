@@ -49,9 +49,13 @@ export function extractTime(raw) {
   return match ? match[1] : null;
 }
 
-function bucketBy(list, dateOf, toItem) {
+function bucketBy(list, dateOf, toItem, keep) {
   const map = new Map();
   list.forEach((entry, index) => {
+    // Skipped inside the walk, never by filtering the list first: `index` is
+    // what a { kind, index } detail target points at, so it has to stay the
+    // entry's position in state.data, not its position among the survivors.
+    if (keep && !keep(entry, index)) return;
     const iso = toIsoDate(dateOf(entry));
     if (!iso) return;
     if (!map.has(iso)) map.set(iso, []);
@@ -66,9 +70,12 @@ function bucketBy(list, dateOf, toItem) {
  * the list view. Assignments aren't pre-filtered: bucketBy already skips
  * undated entries, and filtering first would shift the indices that
  * { kind: 'assignment', index } targets point at. */
-function itemsByDay({ data, config, reminders }) {
+function itemsByDay({ data, config, reminders, viewer = null }) {
+  const mineOnly = config.calendarOnlyMine && viewer
+    ? (e) => isEventTargetedAtMe(e, viewer.classIds, viewer.gradeLevel)
+    : null;
   const maps = [
-    bucketBy(data.calendar, (e) => e.event_date, (e, index) => ({ kind: 'calendarEvent', index, title: e.title, time: extractTime(e.start_time) })),
+    bucketBy(data.calendar, (e) => e.event_date, (e, index) => ({ kind: 'calendarEvent', index, title: e.title, time: extractTime(e.start_time) }), mineOnly),
     config.calendarShowAssignments
       ? bucketBy(data.assignments, (a) => a.due_date, (a, index) => ({ kind: 'assignment', index, title: a.title, time: extractTime(a.due_date) }))
       : new Map(),
@@ -84,8 +91,8 @@ function itemsByDay({ data, config, reminders }) {
 
 /** One month's grid cells with their merged items. Pure and data-only so
  * it's testable without touching the DOM. */
-export function buildCalendarMonth({ year, month, data, config, reminders, today = new Date() }) {
-  const byDay = itemsByDay({ data, config, reminders });
+export function buildCalendarMonth({ year, month, data, config, reminders, viewer = null, today = new Date() }) {
+  const byDay = itemsByDay({ data, config, reminders, viewer });
   const cells = monthCells(year, month, today).map((cell) => ({ ...cell, items: byDay.get(cell.iso) ?? [] }));
   return { year, month, cells };
 }
@@ -101,8 +108,8 @@ function agendaDayLabel(iso) {
  * fold into a collapsible "Earlier" section (collapse.calendarPast, folded
  * unless set false), a 'now' row marks where today falls, and items due
  * within the next 7 days are flagged `soon` for Notebook's highlighters. */
-export function calendarAgendaKinds({ data, config, reminders, collapse = {}, today = new Date() }) {
-  const days = [...itemsByDay({ data, config, reminders })].sort(([a], [b]) => a.localeCompare(b));
+export function calendarAgendaKinds({ data, config, reminders, viewer = null, collapse = {}, today = new Date() }) {
+  const days = [...itemsByDay({ data, config, reminders, viewer })].sort(([a], [b]) => a.localeCompare(b));
   if (days.length === 0) return [];
 
   const todayIso = isoOf(today);
@@ -141,6 +148,84 @@ const CHIP_CLASS = { calendarEvent: 'calendar-chip-event', assignment: 'calendar
 
 const MAX_VISIBLE_CHIPS = 3;
 
+// Known calendar_events.color names, each backed by a --event-color-* custom
+// property (light/dark values in calendar.css) so a school's chosen color
+// layers on top of the kind-based chip color instead of replacing it. Data,
+// not logic, so a new school color is one line here plus one in the CSS.
+const EVENT_COLOR_NAMES = ['teal', 'amber'];
+
+/** Maps a calendar_events.color name to the CSS custom property carrying its
+ * accent hue. Null or a name outside the known palette both fall back to
+ * null, so the caller skips the accent entirely rather than guess a color a
+ * school never set — the event still reads fine via CHIP_CLASS alone. */
+export function eventColorToken(colorName) {
+  return colorName && EVENT_COLOR_NAMES.includes(colorName) ? `--event-color-${colorName}` : null;
+}
+
+/** audience/audiences overlap; audiences (the array) wins when non-empty. */
+export function eventAudiences(event) {
+  if (Array.isArray(event.audiences) && event.audiences.length) return event.audiences;
+  return event.audience ? [event.audience] : [];
+}
+
+/** class_id/class_ids overlap the same way audience/audiences do. */
+export function eventClassIds(event) {
+  if (Array.isArray(event.class_ids) && event.class_ids.length) return event.class_ids;
+  return event.class_id ? [event.class_id] : [];
+}
+
+/** Whether `event` is aimed at a student enrolled in `userClassIds` and in
+ * `userGradeLevel`: explicit "everyone", one of their classes, their grade,
+ * or — since every targeting field is frequently null — an event with none
+ * of audience/audiences/class_id/class_ids/grade_level set, which reads as
+ * untargeted and therefore for everyone. */
+export function isEventTargetedAtMe(event, userClassIds = [], userGradeLevel = null) {
+  const audiences = eventAudiences(event);
+  const classIds = eventClassIds(event);
+  const gradeLevel = event.grade_level ?? null;
+  if (audiences.length === 0 && classIds.length === 0 && gradeLevel == null) return true;
+  if (audiences.includes('everyone')) return true;
+  if (classIds.some((id) => userClassIds.includes(id))) return true;
+  return gradeLevel != null && gradeLevel === userGradeLevel;
+}
+
+/** A compact description of who `event` is aimed at, for a "your class" /
+ * "Grade 9" / "whole school" marker — null when there's nothing worth saying
+ * (no targeting field set at all). `mine` distinguishes a class/grade marker
+ * that matches the signed-in student from one that happens not to. */
+export function eventTargetingInfo(event, userClassIds = [], userGradeLevel = null) {
+  const audiences = eventAudiences(event);
+  const classIds = eventClassIds(event);
+  const gradeLevel = event.grade_level ?? null;
+  if (audiences.length === 0 && classIds.length === 0 && gradeLevel == null) return null;
+  if (audiences.includes('everyone')) return { kind: 'everyone' };
+  if (classIds.length > 0) return { kind: 'class', mine: classIds.some((id) => userClassIds.includes(id)) };
+  if (gradeLevel != null) return { kind: 'grade', grade: gradeLevel, mine: gradeLevel === userGradeLevel };
+  return { kind: 'other' };
+}
+
+function targetingLabel(info) {
+  if (!info) return null;
+  switch (info.kind) {
+    case 'everyone': return t('calendar.audienceEveryone');
+    case 'class': return info.mine ? t('calendar.audienceMyClass') : t('calendar.audienceOtherClass');
+    case 'grade': return t('calendar.audienceGrade', { grade: info.grade });
+    default: return t('calendar.audienceLimited');
+  }
+}
+
+/** The signed-in student's own class ids and grade level, read off
+ * `enrollments` (each row's nested `students` object carries the enrolled
+ * student's own grade_level) since state.js exposes ownStudentId but no
+ * dedicated grade-level field. Pure given the data already loaded into
+ * state, so the DOM layer can compute this once per render and hand plain
+ * arrays/numbers to the targeting helpers above. */
+export function ownClassesAndGrade(data, ownStudentId) {
+  const mine = (data.enrollments ?? []).filter((e) => e.student_id === ownStudentId);
+  const gradeLevel = mine.map((e) => e.students?.grade_level).find((g) => g != null) ?? null;
+  return { classIds: mine.map((e) => e.class_id).filter(Boolean), gradeLevel };
+}
+
 // Notebook style marks. Each stroke's wobble is seeded by what it marks (the
 // day, the month) so rebuilding the grid on every render redraws identical
 // strokes instead of jittering.
@@ -160,16 +245,25 @@ function dayMarks(cell, { isSelected, drawSelection }) {
   return marks;
 }
 
-function dayCell(cell, { isSelected, onSelect, onContextMenu, notebook, drawToday, drawSelection }) {
+function dayCell(cell, { isSelected, onSelect, onContextMenu, notebook, drawToday, drawSelection, data }) {
   const visible = cell.items.slice(0, MAX_VISIBLE_CHIPS);
   const overflow = cell.items.length - visible.length;
 
-  const chips = visible.map((item) =>
-    el('div', { class: `calendar-chip ${CHIP_CLASS[item.kind]}`, title: [item.time, item.title].filter(Boolean).join(' ') }, [
-      item.time ? el('span', { class: 'calendar-chip-time', text: item.time }) : null,
-      el('span', { class: 'calendar-chip-title', text: item.title }),
-    ]),
-  );
+  const chips = visible.map((item) => {
+    const colorToken = item.kind === 'calendarEvent' ? eventColorToken(data.calendar[item.index]?.color) : null;
+    return el(
+      'div',
+      {
+        class: `calendar-chip ${CHIP_CLASS[item.kind]}${colorToken ? ' calendar-chip-colored' : ''}`,
+        style: colorToken ? `--event-accent: var(${colorToken})` : undefined,
+        title: [item.time, item.title].filter(Boolean).join(' '),
+      },
+      [
+        item.time ? el('span', { class: 'calendar-chip-time', text: item.time }) : null,
+        el('span', { class: 'calendar-chip-title', text: item.title }),
+      ],
+    );
+  });
   if (overflow > 0) chips.push(el('div', { class: 'calendar-chip calendar-chip-more', text: t('calendar.moreItems', { n: overflow }) }));
 
   return el(
@@ -213,7 +307,7 @@ function monthLabel(year, month) {
   return new Date(year, month, 1).toLocaleDateString(getDateLocale(), { month: 'long', year: 'numeric' });
 }
 
-function dayPanel(cell, data, { onOpenDetail, onContextMenuItem, onAddReminder }) {
+function dayPanel(cell, data, { onOpenDetail, onContextMenuItem, onAddReminder, userClassIds = [], userGradeLevel = null }) {
   if (!cell) return el('div', { class: 'calendar-daypanel-empty', text: t('calendar.pickDay') });
 
   const label = cell.date.toLocaleDateString(getDateLocale(), { weekday: 'long', month: 'long', day: 'numeric' });
@@ -249,18 +343,22 @@ function dayPanel(cell, data, { onOpenDetail, onContextMenuItem, onAddReminder }
       ]);
     }
     const target = { kind: item.kind, index: item.index };
+    const event = item.kind === 'calendarEvent' ? data.calendar[item.index] : null;
+    const colorToken = event ? eventColorToken(event.color) : null;
+    const targetLabel = event ? targetingLabel(eventTargetingInfo(event, userClassIds, userGradeLevel)) : null;
     return el(
       'button',
       {
-        class: 'row-item',
+        class: `row-item${colorToken ? ' calendar-row-colored' : ''}`,
         type: 'button',
+        style: colorToken ? `--event-accent: var(${colorToken})` : undefined,
         onclick: () => onOpenDetail(target),
         oncontextmenu: (e) => {
           e.preventDefault();
           onContextMenuItem.row(e.clientX, e.clientY, target);
         },
       },
-      [renderItemBody(target, data, null)],
+      [renderItemBody(target, data, null), targetLabel ? el('div', { class: 'calendar-target-badge', text: targetLabel }) : null],
     );
   });
 
@@ -287,7 +385,9 @@ export function marksToDraw(prev, { fresh, monthKey, selected }) {
 export function renderCalendarGrid(state, callbacks, { fresh = false } = {}) {
   const { onMonthChange, onToday, onSelectDay, onOpenDetail, onDayContextMenu, onRowContextMenu, onAddReminder, onDeleteReminder } = callbacks;
   const { year, month } = state.calendarViewMonth;
-  const grid = buildCalendarMonth({ year, month, data: state.data, config: state.config, reminders: state.calendarReminders, today: new Date() });
+  const viewer = ownClassesAndGrade(state.data, state.ownStudentId);
+  const { classIds: userClassIds, gradeLevel: userGradeLevel } = viewer;
+  const grid = buildCalendarMonth({ year, month, data: state.data, config: state.config, reminders: state.calendarReminders, viewer, today: new Date() });
 
   const notebook = state.config.style === 'notebook';
   const monthKey = `${year}-${month}`;
@@ -317,6 +417,7 @@ export function renderCalendarGrid(state, callbacks, { fresh = false } = {}) {
     notebook,
     drawToday: draw.today,
     drawSelection: draw.selection,
+    data: state.data,
   })));
   if (notebook) {
     const weeks = grid.cells.length / 7;
@@ -328,6 +429,8 @@ export function renderCalendarGrid(state, callbacks, { fresh = false } = {}) {
     onOpenDetail,
     onAddReminder,
     onContextMenuItem: { row: onRowContextMenu, delete: onDeleteReminder },
+    userClassIds,
+    userGradeLevel,
   });
 
   const shell = el('div', { class: 'calendar-shell' }, [header, weekdayRow, cellsEl, panel]);
@@ -365,6 +468,26 @@ function wireSwipeNav(shell, onMonthChange) {
     if (Math.abs(dx) > THRESHOLD) onMonthChange(dx > 0 ? -1 : 1);
     touchStartX = null;
   }, { passive: true });
+}
+
+/** Hides calendar_events aimed at other classes or grade levels. A flat
+ * toolbar toggle beside the view switch rather than a filter menu, since
+ * "everything" and "just mine" are the only two useful answers. */
+export function calendarOnlyMineToggle(config, onToggle) {
+  const on = !!config.calendarOnlyMine;
+  const label = on ? t('calendar.showAllEvents') : t('calendar.showOnlyMine');
+  return el(
+    'button',
+    {
+      class: `btn-icon ${on ? 'active-toggle' : ''}`,
+      type: 'button',
+      'aria-pressed': String(on),
+      'aria-label': label,
+      title: label,
+      onclick: () => onToggle(!on),
+    },
+    [svgIcon(iconPaths(on ? 'eyeOff' : 'eye'))],
+  );
 }
 
 export function calendarViewToggle(config, onToggle) {

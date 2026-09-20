@@ -38,3 +38,4 @@
 .quiz-option-btn:hover { background: var(--bg-subtle); }
 .quiz-option-btn.chosen { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .take-quiz-progress { font-size: 0.8125rem; color: var(--text-muted); }
+.quiz-window-warn { color: var(--bad-text); }

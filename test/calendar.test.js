@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toIsoDate, isoOf, monthCells, buildCalendarMonth, extractTime, marksToDraw, calendarAgendaKinds } from '../src/calendar.js';
+import {
+  toIsoDate, isoOf, monthCells, buildCalendarMonth, extractTime, marksToDraw, calendarAgendaKinds,
+  eventColorToken, eventAudiences, eventClassIds, isEventTargetedAtMe, eventTargetingInfo, ownClassesAndGrade,
+} from '../src/calendar.js';
 import { i18nReady } from '../src/i18n.js';
 
 await i18nReady;
@@ -156,3 +159,126 @@ test('calendarAgendaKinds unfolds past days on request and honors calendarShowAs
 
   assert.deepEqual(calendarAgendaKinds({ data: dataWith(), config: CONFIG, reminders: [], today }), []);
 });
+
+test('eventColorToken maps known school colors to their CSS custom property, else null', () => {
+  assert.equal(eventColorToken('teal'), '--event-color-teal');
+  assert.equal(eventColorToken('amber'), '--event-color-amber');
+  assert.equal(eventColorToken('magenta'), null, 'unknown color names fall back to no accent, not a guess');
+  assert.equal(eventColorToken(null), null);
+  assert.equal(eventColorToken(undefined), null);
+});
+
+test('eventAudiences prefers the audiences array over the audience scalar', () => {
+  assert.deepEqual(eventAudiences({ audiences: ['everyone'], audience: 'staff' }), ['everyone']);
+  assert.deepEqual(eventAudiences({ audiences: [], audience: 'everyone' }), ['everyone'], 'an empty array falls back to the scalar');
+  assert.deepEqual(eventAudiences({ audiences: null, audience: 'everyone' }), ['everyone']);
+  assert.deepEqual(eventAudiences({ audiences: null, audience: null }), []);
+  assert.deepEqual(eventAudiences({}), []);
+});
+
+test('eventClassIds prefers the class_ids array over the class_id scalar', () => {
+  assert.deepEqual(eventClassIds({ class_ids: ['c1', 'c2'], class_id: 'c3' }), ['c1', 'c2']);
+  assert.deepEqual(eventClassIds({ class_ids: [], class_id: 'c3' }), ['c3'], 'an empty array falls back to the scalar');
+  assert.deepEqual(eventClassIds({ class_ids: null, class_id: 'c3' }), ['c3']);
+  assert.deepEqual(eventClassIds({ class_ids: null, class_id: null }), []);
+  assert.deepEqual(eventClassIds({}), []);
+});
+
+test('isEventTargetedAtMe treats a fully untargeted event (every new field null) as everyone\'s', () => {
+  const bare = { id: 'e1', title: 'Pep rally', event_date: '2026-02-12' };
+  assert.equal(isEventTargetedAtMe(bare, ['c1'], 9), true);
+  assert.equal(isEventTargetedAtMe(bare, [], null), true);
+});
+
+test('isEventTargetedAtMe matches explicit everyone, my class, my grade, and rejects the rest', () => {
+  assert.equal(isEventTargetedAtMe({ audience: 'everyone' }, [], null), true);
+  assert.equal(isEventTargetedAtMe({ audiences: ['everyone'] }, [], null), true);
+  assert.equal(isEventTargetedAtMe({ class_id: 'c1' }, ['c1', 'c2'], null), true, 'class_id in userClassIds');
+  assert.equal(isEventTargetedAtMe({ class_ids: ['c9', 'c1'] }, ['c1'], null), true, 'class_ids overlapping userClassIds');
+  assert.equal(isEventTargetedAtMe({ class_id: 'c1' }, ['c2'], null), false, 'class_id not one of mine');
+  assert.equal(isEventTargetedAtMe({ grade_level: 9 }, [], 9), true);
+  assert.equal(isEventTargetedAtMe({ grade_level: 9 }, [], 10), false);
+  assert.equal(isEventTargetedAtMe({ audience: 'staff' }, [], null), false, 'a real audience that is not "everyone" and matches nothing else');
+});
+
+test('eventTargetingInfo describes an event\'s audience, and is null when there is nothing to say', () => {
+  assert.equal(eventTargetingInfo({}), null);
+  assert.deepEqual(eventTargetingInfo({ audience: 'everyone' }), { kind: 'everyone' });
+  assert.deepEqual(eventTargetingInfo({ class_id: 'c1' }, ['c1']), { kind: 'class', mine: true });
+  assert.deepEqual(eventTargetingInfo({ class_id: 'c1' }, ['c2']), { kind: 'class', mine: false });
+  assert.deepEqual(eventTargetingInfo({ grade_level: 9 }, [], 9), { kind: 'grade', grade: 9, mine: true });
+  assert.deepEqual(eventTargetingInfo({ grade_level: 9 }, [], 10), { kind: 'grade', grade: 9, mine: false });
+  assert.deepEqual(eventTargetingInfo({ audience: 'staff' }), { kind: 'other' });
+});
+
+test('ownClassesAndGrade reads the signed-in student\'s classes and grade level off enrollments', () => {
+  const data = {
+    enrollments: [
+      { student_id: 's1', class_id: 'c1', students: { id: 's1', grade_level: 9 } },
+      { student_id: 's1', class_id: 'c2', students: { id: 's1', grade_level: 9 } },
+      { student_id: 's2', class_id: 'c3', students: { id: 's2', grade_level: 10 } },
+    ],
+  };
+  assert.deepEqual(ownClassesAndGrade(data, 's1'), { classIds: ['c1', 'c2'], gradeLevel: 9 });
+  assert.deepEqual(ownClassesAndGrade(data, 'nobody'), { classIds: [], gradeLevel: null });
+  assert.deepEqual(ownClassesAndGrade({ enrollments: [] }, 's1'), { classIds: [], gradeLevel: null });
+});
+
+test('buildCalendarMonth is unaffected by the new calendar_events columns when they are all null', () => {
+  const data = dataWith({
+    calendar: [{ id: 'e1', title: 'Pep rally', event_date: '2026-02-12', color: null, audience: null, audiences: null, class_id: null, class_ids: null, grade_level: null }],
+  });
+  const grid = buildCalendarMonth({ year: 2026, month: 1, data, config: CONFIG, reminders: [], today: new Date(2026, 1, 1) });
+  const day12 = grid.cells.find((c) => c.iso === '2026-02-12');
+  assert.deepEqual(day12.items.map((i) => ({ kind: i.kind, title: i.title, time: i.time })), [{ kind: 'calendarEvent', title: 'Pep rally', time: null }]);
+});
+
+const ONLY_MINE = { calendarShowAssignments: true, calendarOnlyMine: true };
+const VIEWER = { classIds: ['c-mine'], gradeLevel: 9 };
+
+function eventsForFilterTests() {
+  return [
+    { id: 'e0', title: 'Other class only', event_date: '2026-09-10', audiences: ['class'], class_ids: ['c-theirs'] },
+    { id: 'e1', title: 'Whole school', event_date: '2026-09-10', audiences: ['everyone'] },
+    { id: 'e2', title: 'My class', event_date: '2026-09-10', audiences: ['class'], class_ids: ['c-mine'] },
+    { id: 'e3', title: 'Grade 11', event_date: '2026-09-10', audiences: ['grade'], grade_level: 11 },
+    { id: 'e4', title: 'My grade', event_date: '2026-09-10', audiences: ['grade'], grade_level: 9 },
+  ];
+}
+
+function septemberItems(config, viewer) {
+  const grid = buildCalendarMonth({ year: 2026, month: 8, data: dataWith({ calendar: eventsForFilterTests() }), config, viewer, reminders: [], today: new Date(2026, 8, 10) });
+  return grid.cells.find((c) => c.iso === '2026-09-10').items;
+}
+
+test('calendarOnlyMine keeps events aimed at everyone, my class or my grade', () => {
+  const titles = septemberItems(ONLY_MINE, VIEWER).map((i) => i.title);
+  assert.deepEqual(titles, ['Whole school', 'My class', 'My grade']);
+});
+
+test('calendarOnlyMine off shows every event', () => {
+  assert.equal(septemberItems(CONFIG, VIEWER).length, 5);
+});
+
+test('filtered calendar items keep their original state.data index, so detail targets stay correct', () => {
+  const items = septemberItems(ONLY_MINE, VIEWER);
+  const source = eventsForFilterTests();
+  for (const item of items) {
+    assert.equal(source[item.index].title, item.title, `index ${item.index} must still point at "${item.title}"`);
+  }
+  assert.deepEqual(items.map((i) => i.index), [1, 2, 4], 'the skipped events must not close the gaps');
+});
+
+test('calendarOnlyMine without a viewer filters nothing rather than hiding everything', () => {
+  assert.equal(septemberItems(ONLY_MINE, null).length, 5);
+});
+
+test('calendarAgendaKinds honours calendarOnlyMine too', () => {
+  const data = dataWith({ calendar: eventsForFilterTests() });
+  const all = calendarAgendaKinds({ data, config: CONFIG, viewer: VIEWER, reminders: [], today: new Date(2026, 8, 10) });
+  const mine = calendarAgendaKinds({ data, config: ONLY_MINE, viewer: VIEWER, reminders: [], today: new Date(2026, 8, 10) });
+  const countItems = (rows) => rows.filter((r) => r.type === 'item').length;
+  assert.equal(countItems(all), 5);
+  assert.equal(countItems(mine), 3);
+});
+

@@ -1,0 +1,90 @@
+/* Command palette. Scoped under .cmdk-panel (and its children below) so it
+   never collides with the old .palette-* rules in styles/overlays.css —
+   .overlay-center/.overlay-backdrop are the shared layout classes both use.
+   Everything here reads foundation.css tokens, so it follows light/dark and
+   stays plain (non-hand-drawn) under Notebook per NOTEBOOK_STYLE.md's rule
+   that data text never goes through --font-hand. */
+
+.cmdk-panel {
+  position: relative;
+  z-index: 1;
+  width: 560px;
+  max-width: calc(100% - 32px);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  animation: cmdk-pop-in 140ms ease-out;
+}
+
+@keyframes cmdk-pop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+
+.cmdk-input {
+  width: 100%;
+  padding: 18px 20px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 1.0625rem;
+  color: var(--text-primary);
+}
+.cmdk-input::placeholder { color: var(--text-muted); }
+.cmdk-input:focus { outline: none; }
+
+.cmdk-list {
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.cmdk-category {
+  padding: 10px 14px 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+}
+.cmdk-item:hover { background: var(--bg-subtle); }
+.cmdk-item.active { background: var(--hl-soft); }
+.cmdk-item .icon { width: 16px; height: 16px; flex: none; color: var(--text-muted); }
+.cmdk-item.active .icon { color: var(--text-primary); }
+
+.cmdk-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmdk-item-hint {
+  flex: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+
+.cmdk-empty { padding: 16px 14px; color: var(--text-muted); font-size: 0.9rem; }

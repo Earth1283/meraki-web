@@ -4,6 +4,10 @@ import { iconPaths } from './icons.js';
 import { seededRandom, sketchCircle, sketchSpiral, sketchStar, sketchSvg, sketchTallyGroup, tallyGroups } from './sketch.js';
 import { strikeNumber, strikeSlip } from './slips.js';
 import { markCode } from './marks.js';
+// quiz.js imports pill() from this module, so the two form an import cycle.
+// Nothing here reads these at module scope (see quizPillClass), which is
+// what keeps that cycle safe regardless of which module loads first.
+import { quizAvailability, formatQuizWindow, QUIZ_AVAILABILITY } from './quiz.js';
 
 // Mood/tab labels are looked up live (functions, not module-eval constants)
 // so every call site re-reads them under the current locale on each render.
@@ -33,10 +37,6 @@ export function tabTitle(id) {
   return t(`tab.${id}`) ?? id;
 }
 
-export function commandLabels() {
-  return [...tabs().map((tb) => t('palette.goto', { name: tb.title })), t('palette.refresh'), t('palette.settings'), t('palette.logout')];
-}
-
 /** All known tab ids, arranged per config.tabOrder — any id missing from a
  * stored order (new tabs shipped after the config was saved) is appended at
  * the end, so a saved order never silently hides a tab that didn't exist
@@ -59,11 +59,6 @@ export function orderedTabs(config) {
 export function visibleTabs(config) {
   const hidden = new Set(config.hiddenTabs || []);
   return orderedTabs(config).filter((t) => !hidden.has(t.id));
-}
-
-export function filterLabels(labels, query) {
-  const q = query.toLowerCase();
-  return labels.filter((l) => l.toLowerCase().includes(q));
 }
 
 export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {}) {
@@ -377,6 +372,16 @@ export function initials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function quizPillClass(availabilityState) {
+  switch (availabilityState) {
+    case QUIZ_AVAILABILITY.NOT_YET_OPEN: return 'accent';
+    case QUIZ_AVAILABILITY.OPEN: return 'accent2';
+    case QUIZ_AVAILABILITY.CLOSING_SOON: return 'warn';
+    case QUIZ_AVAILABILITY.CLOSED: return 'bad';
+    default: return 'dim';
+  }
+}
+
 export function pill(text, cls = '') {
   return text ? el('span', { class: `pill ${cls}`, text }) : null;
 }
@@ -531,9 +536,15 @@ export function renderItemBody(target, data, ownUserId) {
     }
     case 'assessment': {
       const a = data.assessments[target.index];
+      const availability = quizAvailability(a, submissionForAssessment(data, a));
+      const windowText = formatQuizWindow(availability);
       return itemRow({
         title: a.title,
-        pillNode: pill(a.due_at ? t('field.due', { date: formatDateTime(a.due_at) }) : null, 'accent'),
+        // One pill, not two: when the open/close window has something to say
+        // it matters more than the due date, which the meta line still carries.
+        pillNode: windowText
+          ? pill(windowText, quizPillClass(availability.state))
+          : pill(a.due_at ? t('field.due', { date: formatDateTime(a.due_at) }) : null, 'accent'),
         meta: [humanizeStatus(a.kind), a.time_limit_minutes != null ? t('field.min', { n: a.time_limit_minutes }) : null].filter(Boolean).join(' · '),
       });
     }
@@ -695,7 +706,18 @@ export function detailFields(target, data) {
   switch (target.kind) {
     case 'class': {
       const c = data.classes[target.index];
-      return { title: c.name, fields: [[t('label.subject'), c.subject], [t('label.period'), c.period], [t('label.room'), c.room], [t('label.term'), c.term], [t('label.teacher'), c.teacher_name]] };
+      return {
+        title: c.name,
+        fields: [
+          [t('label.subject'), c.subject],
+          [t('label.period'), c.period],
+          [t('label.room'), c.room],
+          [t('label.term'), c.term],
+          [t('label.gradeLevel'), c.grade_level],
+          [t('label.teacher'), c.teacher_name],
+          [t('label.timezone'), c.timezone],
+        ],
+      };
     }
     case 'grade': {
       const g = data.grades[target.index];
@@ -719,13 +741,16 @@ export function detailFields(target, data) {
           [t('label.submissionMode'), humanizeStatus(a.submission_mode)],
           [t('label.submitted'), sub?.submitted_at ? formatDateTime(sub.submitted_at) : null],
           [t('label.submissionStatus'), sub?.status ? humanizeStatus(sub.status) : t('work.notStarted')],
+          [t('label.rubric'), a.rubric_id ? t('field.attached') : null],
+          [t('label.posted'), a.created_at ? formatDateTime(a.created_at) : null],
         ],
         body: a.description ?? null,
       };
     }
     case 'attendance': {
       const r = data.attendance[target.index];
-      return { title: formatDate(r.date), fields: [[t('label.status'), humanizeStatus(r.status)], [t('label.note'), r.note]] };
+      const cls = data.classes.find((c) => c.id === r.class_id)?.name;
+      return { title: formatDate(r.date), fields: [[t('label.status'), humanizeStatus(r.status)], [t('label.class'), cls], [t('label.note'), r.note]] };
     }
     case 'calendarEvent': {
       const e = data.calendar[target.index];
@@ -738,7 +763,7 @@ export function detailFields(target, data) {
     }
     case 'announcement': {
       const a = data.announcements[target.index];
-      return { title: a.title, fields: [[t('label.posted'), formatDateTime(a.created_at)]], body: a.body ?? null };
+      return { title: a.title, fields: [[t('label.posted'), formatDateTime(a.created_at)], [t('label.audience'), a.audience ? humanizeStatus(a.audience) : null]], body: a.body ?? null };
     }
     case 'message': {
       const m = data.messages[target.index];
@@ -754,11 +779,30 @@ export function detailFields(target, data) {
     }
     case 'behaviorNote': {
       const b = data.behaviorNotes[target.index];
-      return { title: formatDate(b.date), fields: [[t('label.kind'), humanizeStatus(b.kind)]], body: b.notes ?? null };
+      return {
+        title: formatDate(b.date),
+        fields: [
+          [t('label.kind'), humanizeStatus(b.kind)],
+          [t('label.reason'), b.reason],
+          [t('label.linkedWork'), b.assignments?.title],
+          [t('label.scoredZero'), b.scored_zero ? t('field.yes') : null],
+        ],
+        body: b.notes ?? null,
+      };
     }
     case 'detention': {
       const d = data.detentions[target.index];
-      return { title: formatDate(d.scheduled_date), fields: [[t('label.status'), humanizeStatus(d.status)], [t('label.strikeCount'), d.strike_count], [t('label.reason'), d.reason]], body: d.notes ?? null };
+      return {
+        title: formatDate(d.scheduled_date),
+        fields: [
+          [t('label.status'), humanizeStatus(d.status)],
+          [t('label.strikeCount'), d.strike_count],
+          [t('label.reason'), d.reason],
+          [t('label.issued'), d.created_at ? formatDateTime(d.created_at) : null],
+          [t('label.guardian'), d.students?.guardian_email],
+        ],
+        body: d.notes ?? null,
+      };
     }
     case 'reportCard': {
       const r = data.reportCards[target.index];

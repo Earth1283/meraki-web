@@ -6,6 +6,7 @@ import { iconPaths } from './icons.js';
 import { renderWhatIf, renderWhatIfGpa } from './whatif.js';
 import { gradeSetup, classPercent, countedPoints, isExtraCredit } from './gradebook.js';
 import { markCode } from './marks.js';
+import { hasStandardsData, standardsMastery, weakestStandardsFirst } from './standards.js';
 
 export const DEFAULT_TARGET_PCT = 90;
 
@@ -284,6 +285,47 @@ function renderComparisonCard(data, config, whatIf, updaters) {
   return el('div', { class: 'analytics-card' }, [el('div', { class: 'field-label', text: t('analytics.comparison') }), body, gpaLine]);
 }
 
+const STANDARDS_CAP = 5;
+
+function standardRow(m) {
+  return el('div', { class: 'standards-row' }, [
+    renderMeter(m.code, m.pct),
+    el('div', { class: 'standards-row-meta' }, [
+      el('span', { class: 'standards-row-desc', text: m.description, title: m.description }),
+      pill(t('standards.gradedOfTagged', { graded: m.gradedCount, tagged: m.taggedCount }), 'dim'),
+    ]),
+  ]);
+}
+
+// Common Core standards a teacher may (or, per the captured traffic, may
+// never) tag assignments with. Ranked weakest-first and capped rather than
+// listing every standard, so this stays a compact card on an already-long
+// tab, not a fourth drill-down menu.
+function renderStandardsPanel(data) {
+  const header = el('div', { class: 'field-label', text: t('standards.title') });
+  if (!hasStandardsData(data)) {
+    return el('div', { class: 'analytics-card standards-panel' }, [header, emptyNote(t('standards.noStandards'))]);
+  }
+
+  const mastery = standardsMastery(data);
+  if (mastery.every((m) => m.taggedCount === 0)) {
+    return el('div', { class: 'analytics-card standards-panel' }, [header, emptyNote(t('standards.noneTagged'))]);
+  }
+
+  const ranked = weakestStandardsFirst(mastery);
+  if (ranked.length === 0) {
+    return el('div', { class: 'analytics-card standards-panel' }, [header, emptyNote(t('standards.noneGraded'))]);
+  }
+
+  const shown = ranked.slice(0, STANDARDS_CAP);
+  const rest = ranked.length - shown.length;
+  const body = el('div', { class: 'standards-list' }, [
+    ...shown.map(standardRow),
+    rest > 0 ? emptyNote(t('standards.moreHidden', { n: rest })) : null,
+  ]);
+  return el('div', { class: 'analytics-card standards-panel' }, [header, body]);
+}
+
 /** `whatIf` ({ get, set, clear }, optional) adds the What if calculator to
  * each class card; see renderWhatIf. */
 export function renderAnalyticsTab(data, config, targets, onTargetChange, whatIf = null) {
@@ -293,6 +335,7 @@ export function renderAnalyticsTab(data, config, targets, onTargetChange, whatIf
   const updaters = [];
   const node = el('div', { class: 'analytics-tab' }, [
     renderComparisonCard(data, config, whatIf, updaters),
+    renderStandardsPanel(data),
     el(
       'div',
       { class: 'analytics-grid' },

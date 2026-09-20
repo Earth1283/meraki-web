@@ -1,5 +1,5 @@
 // My Record: strike notes filled into carbon-copy behavior slips, for fun.
-// Same data as the plain row (date, reason), dressed up as the paperwork.
+// Same data as the plain row, dressed up as the paperwork.
 import { el } from './dom.js';
 import { t } from './i18n.js';
 
@@ -30,7 +30,10 @@ export function strikeSlip(b, number) {
     ]),
     line(t('slip.student'), student),
     line(t('slip.date'), b.date),
+    b.reason ? line(t('slip.cause'), b.reason) : null,
+    b.assignments?.title ? line(t('slip.work'), b.assignments.title) : null,
     line(t('slip.reason'), b.notes, 'slip-reason'),
+    b.scored_zero ? el('div', { class: 'slip-zero', text: t('slip.scoredZero') }) : null,
     el('div', { class: 'slip-foot' }, [
       el('span', { class: 'slip-sign', text: t('slip.signature') }),
       el('span', { class: 'slip-copy', text: t('slip.copy') }),

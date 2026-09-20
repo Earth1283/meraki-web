@@ -1,3 +1,6 @@
+import { el } from './dom.js';
+import { renderLoginHistory } from './loginhistory.js';
+
 export const DATA_AND_PRIVACY = `\
 TL;DR: this is the same school account and the same real database as the \
 official site — just a different window onto it. Nothing here is hidden, \
@@ -22,6 +25,8 @@ READS ONLY
                     from Meraki's own app server (meraki-education.app)
   Your work      -> what you turned in, and your teacher's marks on it
                     (assignment_submissions, submission_annotations)
+  Data & Privacy -> login_events (your own sign-in trail, filterable by
+                    date below), the same rows the "Log in" write below adds
 
 WRITES (real rows, visible to staff exactly like the website)
   Messages [n]   -> inserts into messages. The recipient sees it the same
@@ -134,4 +139,31 @@ export function privacyParagraphs() {
     paragraphs.push({ cls, lines });
   }
   return paragraphs;
+}
+
+function renderPrivacyProse() {
+  const container = el('div', { class: 'privacy' });
+  for (const para of privacyParagraphs()) {
+    const p = el('div', { class: `privacy-para ${para.cls}` });
+    para.lines.forEach((line, i) => {
+      if (line.label !== undefined) {
+        p.appendChild(el('div', { class: 'privacy-row' }, [el('span', { class: 'privacy-row-label', text: line.label }), el('span', { class: 'privacy-row-desc', text: line.desc })]));
+      } else {
+        const isHeading = i === 0 && para.cls === 'priv-section';
+        p.appendChild(el('p', { class: isHeading ? 'privacy-heading' : undefined, text: line.text }));
+      }
+    });
+    container.appendChild(p);
+  }
+  return container;
+}
+
+/** The full Data & Privacy tab: the prose above, then the sign-in trail this
+ * tab has been describing in the abstract ("Log in -> inserts a login_events
+ * row") as an actual, filterable, concrete panel. Callers pass
+ * state.data.loginEvents. */
+export function renderPrivacyTab(loginEvents) {
+  const container = renderPrivacyProse();
+  container.appendChild(renderLoginHistory(loginEvents));
+  return container;
 }

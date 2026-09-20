@@ -7,7 +7,7 @@ import { lazyFetch } from './lazy.js';
 import { submissionForAssessment, submissionForAssignment } from './rows.js';
 import { teacherFeedback, renderTeacherFeedback } from './feedback.js';
 import { assignmentForTarget, renderYourWork } from './submission.js';
-import { renderQuizReview, canTakeQuiz } from './quiz.js';
+import { renderQuizReview } from './quiz.js';
 import { renderTakeQuizCta } from './quiztake.js';
 import { portfolioActions } from './portfolio.js';
 import { downloadFileUpload } from './files.js';
@@ -33,7 +33,7 @@ export function detailSections(target) {
     case 'assessment': {
       const assessment = data.assessments[target.index];
       const sub = submissionForAssessment(data, assessment);
-      if (!sub) return canTakeQuiz(assessment, sub) ? [renderTakeQuizCta(assessment)] : [];
+      if (!sub) return [renderTakeQuizCta(assessment)];
       const answers = lazyFetch(`answers:${sub.id}`, () => api.getAssessmentAnswers(sub.id));
       const questions = lazyFetch(`questions:${assessment.id}`, () => api.getAssessmentQuestions(assessment.id));
       return [renderQuizReview(answers, questions)];
