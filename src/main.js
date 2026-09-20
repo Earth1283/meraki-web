@@ -458,7 +458,10 @@ function renderBody() {
       list.appendChild(
         kind.today
           ? el('div', { class: 'row-section row-section-today' }, [el('span', { class: 'row-section-mark', text: kind.label })])
-          : el('div', { class: 'row-section', text: kind.label }),
+          : el('div', { class: 'row-section' }, [
+            el('span', { text: kind.label }),
+            kind.hint ? el('span', { class: 'row-section-hint', tabindex: '0', title: kind.hint, 'aria-label': kind.hint, text: '?' }) : null,
+          ]),
       );
     } else if (kind.type === 'subheader') {
       (activeGroup ?? list).appendChild(el('div', { class: 'row-section row-subsection', text: kind.label }));

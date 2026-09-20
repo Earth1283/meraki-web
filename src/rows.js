@@ -122,7 +122,7 @@ export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {})
       rows.push({ type: 'header', label: t('me.portfolio') });
       if (data.portfolio.length === 0) rows.push({ type: 'placeholder', text: t('none.yet') });
       else data.portfolio.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'portfolio', index: i } }));
-      rows.push({ type: 'header', label: t('me.checkins') });
+      rows.push({ type: 'header', label: t('me.checkins'), hint: data.checkinsUnavailable ? t('me.checkinsMerakiIssue') : null });
       if (data.checkins.length === 0) rows.push({ type: 'placeholder', text: t('none.yet') });
       else data.checkins.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'checkin', index: i } }));
       break;

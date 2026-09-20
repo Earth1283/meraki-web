@@ -207,7 +207,7 @@ export const state = {
 function emptyData() {
   return {
     classes: [], assignments: [], grades: [], attendance: [], calendar: [],
-    announcements: [], messages: [], portfolio: [], checkins: [],
+    announcements: [], messages: [], portfolio: [], checkins: [], checkinsUnavailable: false,
     hero: null, behaviorNotes: [], detentions: [], reportCards: [],
     assessments: [], discussions: [], fileUploads: [], enrollments: [],
     assignmentSubmissions: [], assessmentSubmissions: [],
@@ -357,6 +357,7 @@ export async function refresh() {
       const field = group.fields[i];
       const [, , , label] = tableByField.get(field);
       if (r.status !== 'fulfilled') {
+        if (field === 'checkins') state.data.checkinsUnavailable = true;
         record(api.friendlyLoadError(label, r.reason));
       } else if (PAGED_FIELDS.includes(field)) {
         const full = r.value.rows.length >= pagedLimit(field);
@@ -364,6 +365,7 @@ export async function refresh() {
         state.pages[field] = { ...state.pages[field], total: r.value.total, full, exhausted: false, error: null };
       } else {
         state.data[field] = r.value;
+        if (field === 'checkins') state.data.checkinsUnavailable = false;
       }
     });
 

@@ -202,6 +202,13 @@ test('me tab shows placeholders for empty portfolio and checkins, no info row wi
   assert.equal(placeholders.length, 2);
 });
 
+test('me tab adds a discreet Meraki-side error hint only when check-ins cannot load', () => {
+  const normal = rowKinds('me', emptyData()).find((k) => k.type === 'header' && k.label === 'Check-ins');
+  const unavailable = rowKinds('me', emptyData({ checkinsUnavailable: true })).find((k) => k.type === 'header' && k.label === 'Check-ins');
+  assert.equal(normal.hint, null);
+  assert.match(unavailable.hint, /not a problem with this app/i);
+});
+
 test('me tab shows the info row once a hero profile exists', () => {
   const kinds = rowKinds('me', emptyData({ hero: { hero_class: 'wizard' } }));
   assert.equal(kinds[0].type, 'info');

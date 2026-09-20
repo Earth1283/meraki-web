@@ -55,6 +55,7 @@
   "stat.noGrades": "Aucune note",
   "me.portfolio": "Portfolio",
   "me.checkins": "Suivis",
+  "me.checkinsMerakiIssue": "Meraki bloque temporairement les suivis. C'est un problème de service, pas de cette application.",
   "portfolio.addTitle": "Ajouter au portfolio",
   "portfolio.title": "Titre",
   "portfolio.titlePlaceholder": "Qu'avez-vous réalisé ?",

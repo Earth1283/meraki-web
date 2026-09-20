@@ -55,6 +55,7 @@
   "stat.noGrades": "No grades",
   "me.portfolio": "Portfolio",
   "me.checkins": "Check-ins",
+  "me.checkinsMerakiIssue": "Meraki is temporarily blocking check-ins. This is a service issue, not a problem with this app.",
   "portfolio.addTitle": "Add to portfolio",
   "portfolio.title": "Title",
   "portfolio.titlePlaceholder": "What did you make?",

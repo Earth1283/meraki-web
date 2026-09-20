@@ -55,6 +55,7 @@
   "stat.noGrades": "暂无成绩",
   "me.portfolio": "作品集",
   "me.checkins": "打卡记录",
+  "me.checkinsMerakiIssue": "Meraki 暂时阻止了打卡记录。这是服务端问题，不是本应用的问题。",
   "portfolio.addTitle": "添加到作品集",
   "portfolio.title": "标题",
   "portfolio.titlePlaceholder": "你做了什么？",

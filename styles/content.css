@@ -47,6 +47,22 @@
   padding: 22px 14px 6px;
   text-align: left;
 }
+.row-section-hint {
+  display: inline-grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.625rem;
+  font-weight: 700;
+  font-variation-settings: normal;
+  line-height: 1;
+  cursor: help;
+}
+.row-section-hint:focus { outline: 2px solid var(--accent-solid); outline-offset: 2px; }
 
 .row-placeholder { padding: 10px 14px; color: var(--text-muted); font-size: 0.9rem; }
 .row-placeholder-good { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); }
@@ -338,4 +354,3 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 .analytics-target-input { width: 72px; padding: 6px 8px; }
 .analytics-status-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 160px; }
 .analytics-status { font-size: 0.875rem; font-weight: 600; }
-
