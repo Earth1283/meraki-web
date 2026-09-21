@@ -87,6 +87,7 @@
   "loading.step.extras": "Chargement des extras",
   "state.nothingHere": "Rien ici pour le moment.",
   "state.retry": "Réessayer",
+  "state.dismiss": "Fermer",
   "state.partialLoadError": "Certaines informations n'ont pas pu être chargées ({n} sources). Réessayez pour compléter les données.",
   "list.loadMore": "Charger plus",
   "list.loadOlderSubmissions": "Charger les rendus plus anciens",

@@ -13,6 +13,7 @@ import { mountLogin, renderOverlay, renderDetailPanel } from './overlays.js';
 import { showToast } from './toast.js';
 import { renderChat } from './chat.js';
 import { renderLoadMore, disconnectLoadMore } from './loadmore.js';
+import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js';
 import { installGlobalKeyboard } from './keyboard.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 import { i18nReady, t, onChange as onLocaleChange } from './i18n.js';
@@ -377,11 +378,20 @@ function renderBody() {
     return;
   }
 
-  if (state.error) {
+  if (state.error && !isErrorDismissed(state.error)) {
+    const message = state.error;
     body.appendChild(
       el('div', { class: 'banner-error', role: 'alert' }, [
-        el('span', { text: state.error }),
-        el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => refresh(), text: t('state.retry') }),
+        el('span', { class: 'banner-error-text', text: message }),
+        el('div', { class: 'banner-error-actions' }, [
+          el('button', {
+            class: 'btn btn-ghost btn-sm',
+            type: 'button',
+            onclick: () => { restoreError(message); refresh(); },
+            text: t('state.retry'),
+          }),
+          dismissButton(message, render),
+        ]),
       ]),
     );
   }

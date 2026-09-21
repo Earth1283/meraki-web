@@ -87,6 +87,7 @@
   "loading.step.extras": "Loading extras",
   "state.nothingHere": "Nothing here yet.",
   "state.retry": "Retry",
+  "state.dismiss": "Dismiss",
   "state.partialLoadError": "Some information couldn't be loaded ({n} sources). Try again to fill in the gaps.",
   "list.loadMore": "Load more",
   "list.loadOlderSubmissions": "Load older submissions",

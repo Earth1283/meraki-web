@@ -228,6 +228,7 @@
   .calendar-chip-title, .calendar-chip-time { display: none; }
   .calendar-chip-more { font-size: 0.625rem; line-height: 1; padding: 0; }
   .btn, .banner-error .btn-sm { min-height: 44px; }
+  .error-dismiss { width: 44px; height: 44px; }
   .settings-panel .panel-header { top: -18px; margin: -18px -20px 4px; padding: 18px 20px 12px; }
   .detail-field { grid-template-columns: minmax(86px, 34%) 1fr; gap: 8px; padding-block: 7px; }
 }

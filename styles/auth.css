@@ -110,6 +110,22 @@
   font-size: 0.875rem;
   box-shadow: inset 3px 0 0 var(--bad);
 }
+.banner-error-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.error-dismiss {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.error-dismiss:hover { opacity: 1; background: rgba(0, 0, 0, 0.08); }
+.error-dismiss svg { width: 16px; height: 16px; }
 
 .login-screen {
   --margin-x: clamp(28px, 11vw, 168px);

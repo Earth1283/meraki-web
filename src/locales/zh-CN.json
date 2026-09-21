@@ -87,6 +87,7 @@
   "loading.step.extras": "正在加载其他内容",
   "state.nothingHere": "这里还没有内容。",
   "state.retry": "重试",
+  "state.dismiss": "关闭",
   "state.partialLoadError": "部分信息加载失败（{n} 个来源）。请重试以补全数据。",
   "list.loadMore": "加载更多",
   "list.loadOlderSubmissions": "加载更早的提交记录",

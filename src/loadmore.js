@@ -2,7 +2,8 @@
 // state.js; this is just the button, and the watcher that presses it for you
 // once it scrolls into view.
 import { el } from './dom.js';
-import { state, loadMore } from './state.js';
+import { state, loadMore, notify } from './state.js';
+import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js';
 import { hasMoreRows } from './paging.js';
 import { t } from './i18n.js';
 
@@ -34,13 +35,18 @@ export function renderLoadMore(tab, { refocus = false } = {}) {
   const pages = fields.map((f) => state.pages[f]);
   const loading = pages.some((p) => p.loading);
   const error = pages.find((p) => p.error)?.error ?? null;
-  const loadAll = () => fields.forEach((f) => loadMore(f));
+  const loadAll = () => {
+    if (error) restoreError(error);
+    fields.forEach((f) => loadMore(f));
+  };
 
   const count = fields.length === 1 && pages[0].total != null ? t('list.shownOf', { shown: state.data[fields[0]].length, total: pages[0].total }) : null;
   const label = loading ? t('list.loadingMore') : error ? t('state.retry') : tab === 'assignments' ? t('list.loadOlderSubmissions') : t('list.loadMore');
   const button = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', disabled: loading, onclick: loadAll, text: label });
   const node = el('div', { class: 'load-more' }, [
-    error ? el('span', { class: 'load-more-error', role: 'alert', text: error }) : null,
+    error && !isErrorDismissed(error)
+      ? el('div', { class: 'load-more-error', role: 'alert' }, [el('span', { text: error }), dismissButton(error, notify)])
+      : null,
     count ? el('span', { class: 'load-more-count', text: count }) : null,
     button,
   ]);

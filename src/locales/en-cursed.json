@@ -61,6 +61,7 @@
   "loading.step.extras": "Scraping the barrel for the rest",
   "state.nothingHere": "A vast, judgmental emptiness.",
   "state.retry": "Try again, brave soul",
+  "state.dismiss": "Begone",
   "mood.1": "Send help",
   "mood.2": "Eh",
   "mood.3": "Functional",
