@@ -18,3 +18,5 @@ Thumbs.db
 har/
 *.har
 
+demo/
+test/demo-*.test.js
