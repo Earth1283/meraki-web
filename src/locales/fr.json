@@ -85,6 +85,8 @@
   "loading.step.academics": "Chargement des notes et devoirs",
   "loading.step.comms": "Chargement des annonces et messages",
   "loading.step.extras": "Chargement des extras",
+  "loading.tray.title": "Finalisation…",
+  "loading.tray.done": "Terminé",
   "state.nothingHere": "Rien ici pour le moment.",
   "state.retry": "Réessayer",
   "state.dismiss": "Fermer",

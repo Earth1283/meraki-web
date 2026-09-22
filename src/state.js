@@ -139,6 +139,10 @@ export const state = {
   ownStudentId: null,
   ownStudentName: '',
   loading: true,
+  // True while the shell is already up and the non-essential step groups
+  // (everything after 'core') are still filling in behind it — see the
+  // bottom-right tray in loadingtray.js. Only ever set during the first load.
+  backgroundLoading: false,
   // True once the first refresh() has completed — background refreshes
   // (e.g. the reconciling one after an optimistic write) still flip
   // `loading` on/off, but only the very first load shows a spinner; every
@@ -240,7 +244,7 @@ export function doLogout() {
   autoRefreshTimer = null;
   Object.assign(state, {
     tab: 'overview', data: emptyData(), ownUserId: '', ownStudentId: null, ownStudentName: '',
-    loading: true, hasLoadedOnce: false, status: 'Loading…', error: null, selectedIndex: -1,
+    loading: true, backgroundLoading: false, hasLoadedOnce: false, status: 'Loading…', error: null, selectedIndex: -1,
     activeOverlay: null, detailTarget: null, detailBackStack: [], whatIf: {}, pages: {},
   });
   notify();
@@ -396,10 +400,21 @@ export async function refresh() {
       setStepStatus(group.id, 'done');
       notify();
     }
+
+    // 'core' is enough to draw the real shell (classes, calendar, roster).
+    // Let the UI through right away instead of blocking behind academics/
+    // comms/extras too — those keep loading in the background tray below.
+    if (isFirstLoad && group.id === 'core') {
+      state.loading = false;
+      state.hasLoadedOnce = true;
+      state.backgroundLoading = true;
+      notify();
+    }
   }
 
   state.loading = false;
   state.hasLoadedOnce = true;
+  state.backgroundLoading = false;
   state.status = 'Ready.';
   state.loadingSteps = [];
   state.error = errors.length === 0

@@ -85,6 +85,8 @@
   "loading.step.academics": "正在加载成绩与作业",
   "loading.step.comms": "正在加载公告与消息",
   "loading.step.extras": "正在加载其他内容",
+  "loading.tray.title": "即将完成…",
+  "loading.tray.done": "完成",
   "state.nothingHere": "这里还没有内容。",
   "state.retry": "重试",
   "state.dismiss": "关闭",

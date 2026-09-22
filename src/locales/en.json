@@ -85,6 +85,8 @@
   "loading.step.academics": "Loading grades & assignments",
   "loading.step.comms": "Loading announcements & messages",
   "loading.step.extras": "Loading extras",
+  "loading.tray.title": "Finishing up…",
+  "loading.tray.done": "Done",
   "state.nothingHere": "Nothing here yet.",
   "state.retry": "Retry",
   "state.dismiss": "Dismiss",

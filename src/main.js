@@ -13,6 +13,7 @@ import { mountLogin, renderOverlay, renderDetailPanel } from './overlays.js';
 import { showToast } from './toast.js';
 import { renderChat } from './chat.js';
 import { renderLoadMore, disconnectLoadMore } from './loadmore.js';
+import { renderLoadingTray } from './loadingtray.js';
 import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js';
 import { installGlobalKeyboard } from './keyboard.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
@@ -53,6 +54,7 @@ function render() {
   renderBody();
   renderDetailPanel();
   renderOverlay();
+  renderLoadingTray();
   associateFieldLabels(shell);
   associateFieldLabels(document.getElementById('overlay-root'));
 }

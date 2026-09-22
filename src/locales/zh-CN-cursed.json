@@ -59,6 +59,8 @@
   "loading.step.academics": "正在打捞成绩与作业炼狱",
   "loading.step.comms": "正在窃听圣旨与虚空消息",
   "loading.step.extras": "正在刮桶底捞剩下的",
+  "loading.tray.title": "仪式即将完成…",
+  "loading.tray.done": "仪式完成",
   "state.nothingHere": "空得连个鬼影都没有。",
   "state.retry": "勇士，再渡一劫",
   "state.dismiss": "退散",

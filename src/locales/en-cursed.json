@@ -59,6 +59,8 @@
   "loading.step.academics": "Excavating grades & homework purgatory",
   "loading.step.comms": "Eavesdropping on decrees & the void",
   "loading.step.extras": "Scraping the barrel for the rest",
+  "loading.tray.title": "Wrapping up the ritual…",
+  "loading.tray.done": "Ritual complete",
   "state.nothingHere": "A vast, judgmental emptiness.",
   "state.retry": "Try again, brave soul",
   "state.dismiss": "Begone",

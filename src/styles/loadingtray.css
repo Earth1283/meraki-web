@@ -1,0 +1,69 @@
+#loading-tray-root {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 55;
+  pointer-events: none;
+}
+
+.loading-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.loading-tray.in { opacity: 1; transform: translateY(0); }
+
+.tray-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.tray-label { flex: 1; }
+
+.tray-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tray-icon .icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--good);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 26;
+  stroke-dashoffset: 26;
+  animation: draw-tray-check 320ms ease forwards;
+}
+@keyframes draw-tray-check { to { stroke-dashoffset: 0; } }
+
+.tray-progress {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.tray-progress-fill {
+  height: 100%;
+  background: var(--text-primary);
+  transition: width 250ms ease;
+}
+.loading-tray.done .tray-progress-fill { background: var(--good); }

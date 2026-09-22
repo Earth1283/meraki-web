@@ -59,6 +59,8 @@
   "loading.step.academics": "On fouille les notes et le purgatoire des devoirs",
   "loading.step.extras": "On racle les fonds de tiroir",
   "loading.step.comms": "On espionne les décrets et le vide",
+  "loading.tray.title": "On finit le rituel…",
+  "loading.tray.done": "Rituel terminé",
   "state.nothingHere": "Un grand vide, plein de jugement.",
   "state.retry": "Retente ta chance, courageux",
   "state.dismiss": "Va-t-en",
