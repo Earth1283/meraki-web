@@ -102,6 +102,8 @@
   font-weight: 500;
   font-size: 0.9375rem;
   text-align: left;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .nav-item:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); color: var(--text-primary); }
 .nav-item.active { color: var(--text-primary); font-weight: 650; }

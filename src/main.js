@@ -17,6 +17,8 @@ import { renderLoadingTray } from './loadingtray.js';
 import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js';
 import { installGlobalKeyboard } from './keyboard.js';
 import { enterView } from './motion.js';
+import { installRouter } from './router.js';
+import { hashFor } from './route.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 import { i18nReady, t, onChange as onLocaleChange } from './i18n.js';
 
@@ -84,14 +86,13 @@ function renderTabbar() {
       el('div', { class: 'nav-group-label', text: t(group.labelKey) }),
       ...groupTabs.map((tb) =>
         el(
-          'button',
+          'a',
           {
             class: `nav-item ${state.tab === tb.id ? 'active' : ''} ${state.tab === tb.id && tabJustChanged ? 'just-activated' : ''}`,
-            type: 'button',
+            href: hashFor({ tab: tb.id }),
             title: tb.title,
             'data-nav-group': group.id,
             'aria-current': state.tab === tb.id ? 'page' : null,
-            onclick: () => setTab(tb.id),
           },
           [el('span', { class: 'nav-icon' }, [svgIcon(iconPaths(tb.id))]), el('span', { class: 'nav-label', text: tb.title })],
         )),
@@ -634,6 +635,7 @@ function isDarkTheme() {
 }
 
 
+installRouter();
 subscribe(render);
 onLocaleChange(render);
 installGlobalKeyboard();
