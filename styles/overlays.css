@@ -3,9 +3,8 @@
   position: fixed;
   inset: 0;
   background: var(--scrim);
-  animation: fade-in 160ms ease-out;
+  animation: fade-in var(--dur-ui) var(--ease-out);
 }
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* Inert on desktop (the detail panel is a real grid column there, no
    dimming) — only shown inside the mobile media query below. */
@@ -32,11 +31,10 @@
   box-shadow: var(--shadow-modal);
   padding: 22px 28px 32px;
   overflow-y: auto;
-  animation: slide-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: sheet-in-right var(--dur-panel) var(--ease-out);
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
-@keyframes slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
 .panel-header {
   display: flex;
@@ -184,9 +182,9 @@
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-modal);
   overflow: hidden;
-  animation: pop-in 140ms ease-out;
+  transform-origin: 50% 0;
+  animation: pop-in var(--dur-ui) var(--ease-out);
 }
-@keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(0.99); } to { opacity: 1; transform: none; } }
 .palette-input {
   width: 100%;
   padding: 18px 20px;
@@ -214,9 +212,8 @@
   border-radius: 11px;
   box-shadow: var(--shadow-pop);
   padding: 5px;
-  animation: context-menu-in 100ms ease-out;
+  animation: menu-in var(--dur-fast) var(--ease-out);
 }
-@keyframes context-menu-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
 .context-menu-item {
   display: flex;
@@ -280,11 +277,14 @@
   font-size: 0.875rem;
   font-weight: 500;
   opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transform: translateY(14px) scale(0.92);
   pointer-events: auto;
 }
-.toast.in { opacity: 1; transform: translateY(0); }
+.toast.in {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-fast) var(--ease-out), transform 600ms var(--ease-spring);
+}
 .toast.bad { background: var(--bad); color: #ffffff; }
 .toast-action {
   background: none;

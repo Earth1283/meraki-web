@@ -4,7 +4,8 @@
 // with what was clicked, and never an action the app can't actually perform
 // (no "Mark as read" — there's no API for it — and "Delete" only on portfolio
 // items, the one kind of row a student can remove).
-import { el, svgIcon, clear } from './dom.js';
+import { el, svgIcon } from './dom.js';
+import { leave } from './motion.js';
 import { iconPaths } from './icons.js';
 import { state, openDetailFor, setTab, openCompose, openTakeQuiz } from './state.js';
 import { detailFields, submissionForAssessment } from './rows.js';
@@ -163,11 +164,12 @@ export function openContextMenu(x, y, items) {
 
   menu.style.visibility = 'hidden';
   root.appendChild(menu);
-  const rect = menu.getBoundingClientRect();
+  const rect = { width: menu.offsetWidth, height: menu.offsetHeight };
   const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
   const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
+  menu.style.transformOrigin = `${x - left}px ${y - top}px`;
   menu.style.visibility = 'visible';
 
   let selected = -1;
@@ -207,7 +209,7 @@ export function openContextMenu(x, y, items) {
     document.removeEventListener('contextmenu', onOutside, true);
     window.removeEventListener('scroll', onBlurAway, true);
     window.removeEventListener('resize', onBlurAway);
-    clear(root);
+    [...root.children].forEach((node) => leave(node));
     cleanup = null;
   };
 

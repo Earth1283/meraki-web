@@ -13,15 +13,16 @@
     max-width: 300px;
     z-index: 50;
     transform: translateX(-100%);
-    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: transform 220ms var(--ease-in);
   }
-  #tabbar.open { transform: translateX(0); box-shadow: var(--shadow-modal); }
+  #tabbar.open { transform: translateX(0); box-shadow: var(--shadow-modal); transition: transform var(--dur-panel) var(--ease-out); }
 
   .tabbar-backdrop {
     position: fixed;
     inset: 0;
     z-index: 49;
     background: var(--scrim);
+    animation: fade-in var(--dur-ui) var(--ease-out);
   }
 
   .toolbar-inner { padding: 10px 16px; min-height: 60px; gap: 8px; }
@@ -43,9 +44,8 @@
     border-top: 1px solid var(--border);
     border-radius: 18px 18px 0 0;
     padding: 18px 20px 28px;
-    animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: sheet-in-up var(--dur-panel) var(--ease-out);
   }
-  @keyframes slide-up { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
   /* Not enough width for a labeled thread list too — collapse it to an
      avatar-only rail, Discord's own mobile compromise. */
@@ -67,7 +67,7 @@
     border-radius: 18px 18px 0 0;
     box-shadow: var(--shadow-modal);
     padding: 18px 20px 32px;
-    animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: sheet-in-up var(--dur-panel) var(--ease-out);
   }
   .detail-backdrop {
     display: block;
@@ -75,6 +75,7 @@
     inset: 0;
     z-index: 39;
     background: var(--scrim);
+    animation: fade-in var(--dur-ui) var(--ease-out);
   }
 
   .privacy-row { flex-direction: column; gap: 2px; }

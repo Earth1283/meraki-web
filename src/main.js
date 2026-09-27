@@ -16,6 +16,7 @@ import { renderLoadMore, disconnectLoadMore } from './loadmore.js';
 import { renderLoadingTray } from './loadingtray.js';
 import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js';
 import { installGlobalKeyboard } from './keyboard.js';
+import { enterView } from './motion.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 import { i18nReady, t, onChange as onLocaleChange } from './i18n.js';
 
@@ -51,7 +52,9 @@ function render() {
   shell.classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
   renderTabbar();
   renderToolbar();
+  const viewBefore = prevBodyView;
   renderBody();
+  if (prevBodyView !== viewBefore) enterView(body);
   renderDetailPanel();
   renderOverlay();
   renderLoadingTray();

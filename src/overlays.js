@@ -1,5 +1,6 @@
 import { el, clear, svgIcon, focusFirstIn } from './dom.js';
 import { iconPaths } from './icons.js';
+import { leave, clearSettled, enterView } from './motion.js';
 import { state, closeOverlay, detailGoBack } from './state.js';
 import { detailFields, fieldDisplay } from './rows.js';
 import { buildPalette } from './palette.js';
@@ -42,7 +43,9 @@ export function renderOverlay() {
   const justOpened = isModal && lastModalOverlay !== current;
   if (justOpened) modalReturnFocus = document.activeElement;
 
-  clear(overlayRoot);
+  const closingModal = lastModalOverlay && lastModalOverlay !== current;
+  if (closingModal) [...overlayRoot.children].forEach((node) => leave(node));
+  else clearSettled(overlayRoot);
   switch (current) {
     case 'palette':
       overlayRoot.appendChild(buildPalette());
@@ -85,7 +88,7 @@ export function renderOverlay() {
   // overlay via setConfig -> notify()) doesn't yank focus back to the top
   // every time.
   if (justOpened && ['checkin', 'help', 'resources', 'settings', 'quiz'].includes(current)) {
-    queueMicrotask(() => focusFirstIn(overlayRoot));
+    queueMicrotask(() => focusFirstIn(overlayRoot.lastElementChild));
   }
 
   if (!isModal && lastModalOverlay) {
@@ -106,21 +109,34 @@ export function renderOverlay() {
 // different item (new target), so scroll position only resets on the latter
 // and focus only jumps in on the latter too.
 let lastDetailTargetKey = null;
+let cancelDetailLeave = null;
 
 export function renderDetailPanel() {
   const isOpen = state.activeOverlay === 'detail';
   shellEl.classList.toggle('detail-open', isOpen);
-  detailPanel.hidden = !isOpen;
 
   if (!isOpen) {
-    clear(detailPanel);
+    if (detailPanel.hidden || cancelDetailLeave) return;
     lastDetailTargetKey = null;
-    if (detailMobileBackdrop) {
-      detailMobileBackdrop.remove();
-      detailMobileBackdrop = null;
-    }
+    cancelDetailLeave = leave(detailPanel, {
+      waitOn: shellEl,
+      onDone: () => {
+        cancelDetailLeave = null;
+        detailPanel.classList.remove('is-leaving');
+        detailPanel.inert = false;
+        detailPanel.hidden = true;
+        clear(detailPanel);
+      },
+    });
+    leave(detailMobileBackdrop);
+    detailMobileBackdrop = null;
     return;
   }
+
+  cancelDetailLeave?.();
+  cancelDetailLeave = null;
+  const wasShowing = !detailPanel.hidden;
+  detailPanel.hidden = false;
 
   const target = state.detailTarget;
   const targetKey = JSON.stringify(target);
@@ -181,5 +197,6 @@ export function renderDetailPanel() {
   }
 
   detailPanel.scrollTop = savedScrollTop;
+  if (isNewTarget && wasShowing) enterView(detailPanel);
   if (isNewTarget) queueMicrotask(() => focusFirstIn(detailPanel));
 }

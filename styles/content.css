@@ -129,7 +129,7 @@ button.row-item.selected:hover { background: var(--hl-soft); }
    The base .icon points down, so "collapsed" rotates it back to pointing
    right — expanding is what turns it, matching how folder/tree disclosure
    triangles read everywhere else. */
-.row-section-chevron-icon { transition: transform 0.18s ease; transform: rotate(0deg); }
+.row-section-chevron-icon { transition: transform var(--dur-ui) var(--ease-out); transform: rotate(0deg); }
 .row-section-chevron-icon.collapsed { transform: rotate(-90deg); }
 
 /* Calendar list: day headers inside the folded "Earlier" section, and past
@@ -141,7 +141,7 @@ button.row-item.selected:hover { background: var(--hl-soft); }
 /* Freshly-expanded section content fades/slides in — see the comment on
    prevOverviewCollapse in main.js for why this needs the mount-then-flip
    two-step instead of a plain class-toggle transition. */
-.section-items.reveal-pending { opacity: 0; transform: translateY(-6px); transition: opacity 0.2s ease, transform 0.2s ease; }
+.section-items.reveal-pending { opacity: 0; transform: translateY(-6px); transition: opacity var(--dur-ui) var(--ease-out), transform var(--dur-panel) var(--ease-out); }
 .section-items.reveal-pending.reveal-in { opacity: 1; transform: translateY(0); }
 
 .row-item-inner { min-width: 0; }

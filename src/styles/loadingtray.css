@@ -18,10 +18,14 @@
   color: var(--text-primary);
   box-shadow: var(--shadow-pop);
   opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transform: translateY(10px) scale(0.97);
+  transition: opacity var(--dur-exit) var(--ease-in), transform var(--dur-exit) var(--ease-in);
 }
-.loading-tray.in { opacity: 1; transform: translateY(0); }
+.loading-tray.in {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-ui) var(--ease-out), transform var(--dur-panel) var(--ease-out);
+}
 
 .tray-row {
   display: flex;
@@ -64,6 +68,6 @@
 .tray-progress-fill {
   height: 100%;
   background: var(--text-primary);
-  transition: width 250ms ease;
+  transition: width 420ms var(--ease-out);
 }
 .loading-tray.done .tray-progress-fill { background: var(--good); }

@@ -1,6 +1,7 @@
 import { el } from './dom.js';
 import { state } from './state.js';
 import { seededRandom, sketchPlane, sketchSvg } from './sketch.js';
+import { leave, flip } from './motion.js';
 
 const toastRoot = document.getElementById('toast-root');
 
@@ -13,8 +14,7 @@ export function showToast(text, kind = 'ok', action = null, { flourish = null, d
   const dismiss = () => {
     if (dismissed) return;
     dismissed = true;
-    node.classList.remove('in');
-    setTimeout(() => node.remove(), 200);
+    leave(node, { onDone: () => flip(otherToasts(), () => node.remove()) });
   };
   // Notebook style's "passing a note": a paper plane draws itself in on the
   // toast, then flies off it.
@@ -26,7 +26,8 @@ export function showToast(text, kind = 'ok', action = null, { flourish = null, d
     el('span', { class: 'toast-text', text }),
     action ? el('button', { class: 'toast-action', type: 'button', onclick: () => { dismiss(); action.onClick(); } }, action.label) : null,
   ]);
-  toastRoot.appendChild(node);
+  const otherToasts = () => [...toastRoot.children].filter((toast) => toast !== node);
+  flip(otherToasts(), () => toastRoot.appendChild(node));
   requestAnimationFrame(() => node.classList.add('in'));
   setTimeout(dismiss, duration ?? (action ? 5000 : 3200));
 }

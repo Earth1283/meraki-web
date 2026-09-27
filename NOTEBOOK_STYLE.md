@@ -72,6 +72,9 @@ days. In the dark theme the pen turns to chalk.
 - [x] **Messages:** a paper plane draws in and flies off the "Message sent" toast
 - [x] **Check-in:** doodled mood faces; the chosen one circled in blue ink
 - [x] **Empty states:** a star-and-spiral margin doodle instead of the `·` icon
+- [x] **Motion:** announcement cards pin onto the corkboard one by one; pen
+      marks and highlighter swipes wait for their row to land (`--sketch-delay`);
+      the paper plane pulls back, climbs out of the toast in page ink, and arcs away
 - [x] **My Record:** detentions as pink punched slips (all locales, CSS only,
       no new strings)
 - [x] **My Record:** strikes as carbon-copy behavior slips in both styles;

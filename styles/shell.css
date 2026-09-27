@@ -1,20 +1,24 @@
 #shell {
   display: grid;
-  grid-template-columns: 244px 1fr;
+  grid-template-columns: 244px minmax(0, 1fr) 0px;
   height: 100%;
-  transition: grid-template-columns 180ms ease;
+  overflow: clip;
+  transition: grid-template-columns 280ms var(--ease-in-out);
 }
 #shell[hidden] { display: none; }
-#shell.sidebar-collapsed { grid-template-columns: 72px 1fr; }
-#shell.detail-open { grid-template-columns: 244px 1fr 440px; }
-#shell.sidebar-collapsed.detail-open { grid-template-columns: 72px 1fr 440px; }
+#shell.sidebar-collapsed { grid-template-columns: 72px minmax(0, 1fr) 0px; }
+#shell.detail-open {
+  grid-template-columns: 244px minmax(0, 1fr) 440px;
+  transition: grid-template-columns var(--dur-panel) var(--ease-out);
+}
+#shell.sidebar-collapsed.detail-open { grid-template-columns: 72px minmax(0, 1fr) 440px; }
 
 #detail-panel {
   border-left: 1px solid var(--border);
   background: var(--bg);
   overflow-y: auto;
+  width: 440px;
   padding: 22px 28px 40px;
-  animation: slide-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
