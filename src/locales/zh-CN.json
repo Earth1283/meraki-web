@@ -499,5 +499,7 @@
   "palette.category.messages": "消息",
   "palette.category.assessments": "测验",
   "calendar.showOnlyMine": "仅显示与我相关的",
-  "calendar.showAllEvents": "显示全部校历事件"
+  "calendar.showAllEvents": "显示全部校历事件",
+  "cache.updating": "正在显示{when}保存的数据，更新中…",
+  "cache.stale": "无法更新——显示的是{when}保存的数据。"
 }

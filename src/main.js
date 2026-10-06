@@ -14,6 +14,7 @@ import { showToast } from './toast.js';
 import { renderChat } from './chat.js';
 import { renderLoadMore, disconnectLoadMore } from './loadmore.js';
 import { renderLoadingTray } from './loadingtray.js';
+import { renderCachedNote } from './cachednote.js';
 import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js';
 import { installGlobalKeyboard } from './keyboard.js';
 import { enterView } from './motion.js';
@@ -383,6 +384,8 @@ function renderBody() {
     renderChat(body);
     return;
   }
+
+  if (state.cachedAt) body.appendChild(renderCachedNote({ savedAt: state.cachedAt, updating: state.loading }));
 
   if (state.error && !isErrorDismissed(state.error)) {
     const message = state.error;

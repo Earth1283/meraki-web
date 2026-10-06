@@ -499,5 +499,7 @@
   "palette.category.messages": "Messages",
   "palette.category.assessments": "Assessments",
   "calendar.showOnlyMine": "Show only what's aimed at me",
-  "calendar.showAllEvents": "Show all school events"
+  "calendar.showAllEvents": "Show all school events",
+  "cache.updating": "Showing saved data from {when}. Updating…",
+  "cache.stale": "Couldn't update — showing saved data from {when}."
 }

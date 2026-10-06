@@ -499,5 +499,7 @@
   "palette.category.messages": "Messages",
   "palette.category.assessments": "Évaluations",
   "calendar.showOnlyMine": "N'afficher que ce qui me concerne",
-  "calendar.showAllEvents": "Afficher tous les événements"
+  "calendar.showAllEvents": "Afficher tous les événements",
+  "cache.updating": "Données enregistrées {when}. Mise à jour…",
+  "cache.stale": "Mise à jour impossible — données enregistrées {when}."
 }

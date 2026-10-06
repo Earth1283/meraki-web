@@ -1,0 +1,13 @@
+.banner-cached {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  box-shadow: inset 3px 0 0 var(--border-strong);
+}
+#body > .banner-cached { width: min(100%, 1080px); }

@@ -25,3 +25,8 @@ test('lists every table this client writes to', () => {
     assert.match(DATA_AND_PRIVACY, new RegExp(table));
   }
 });
+
+test('discloses the on-device data copy and that logout deletes it', () => {
+  assert.match(DATA_AND_PRIVACY, /copy of what it last loaded/);
+  assert.match(DATA_AND_PRIVACY, /deleted when you log out/);
+});

@@ -85,6 +85,11 @@ sees your password, your session token, or anything you type. Quiz \
 questions and "Notify the teacher" go to Meraki's own app server \
 (meraki-education.app) with your session token, the same way the official \
 site calls it.
+
+To open instantly, this client keeps a copy of what it last loaded (your \
+classes, grades, messages and so on) in your browser's own storage, and \
+shows it while the fresh data loads. It never leaves your device, and it is \
+deleted when you log out. On a shared computer, log out when you're done.
 `;
 
 function classifyParagraph(firstLine) {
@@ -104,7 +109,7 @@ function classifyParagraph(firstLine) {
   ) {
     return { cls: 'priv-warn', prefix: '⚠ ' };
   }
-  if (firstLine.startsWith('One technical note:') || firstLine.startsWith("If you're using the self-hosted")) {
+  if (firstLine.startsWith('One technical note:') || firstLine.startsWith("If you're using the self-hosted") || firstLine.startsWith('To open instantly')) {
     return { cls: 'priv-note', prefix: 'ℹ ' };
   }
   if (firstLine.startsWith('Transparency goes both ways') || firstLine.startsWith('None of this is hidden')) {

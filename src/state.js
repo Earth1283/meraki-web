@@ -5,6 +5,7 @@ import { rowKinds, TAB_IDS } from './rows.js';
 import { PAGE_SIZE, hasMoreRows } from './paging.js';
 import { calendarAgendaKinds, ownClassesAndGrade } from './calendar.js';
 import { t } from './i18n.js';
+import { buildSnapshot, loadSnapshot, saveSnapshot, clearSnapshot, mergeSnapshotData } from './snapshot.js';
 
 const SIDEBAR_KEY = 'meraki-web.sidebarCollapsed';
 function loadSidebarCollapsed() {
@@ -148,6 +149,9 @@ export const state = {
   // `loading` on/off, but only the very first load shows a spinner; every
   // refresh after that leaves existing content on screen while it updates.
   hasLoadedOnce: false,
+  // Timestamp of the saved copy currently on screen; null once a refresh has
+  // fetched everything fresh.
+  cachedAt: null,
   status: 'Loading…',
   // Only populated during the first load (see STEP_GROUPS); empty otherwise.
   loadingSteps: [],
@@ -235,16 +239,31 @@ export function isLoggedIn() {
 export async function afterLogin() {
   state.ownUserId = api.getSession()?.user_id ?? '';
   restartAutoRefresh();
+  await showSnapshot();
   await refresh();
+}
+
+async function showSnapshot() {
+  if (state.hasLoadedOnce) return;
+  const snapshot = await loadSnapshot(state.ownUserId);
+  if (!snapshot) return;
+  state.data = mergeSnapshotData(emptyData(), snapshot.data);
+  state.ownStudentId = snapshot.ownStudentId ?? null;
+  state.ownStudentName = snapshot.ownStudentName ?? '';
+  state.cachedAt = snapshot.savedAt;
+  state.loading = false;
+  state.hasLoadedOnce = true;
+  notify();
 }
 
 export function doLogout() {
   api.logout();
+  clearSnapshot();
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   autoRefreshTimer = null;
   Object.assign(state, {
     tab: 'overview', data: emptyData(), ownUserId: '', ownStudentId: null, ownStudentName: '',
-    loading: true, backgroundLoading: false, hasLoadedOnce: false, status: 'Loading…', error: null, selectedIndex: -1,
+    loading: true, backgroundLoading: false, hasLoadedOnce: false, cachedAt: null, status: 'Loading…', error: null, selectedIndex: -1,
     activeOverlay: null, detailTarget: null, detailBackStack: [], whatIf: {}, pages: {},
   });
   notify();
@@ -423,6 +442,10 @@ export async function refresh() {
       ? errors[0]
       : t('state.partialLoadError', { n: errors.length });
   const expired = errors.some((e) => e.toLowerCase().includes('log in again'));
+  if (errors.length === 0) {
+    state.cachedAt = null;
+    saveSnapshot(buildSnapshot({ userId: state.ownUserId, data: state.data, ownStudentId: state.ownStudentId, ownStudentName: state.ownStudentName }));
+  }
   clampSelection();
   notify();
   if (expired) doLogout();
