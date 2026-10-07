@@ -1,0 +1,24 @@
+/* The category pill on an assignment row (assignmenttype.js). */
+.pill.type {
+  --type-h: 250;
+  background: oklch(0.94 0.045 var(--type-h));
+  color: oklch(0.38 0.1 var(--type-h));
+  box-shadow: none;
+}
+.pill.type-0 { --type-h: 250; }
+.pill.type-1 { --type-h: 310; }
+.pill.type-2 { --type-h: 25; }
+.pill.type-3 { --type-h: 170; }
+.pill.type-4 { --type-h: 80; }
+.pill.type-5 { --type-h: 215; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .pill.type {
+    background: oklch(0.33 0.06 var(--type-h));
+    color: oklch(0.88 0.09 var(--type-h));
+  }
+}
+:root[data-theme='dark'] .pill.type {
+  background: oklch(0.33 0.06 var(--type-h));
+  color: oklch(0.88 0.09 var(--type-h));
+}

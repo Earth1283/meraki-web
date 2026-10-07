@@ -501,5 +501,15 @@
   "calendar.showOnlyMine": "N'afficher que ce qui me concerne",
   "calendar.showAllEvents": "Afficher tous les événements",
   "cache.updating": "Données enregistrées {when}. Mise à jour…",
-  "cache.stale": "Mise à jour impossible — données enregistrées {when}."
+  "cache.stale": "Mise à jour impossible — données enregistrées {when}.",
+  "quiz.late": "En retard",
+  "quiz.lateAccepted": "En retard, accepté",
+  "label.lateStatus": "Ponctualité",
+  "rubric.title": "Grille d'évaluation",
+  "rubric.level": "Niveau",
+  "rubric.weight": "×{n}",
+  "rubric.notScored": "Non noté",
+  "rubric.total": "Total",
+  "rubric.comment": "Commentaire sur la grille",
+  "rubric.failed": "Impossible de charger la grille ({msg})"
 }

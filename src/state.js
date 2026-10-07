@@ -324,7 +324,7 @@ const TABLES = [
   ['assignmentSubmissions', 'assignment_submissions', 'select=id,assignment_id,submitted_at,status,body,teacher_note,file_upload_id,file_uploads(id,file_name,storage_path)&order=submitted_at.desc', 'assignment submissions'],
   ['standards', 'standards', 'select=id,code,description,subject,grade_level&order=code.asc', 'the standards list'],
   ['assignmentStandards', 'assignment_standards', 'select=id,standard_id,assignment_id,assignments(title,class_id)', 'assignment standards'],
-  ['assessmentSubmissions', 'assessment_submissions', 'select=id,assessment_id,auto_score,manual_score,total_points,submitted_at,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc', 'assessment submissions'],
+  ['assessmentSubmissions', 'assessment_submissions', 'select=id,assessment_id,auto_score,manual_score,total_points,submitted_at,is_late,late_accepted,assessments(title,class_id,time_limit_minutes)&order=submitted_at.desc', 'assessment submissions'],
 ];
 
 // refresh() awaits these in order (each group's fields still fetched in

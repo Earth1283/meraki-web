@@ -8,6 +8,7 @@ import { submissionForAssessment, submissionForAssignment } from './rows.js';
 import { teacherFeedback, renderTeacherFeedback } from './feedback.js';
 import { assignmentForTarget, renderYourWork } from './submission.js';
 import { renderQuizReview } from './quiz.js';
+import { renderRubricBreakdown } from './rubric.js';
 import { renderTakeQuizCta } from './quiztake.js';
 import { portfolioActions } from './portfolio.js';
 import { downloadFileUpload } from './files.js';
@@ -23,12 +24,16 @@ export function detailSections(target) {
       const feedback = teacherFeedback(target, data);
       if (feedback) nodes.push(renderTeacherFeedback(feedback));
       const assignment = assignmentForTarget(target, data);
+      if (assignment?.rubric_id) {
+        const scoring = lazyFetch(`rubric:${assignment.id}`, () => api.getRubricScoring(assignment.rubric_id, assignment.id));
+        nodes.push(renderRubricBreakdown(scoring));
+      }
       if (assignment) {
         const submission = submissionForAssignment(data, assignment.id);
         const annotations = submission ? lazyFetch(`annotations:${submission.id}`, () => api.getSubmissionAnnotations(submission.id)) : [];
         nodes.push(renderYourWork({ assignment, submission, annotations, onTurnIn: () => openTurnIn(assignment.id), onDownload: downloadFileUpload }));
       }
-      return nodes;
+      return nodes.filter(Boolean);
     }
     case 'assessment': {
       const assessment = data.assessments[target.index];

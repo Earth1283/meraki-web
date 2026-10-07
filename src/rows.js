@@ -7,7 +7,8 @@ import { markCode } from './marks.js';
 // quiz.js imports pill() from this module, so the two form an import cycle.
 // Nothing here reads these at module scope (see quizPillClass), which is
 // what keeps that cycle safe regardless of which module loads first.
-import { quizAvailability, formatQuizWindow, QUIZ_AVAILABILITY } from './quiz.js';
+import { quizAvailability, formatQuizWindow, quizLateness, QUIZ_AVAILABILITY } from './quiz.js';
+import { categoryTone } from './assignmenttype.js';
 
 // Mood/tab labels are looked up live (functions, not module-eval constants)
 // so every call site re-reads them under the current locale on each render.
@@ -372,6 +373,8 @@ export function initials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+const LATENESS_LABELS = { late: 'quiz.late', 'late-accepted': 'quiz.lateAccepted' };
+
 function quizPillClass(availabilityState) {
   switch (availabilityState) {
     case QUIZ_AVAILABILITY.NOT_YET_OPEN: return 'accent';
@@ -434,10 +437,12 @@ export function renderItemBody(target, data, ownUserId) {
     case 'assignment': {
       const a = data.assignments[target.index];
       const cls = a.classes?.name ?? data.classes.find((c) => c.id === a.class_id)?.name ?? '';
+      const tone = categoryTone(a.category);
       return itemRow({
+        leading: tone != null ? pill(a.category.trim(), `type type-${tone}`) : null,
         title: a.title,
         pillNode: pill(a.due_date ? t('field.due', { date: formatDate(a.due_date) }) : null, 'accent'),
-        meta: [cls, a.category, a.points_possible != null ? t('field.pts', { n: a.points_possible }) : null].filter(Boolean).join(' · '),
+        meta: [cls, a.points_possible != null ? t('field.pts', { n: a.points_possible }) : null].filter(Boolean).join(' · '),
       });
     }
     case 'attendance': {
@@ -538,11 +543,14 @@ export function renderItemBody(target, data, ownUserId) {
       const a = data.assessments[target.index];
       const availability = quizAvailability(a, submissionForAssessment(data, a));
       const windowText = formatQuizWindow(availability);
+      const lateness = quizLateness(submissionForAssessment(data, a));
       return itemRow({
         title: a.title,
         // One pill, not two: when the open/close window has something to say
         // it matters more than the due date, which the meta line still carries.
-        pillNode: windowText
+        pillNode: lateness
+          ? pill(t(LATENESS_LABELS[lateness]), lateness === 'late' ? 'warn' : 'dim')
+          : windowText
           ? pill(windowText, quizPillClass(availability.state))
           : pill(a.due_at ? t('field.due', { date: formatDateTime(a.due_at) }) : null, 'accent'),
         meta: [humanizeStatus(a.kind), a.time_limit_minutes != null ? t('field.min', { n: a.time_limit_minutes }) : null].filter(Boolean).join(' · '),
@@ -824,6 +832,7 @@ export function detailFields(target, data) {
           [t('label.timeLimit'), a.time_limit_minutes != null ? t('field.min', { n: a.time_limit_minutes }) : null],
           [t('label.yourScore'), score],
           [t('label.submitted'), sub?.submitted_at ? formatDateTime(sub.submitted_at) : null],
+          [t('label.lateStatus'), quizLateness(sub) ? t(LATENESS_LABELS[quizLateness(sub)]) : null],
         ],
         body: a.instructions ?? null,
       };

@@ -501,5 +501,15 @@
   "calendar.showOnlyMine": "仅显示与我相关的",
   "calendar.showAllEvents": "显示全部校历事件",
   "cache.updating": "正在显示{when}保存的数据，更新中…",
-  "cache.stale": "无法更新——显示的是{when}保存的数据。"
+  "cache.stale": "无法更新——显示的是{when}保存的数据。",
+  "quiz.late": "迟交",
+  "quiz.lateAccepted": "迟交，已接受",
+  "label.lateStatus": "按时情况",
+  "rubric.title": "评分标准",
+  "rubric.level": "等级",
+  "rubric.weight": "×{n}",
+  "rubric.notScored": "未评分",
+  "rubric.total": "总分",
+  "rubric.comment": "评分标准评语",
+  "rubric.failed": "无法加载评分标准（{msg}）"
 }

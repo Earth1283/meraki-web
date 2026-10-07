@@ -63,6 +63,13 @@ export function quizAvailability(assessment, submission, nowMs = Date.now()) {
   return { state, opensAt, closesAt, msUntilOpen: null, msUntilClose };
 }
 
+/** How a submitted quiz stands against its deadline: 'late', 'late-accepted'
+ * (the teacher took it anyway), or null when it was on time or isn't in. */
+export function quizLateness(submission) {
+  if (!submission?.is_late) return null;
+  return submission.late_accepted ? 'late-accepted' : 'late';
+}
+
 /** Whether a "Take Quiz" button belongs on an assessment's detail at all:
  * this is the one place that decides a quiz is actually takeable — open
  * (or closing soon, which is still open) and not already submitted. */

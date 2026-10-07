@@ -501,5 +501,15 @@
   "calendar.showOnlyMine": "Show only what's aimed at me",
   "calendar.showAllEvents": "Show all school events",
   "cache.updating": "Showing saved data from {when}. Updating…",
-  "cache.stale": "Couldn't update — showing saved data from {when}."
+  "cache.stale": "Couldn't update — showing saved data from {when}.",
+  "quiz.late": "Late",
+  "quiz.lateAccepted": "Late, accepted",
+  "label.lateStatus": "Timeliness",
+  "rubric.title": "Rubric",
+  "rubric.level": "Level",
+  "rubric.weight": "×{n}",
+  "rubric.notScored": "Not scored",
+  "rubric.total": "Total",
+  "rubric.comment": "Rubric comment",
+  "rubric.failed": "Couldn't load the rubric ({msg})"
 }

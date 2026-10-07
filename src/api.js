@@ -344,6 +344,16 @@ export async function getSubmissionAnnotations(submissionId) {
   return getTable('submission_annotations', `select=id,mark_code,mark_symbol,mark_label,excerpt,start_offset,end_offset,comment,created_at&submission_id=eq.${submissionId}&order=start_offset.asc.nullslast`);
 }
 
+// The rubric an assignment is graded against and how it scored you, which
+// Meraki's own app reads the same way.
+export async function getRubricScoring(rubricId, assignmentId) {
+  const [rubrics, scores] = await Promise.all([
+    getTable('rubrics', `select=id,title,description,criteria,total_points&id=eq.${encodeURIComponent(rubricId)}`),
+    getTable('rubric_scores', `select=selections,comment,points_earned&assignment_id=eq.${encodeURIComponent(assignmentId)}&limit=1`),
+  ]);
+  return { rubric: rubrics[0] ?? null, score: scores[0] ?? null };
+}
+
 /** Asks Meraki's app to notify a message's recipient, as the official site
  * does right after every send. Resolves to whether it says one went out. */
 export async function notifyMessageRecipient(messageId) {

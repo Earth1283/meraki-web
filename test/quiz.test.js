@@ -190,3 +190,12 @@ test('formatQuizWindow counts down to closing when open or closing-soon, or says
   const when = `${d.toLocaleDateString(getDateLocale(), { weekday: 'short' })} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
   assert.equal(formatQuizWindow(far), t('quiz.window.closesAt', { when }));
 });
+
+test('quizLateness reports late work, and whether the teacher accepted it', async () => {
+  const { quizLateness } = await import('../src/quiz.js');
+  assert.equal(quizLateness({ is_late: true, late_accepted: false }), 'late');
+  assert.equal(quizLateness({ is_late: true, late_accepted: true }), 'late-accepted');
+  assert.equal(quizLateness({ is_late: false, late_accepted: true }), null);
+  assert.equal(quizLateness(null), null);
+  assert.equal(quizLateness({}), null);
+});

@@ -1,0 +1,11 @@
+/* A graded assignment's rubric breakdown (rubric.js). */
+.rubric-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.rubric-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.rubric-row:last-child { border-bottom: none; }
+.rubric-row-head { display: flex; align-items: baseline; gap: 8px; }
+.rubric-criterion { flex: 1; min-width: 0; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
+.rubric-weight { font-size: 0.75rem; color: var(--text-muted); }
+.rubric-points { flex: none; font-size: 0.875rem; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.rubric-level { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.rubric-descriptor { flex: 1; min-width: 12ch; font-size: 0.8125rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.rubric-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid var(--border-strong); font-weight: 700; color: var(--text-primary); }
