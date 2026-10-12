@@ -602,6 +602,14 @@ function gradeTile({ grade, notebook, draw, onClick, onPickScale }) {
     mark: notebook ? gradeCircle('overall', draw) : null,
     onClick,
   });
+  const value = tile.querySelector('.stat-value');
+  const letterText = value.firstChild;
+  const showScore = () => { letterText.nodeValue = `${grade.pct.toFixed(1)}%`; };
+  const showLetter = () => { letterText.nodeValue = grade.letter; };
+  value.addEventListener('mouseenter', showScore);
+  value.addEventListener('mouseleave', showLetter);
+  tile.addEventListener('focus', showScore);
+  tile.addEventListener('blur', showLetter);
   const scaleName = t(`grade.scale.${grade.scale}`);
   const chip = el(
     'button',
