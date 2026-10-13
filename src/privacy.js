@@ -90,6 +90,15 @@ To open instantly, this client keeps a copy of what it last loaded (your \
 classes, grades, messages and so on) in your browser's own storage, and \
 shows it while the fresh data loads. It never leaves your device, and it is \
 deleted when you log out. On a shared computer, log out when you're done.
+
+Draft recovery keeps your unfinished assignment text, attachments, quiz \
+answers and quiz timers on this device, separately for each account. Drafts \
+remain after logout so the same account can recover them next time. Cloud \
+sync is off by default. Choose manual sync, a pause after editing, or a \
+regular interval in Settings or the assignment editor. Synced assignment \
+drafts go to Meraki and may be visible to teachers, but are not turned in. \
+Quiz drafts stay on this device. Turning in work or choosing "Use saved \
+submission" clears the local assignment draft.
 `;
 
 function classifyParagraph(firstLine) {

@@ -213,6 +213,19 @@ export async function updateRow(table, id, body) {
   if (!Array.isArray(rows) || rows.length === 0) throw new Error(`PATCH ${table} changed nothing`);
 }
 
+/** A draft sync must never change work turned in from another tab. */
+export async function updateDraftSubmission(id, studentId, body) {
+  const query = `id=eq.${encodeURIComponent(id)}&student_id=eq.${encodeURIComponent(studentId)}&status=eq.draft&select=id`;
+  const resp = await authedFetch(`/rest/v1/assignment_submissions?${query}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error(`Draft sync failed (${resp.status})`);
+  const rows = await resp.json();
+  if (!rows?.length) throw new Error('This assignment is no longer a draft. Your local copy is still saved.');
+}
+
 // Classroom files live in a private storage bucket; a signed URL (short-lived
 // download token) is the only way to fetch one, and it has to be requested
 // fresh each time — Supabase won't hand out a durable public link for it.

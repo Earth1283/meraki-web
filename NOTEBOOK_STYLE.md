@@ -55,6 +55,9 @@ days. In the dark theme the pen turns to chalk.
 
 ### Done
 
+- [x] **Draft recovery:** a blue-ink margin rule, handwritten note heading,
+      and dashed foldout for cloud timing controls in assignment panels.
+
 - [x] Shared kit (above) and the Style setting
 - [x] **Calendar grid view:** hand-ruled grid, handwritten month label with a
       pen underline, today written and circled in blue ink over a

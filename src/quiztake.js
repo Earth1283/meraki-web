@@ -6,13 +6,15 @@
 // they're testable without a browser; this file is the panel and its writes.
 import { el } from './dom.js';
 import * as api from './api.js';
-import { state, closeOverlay, openDetailFor, openTakeQuiz, refresh, notify } from './state.js';
+import { state, closeOverlay, openDetailFor, openTakeQuiz, refresh, notify, subscribe } from './state.js';
 import { lazyFetch } from './lazy.js';
 import { showToast } from './toast.js';
 import { sidePanel } from './panels.js';
 import { submissionForAssessment } from './rows.js';
 import { sortQuestions, answerPayload, answeredCount, effectiveDeadline, formatCountdown, canTakeQuiz, quizAvailability, formatQuizWindow, QUIZ_AVAILABILITY } from './quiz.js';
 import { t } from './i18n.js';
+import { readDraft, writeDraft, removeDraft } from './drafts.js';
+import { buildDraftNote } from './draft-controls.js';
 
 // What's been picked so far, per assessment. Kept until submitted (or
 // abandoned by navigating away for good) so closing the panel by accident —
@@ -20,14 +22,32 @@ import { t } from './i18n.js';
 // way turnin.js keeps a draft alive across re-renders.
 const attempts = new Map();
 
+subscribe(() => {
+  for (const [key, attempt] of attempts) if (attempt.userId !== state.ownUserId) attempts.delete(key);
+});
+
+function persistAttempt(assessmentId, attempt) {
+  attempt.localFailed = !writeDraft(attempt.userId, 'quiz', assessmentId, {
+    answers: attempt.answers, index: attempt.index, startedAt: attempt.startedAt,
+  });
+  attempt.updateStatus?.();
+}
+
 function attemptFor(assessment) {
-  if (!attempts.has(assessment.id)) {
-    attempts.set(assessment.id, { answers: {}, index: 0, startedAt: Date.now(), submitting: false, error: null });
+  const key = `${state.ownUserId}:${assessment.id}`;
+  if (!attempts.has(key)) {
+    const saved = readDraft(state.ownUserId, 'quiz', assessment.id);
+    const answers = {};
+    for (const [id, choice] of Object.entries(saved?.answers ?? {})) if (Number.isInteger(choice) && choice >= 0) answers[id] = choice;
+    const attempt = { userId: state.ownUserId, answers, index: Math.max(0, Number.isInteger(saved?.index) ? saved.index : 0), startedAt: Number.isFinite(saved?.startedAt) && saved.startedAt > 0 ? Math.min(saved.startedAt, Date.now()) : Date.now(), submitting: false, error: null, recovered: !!saved };
+    attempts.set(key, attempt);
+    persistAttempt(assessment.id, attempt);
   }
-  return attempts.get(assessment.id);
+  return attempts.get(key);
 }
 
 async function submit(assessment, attempt, { auto = false } = {}) {
+  if (attempt.submitting || api.getSession()?.user_id !== attempt.userId) return;
   const payload = answerPayload(attempt.answers);
   if (!auto && payload.length === 0) {
     attempt.error = t('quiz.answerAtLeastOne');
@@ -39,7 +59,9 @@ async function submit(assessment, attempt, { auto = false } = {}) {
   notify();
   try {
     const result = await api.submitAssessmentAnswers(assessment.id, payload);
-    attempts.delete(assessment.id);
+    if (api.getSession()?.user_id !== attempt.userId) return;
+    attempts.delete(`${attempt.userId}:${assessment.id}`);
+    removeDraft(attempt.userId, 'quiz', assessment.id);
     const back = state.quizReturn;
     state.quizReturn = null;
     await refresh();
@@ -98,23 +120,25 @@ export function renderTakeQuizCta(assessment) {
     windowHint ? el('p', { class: `row-placeholder ${availability.state === QUIZ_AVAILABILITY.CLOSING_SOON ? 'quiz-window-warn' : ''}`, text: windowHint }) : null,
     takeable
       ? el('div', { class: 'panel-actions panel-actions-start' }, [
-          el('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openTakeQuiz(assessment.id), text: t('quiz.start') }),
+          el('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openTakeQuiz(assessment.id), text: t(readDraft(state.ownUserId, 'quiz', assessment.id) ? 'drafts.resumeQuiz' : 'quiz.start') }),
         ])
       : null,
   ]);
 }
 
-function optionButton(question, attempt, i, option) {
+function optionButton(question, attempt, i, option, assessmentId) {
   const chosen = attempt.answers[question.id] === i;
   return el(
     'button',
     {
       type: 'button',
       role: 'radio',
-      'aria-checked': chosen,
+      'aria-checked': String(chosen),
+      disabled: attempt.submitting,
       class: `quiz-option quiz-option-btn ${chosen ? 'chosen' : ''}`,
       onclick: () => {
         attempt.answers[question.id] = i;
+        persistAttempt(assessmentId, attempt);
         notify();
       },
     },
@@ -122,7 +146,7 @@ function optionButton(question, attempt, i, option) {
   );
 }
 
-function pagerDot(question, attempt, i) {
+function pagerDot(question, attempt, i, assessmentId) {
   return el(
     'button',
     {
@@ -131,6 +155,7 @@ function pagerDot(question, attempt, i) {
       'aria-label': t('detail.question', { n: i + 1 }),
       onclick: () => {
         attempt.index = i;
+        persistAttempt(assessmentId, attempt);
         notify();
       },
     },
@@ -145,6 +170,8 @@ export function buildTakeQuizForm() {
 
   const submission = submissionForAssessment(state.data, assessment);
   if (submission) {
+    removeDraft(state.ownUserId, 'quiz', assessment.id);
+    attempts.delete(`${state.ownUserId}:${assessment.id}`);
     // Reopened after a background refresh landed the submission (e.g. the
     // timer expired and auto-submitted while this panel was closed) — the
     // detail panel's review section covers it from here.
@@ -179,6 +206,7 @@ export function buildTakeQuizForm() {
     disabled: attempt.index === 0,
     onclick: () => {
       attempt.index -= 1;
+      persistAttempt(assessment.id, attempt);
       notify();
     },
     text: t('quiz.prev'),
@@ -190,6 +218,7 @@ export function buildTakeQuizForm() {
         type: 'button',
         onclick: () => {
           attempt.index += 1;
+          persistAttempt(assessment.id, attempt);
           notify();
         },
         text: t('quiz.next'),
@@ -210,7 +239,7 @@ export function buildTakeQuizForm() {
       el(
         'div',
         { class: 'quiz-take-pager' },
-        ordered.map((q, i) => pagerDot(q, attempt, i)),
+        ordered.map((q, i) => pagerDot(q, attempt, i, assessment.id)),
       ),
       el('div', { class: 'quiz-take-question' }, [
         el('div', { class: 'quiz-q-head' }, [
@@ -222,11 +251,12 @@ export function buildTakeQuizForm() {
           ? el(
               'div',
               { class: 'quiz-take-options', role: 'radiogroup', 'aria-label': question.prompt },
-              question.options.map((option, i) => optionButton(question, attempt, i, option)),
+              question.options.map((option, i) => optionButton(question, attempt, i, option, assessment.id)),
             )
           : el('p', { class: 'row-placeholder', text: t('quiz.unsupportedQuestion') }),
       ]),
       el('p', { class: 'take-quiz-progress', text: t('quiz.answeredCount', { n: answeredCount(attempt.answers), total: ordered.length }) }),
+      buildDraftNote(attempt, { userId: attempt.userId, quiz: true }),
       attempt.error ? el('p', { class: 'form-error', role: 'alert', text: attempt.error }) : null,
       el('div', { class: 'panel-actions' }, [prevBtn, nextOrSubmitBtn]),
     ],

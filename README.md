@@ -26,6 +26,19 @@ requests go straight to Supabase.
 No build step, no Node runtime needed to deploy: `src/*.js` are plain ES
 modules loaded directly by the browser.
 
+## Draft recovery
+
+Draft text, quiz answers and quiz timers recover automatically in the same
+browser, scoped to the signed-in account. Assignment attachments are kept in
+IndexedDB. Settings → Draft recovery & cloud sync chooses local-only
+(the default), manual sync, sync after a 5/15/30-second pause, or sync every
+30 seconds / 1 minute / 5 minutes. Cloud sync saves unsubmitted assignment
+drafts to Meraki; those drafts may be visible to teachers. Quiz recovery is
+local-only because the recorded quiz API exposes final submission, not a
+cloud draft operation. Logging out stops sync but retains drafts for the
+same account's next sign-in. Turn-in or “Use saved submission” removes the
+local assignment draft.
+
 ## Develop
 
 ```

@@ -1,9 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { friendlyLoadError, login, insertRow, deleteRow, updateRow, uploadFile, getSubmissionAnnotations, getAssessmentQuestions, submitAssessmentAnswers, notifyMessageRecipient, getTablePage, parseContentRangeTotal, APP_URL } from '../src/api.js';
+import { friendlyLoadError, login, insertRow, deleteRow, updateRow, updateDraftSubmission, uploadFile, getSubmissionAnnotations, getAssessmentQuestions, submitAssessmentAnswers, notifyMessageRecipient, getTablePage, parseContentRangeTotal, APP_URL } from '../src/api.js';
 import { decodeSeroval } from '../src/serverfn.js';
 
 const TOKENS = { access_token: 'a', refresh_token: 'r', user: { id: 'u1' } };
+
+test('draft sync uses a conditional PATCH and rejects a concurrent turn-in', async (t) => {
+  const calls = mockFetch(t, () => ({ json: async () => [] }));
+  await login('jstudent', 'password');
+  await assert.rejects(updateDraftSubmission('sub1', 's1', { body: 'draft' }), /no longer a draft/);
+  const call = calls.at(-1);
+  assert.match(call.url, /student_id=eq.s1&status=eq.draft/);
+  assert.equal(call.init.method, 'PATCH');
+  assert.equal('status' in call.body, false);
+});
 
 // Stands in for fetch for one test: logins get TOKENS, everything else gets
 // an empty 200 overridden by whatever `respond(url, init)` returns. Resolves

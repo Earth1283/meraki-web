@@ -2,12 +2,15 @@
 // site does. The rules are in submission.js; this is the panel and the writes.
 import { el } from './dom.js';
 import * as api from './api.js';
-import { state, closeOverlay, openDetailFor, refresh, notify } from './state.js';
+import { state, closeOverlay, openDetailFor, refresh, notify, subscribe } from './state.js';
 import { showToast } from './toast.js';
 import { sidePanel } from './panels.js';
-import { turnInProblem, turnInWrite, submissionStoragePath } from './submission.js';
+import { turnInProblem, turnInWrite, submissionStoragePath, canTurnIn, MAX_UPLOAD_BYTES } from './submission.js';
 import { formatBytes, formatDate, submissionForAssignment } from './rows.js';
 import { t } from './i18n.js';
+import { readDraft, writeDraft, removeDraft, saveDraftFile, loadDraftFile, createDraftSync, draftSyncPreferences, onDraftSyncPreferences } from './drafts.js';
+import { saveCloudDraft } from './draftcloud.js';
+import { buildDraftNote } from './draft-controls.js';
 
 /** Uploads a new file first (to storage, then its file_uploads row), then
  * updates this student's submission for the assignment or creates it. The
@@ -16,8 +19,13 @@ import { t } from './i18n.js';
  * the same assignment would be worse than one extra request. */
 export async function turnIn(assignment, { body, file, final }) {
   const studentId = state.ownStudentId;
+  const userId = state.ownUserId;
+  const checkAccount = () => { if (api.getSession()?.user_id !== userId) throw new Error(t('drafts.accountChanged')); };
+  checkAccount();
   if (!studentId) throw new Error(t('turnin.noStudentRecord'));
   const [existing] = await api.getTable('assignment_submissions', `select=id,status,file_upload_id&assignment_id=eq.${assignment.id}&student_id=eq.${studentId}`);
+  checkAccount();
+  if (!canTurnIn(assignment, existing)) throw new Error(t('drafts.locked'));
   const problem = turnInProblem({ studentId, final, body, file, existing });
   if (problem) throw new Error(t(problem));
 
@@ -25,6 +33,7 @@ export async function turnIn(assignment, { body, file, final }) {
   if (file) {
     const path = submissionStoragePath(assignment.id, studentId, file.name);
     await api.uploadFile(path, file);
+    checkAccount();
     fileUploadId = await api.insertRow(
       'file_uploads',
       {
@@ -36,28 +45,90 @@ export async function turnIn(assignment, { body, file, final }) {
         file_name: file.name.slice(0, 200),
         mime_type: file.type || null,
         size_bytes: file.size,
-        uploaded_by: state.ownUserId,
+        uploaded_by: userId,
       },
       { returnId: true },
     );
+    checkAccount();
   }
 
   const write = turnInWrite({ assignmentId: assignment.id, studentId, existing, body, fileUploadId, final });
   if (write.op === 'update') await api.updateRow('assignment_submissions', write.id, write.data);
   else await api.insertRow('assignment_submissions', write.data);
+  checkAccount();
   await refresh();
 }
 
 // What's typed into the panel, per assignment. Every notify() rebuilds the
 // open overlay, and a half-written response mustn't vanish when that happens
-// (or when the panel is closed by accident). Dropped once the work is saved.
+// (or when the panel is closed by accident). Dropped once the work is turned in.
 const drafts = new Map();
 
-function draftFor(assignment, submission) {
-  if (!drafts.has(assignment.id)) {
-    drafts.set(assignment.id, { body: submission?.body ?? '', file: null, saving: false, error: null, focused: false, caret: null });
+function persist(draft, assignmentId) {
+  draft.localFailed = !writeDraft(draft.userId, 'assignment', assignmentId, {
+    body: draft.body, fileName: draft.file?.name ?? (draft.loadingFile ? draft.recoveryFileName : draft.missingFile) ?? null,
+    cloudDirty: draft.sync.status.dirty, syncedAt: draft.sync.status.syncedAt,
+  });
+  draft.updateStatus?.();
+}
+
+// Switching accounts clears memory and timers; saved drafts stay scoped to
+// their owner and are recovered only when that same account signs in again.
+subscribe(() => {
+  for (const [key, draft] of drafts) {
+    if (draft.userId !== state.ownUserId) { draft.sync.stop(); drafts.delete(key); }
   }
-  return drafts.get(assignment.id);
+});
+onDraftSyncPreferences((userId, prefs) => {
+  for (const draft of drafts.values()) if (draft.userId === userId) draft.sync.configure(prefs);
+});
+
+function draftFor(assignment, submission) {
+  const key = `${state.ownUserId}:${assignment.id}`;
+  if (!drafts.has(key)) {
+    const saved = readDraft(state.ownUserId, 'assignment', assignment.id);
+    const draft = {
+      userId: state.ownUserId, body: typeof saved?.body === 'string' ? saved.body : submission?.body ?? '',
+      file: null, saving: false, error: null, focused: false, caret: null,
+      recovered: !!saved, loadingFile: !!saved?.fileName, missingFile: null,
+      recoveryFileName: saved?.fileName,
+      fileRevision: 0, pendingFile: Promise.resolve(),
+    };
+    draft.sync = createDraftSync({
+      preferences: draftSyncPreferences(draft.userId),
+      snapshot: () => ({ body: draft.body, file: draft.file }),
+      active: () => api.getSession()?.user_id === draft.userId && !draft.saving && !draft.loadingFile && !draft.missingFile && canTurnIn(assignment, submissionForAssignment(state.data, assignment.id)) && !['submitted', 'collected'].includes(submissionForAssignment(state.data, assignment.id)?.status),
+      write: async (value) => {
+        const row = await saveCloudDraft({ assignment, studentId: state.ownStudentId, userId: draft.userId, ...value });
+        const previous = submissionForAssignment(state.data, assignment.id);
+        const next = { ...previous, ...row, assignment_id: assignment.id };
+        if (value.file) next.file_uploads = { id: row.file_upload_id, file_name: value.file.name };
+        if (previous) Object.assign(previous, next);
+        else state.data.assignmentSubmissions.push(next);
+        if (value.file && draft.file === value.file) {
+          draft.file = null;
+          draft.pendingFile = draft.pendingFile.catch(() => {}).then(() => saveDraftFile(draft.userId, assignment.id, null)).catch(() => {});
+        }
+      },
+      changed: () => { if (draft.sync) persist(draft, assignment.id); },
+    });
+    draft.sync.status.syncedAt = saved?.syncedAt ?? null;
+    drafts.set(key, draft);
+    persist(draft, assignment.id);
+    if (saved?.cloudDirty) draft.sync.edit();
+    if (saved?.fileName) {
+      loadDraftFile(draft.userId, assignment.id).then(file => {
+        if (draft.fileRevision !== 0) return;
+        draft.file = file;
+        draft.missingFile = file ? null : saved.fileName;
+      }, () => { if (draft.fileRevision === 0) draft.missingFile = saved.fileName; }).finally(() => {
+        draft.loadingFile = false;
+        draft.sync.configure(draftSyncPreferences(draft.userId));
+        if (state.ownUserId === draft.userId && state.activeOverlay === 'turnin' && state.turnInAssignmentId === assignment.id) notify();
+      });
+    }
+  }
+  return drafts.get(key);
 }
 
 function afterSaving() {
@@ -82,6 +153,7 @@ export function buildTurnInForm() {
   body.addEventListener('input', () => {
     draft.body = body.value;
     keepCaret();
+    draft.sync.edit();
   });
   body.addEventListener('keyup', keepCaret);
   body.addEventListener('pointerup', keepCaret);
@@ -99,42 +171,85 @@ export function buildTurnInForm() {
   const fileInput = el('input', { class: 'turnin-file-input', type: 'file' });
   const fileNote = el('p', { class: 'turnin-file' });
   const showFile = () => {
-    const current = submission?.file_uploads?.file_name;
+    const current = submissionForAssignment(state.data, assignment.id)?.file_uploads?.file_name;
     if (draft.file) fileNote.textContent = t('turnin.newFile', { name: draft.file.name, size: formatBytes(draft.file.size) });
     else if (current) fileNote.textContent = t('turnin.currentFile', { name: current });
     else fileNote.textContent = t('turnin.fileHint');
   };
   fileInput.addEventListener('change', () => {
-    draft.file = fileInput.files?.[0] ?? null;
+    const selected = fileInput.files?.[0] ?? null;
+    if (!selected) return;
+    if (selected.size > MAX_UPLOAD_BYTES) { showToast(t('turnin.tooBig'), 'bad'); fileInput.value = ''; return; }
+    draft.file = selected;
+    draft.fileRevision += 1;
+    draft.loadingFile = false;
+    draft.missingFile = null;
+    const revision = draft.fileRevision;
+    draft.pendingFile = draft.pendingFile.catch(() => {}).then(() => saveDraftFile(draft.userId, assignment.id, selected)).catch(() => {
+      if (draft.fileRevision === revision) { draft.fileLocalFailed = true; draft.updateStatus?.(); }
+    });
+    draft.fileLocalFailed = false;
+    draft.sync.edit();
     showFile();
+    notify();
   });
   showFile();
 
   const save = (final) => {
+    if (draft.saving || draft.loadingFile || draft.missingFile) return;
     const problem = turnInProblem({ studentId: state.ownStudentId, final, body: draft.body, file: draft.file, existing: submission });
     draft.error = problem ? t(problem) : null;
-    if (!problem) draft.saving = true;
+    if (!problem) { draft.saving = true; draft.sync.stop(); }
     notify();
     if (problem) return;
-    turnIn(assignment, { body: draft.body, file: draft.file, final }).then(
-      () => {
-        drafts.delete(assignment.id);
+    const value = { body: draft.body, file: draft.file, final };
+    draft.sync.settled().then(() => turnIn(assignment, { ...value, file: draft.file })).then(
+      async () => {
+        drafts.delete(`${draft.userId}:${assignment.id}`);
+        removeDraft(draft.userId, 'assignment', assignment.id);
+        await draft.pendingFile;
+        await saveDraftFile(draft.userId, assignment.id, null).catch(() => {});
+        if (state.ownUserId !== draft.userId) return;
         afterSaving();
         showToast(t(final ? 'turnin.turnedIn' : 'turnin.draftSaved'));
       },
       (err) => {
         draft.saving = false;
+        draft.sync.resume();
         draft.error = t('turnin.failed', { msg: err.message });
         notify();
       },
     );
   };
 
-  const draftBtn = el('button', { class: 'btn btn-ghost', type: 'button', disabled: draft.saving, onclick: () => save(false), text: t('turnin.saveDraft') });
+  body.disabled = draft.saving;
+  fileInput.disabled = draft.saving;
+  const cloud = canTurnIn(assignment, submission) && !turnedIn;
+  const draftNote = buildDraftNote(draft, {
+    userId: draft.userId, cloud,
+    onSync: () => draft.sync.sync().then(() => showFile()),
+    onDiscard: async () => {
+      draft.sync.stop();
+      await draft.sync.settled();
+      draft.fileRevision += 1;
+      draft.body = submissionForAssignment(state.data, assignment.id)?.body ?? '';
+      draft.file = null;
+      draft.loadingFile = false;
+      draft.fileLocalFailed = false;
+      draft.missingFile = null;
+      draft.recovered = false;
+      draft.sync.status.dirty = false;
+      removeDraft(draft.userId, 'assignment', assignment.id);
+      await draft.pendingFile;
+      await saveDraftFile(draft.userId, assignment.id, null).catch(() => {});
+      draft.sync.resume();
+      if (state.ownUserId === draft.userId) notify();
+    },
+  });
   const finalBtn = el('button', {
     class: 'btn btn-primary',
     type: 'submit',
-    disabled: draft.saving,
+    disabled: draft.saving || draft.loadingFile || !!draft.missingFile || !canTurnIn(assignment, submission),
     text: draft.saving ? t('turnin.saving') : turnedIn ? t('turnin.update') : t('turnin.submit'),
   });
 
@@ -158,8 +273,9 @@ export function buildTurnInForm() {
       el('label', { class: 'field-label', text: t('turnin.fileLabel') }),
       fileInput,
       fileNote,
+      draftNote,
       draft.error ? el('p', { class: 'form-error', role: 'alert', text: draft.error }) : null,
-      el('div', { class: 'panel-actions' }, [draftBtn, finalBtn]),
+      el('div', { class: 'panel-actions' }, [finalBtn]),
     ],
   );
 

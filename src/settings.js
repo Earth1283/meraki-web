@@ -8,6 +8,8 @@ import { buildLanguageSwitcher } from './login.js';
 import { t } from './i18n.js';
 import { showToast } from './toast.js';
 import { backdrop, closeButton } from './panels.js';
+import { buildDraftSyncControls } from './draft-controls.js';
+import { DEFAULT_DRAFT_SYNC, draftSyncPreferences, setDraftSyncPreferences } from './drafts.js';
 
 // Highlighter colors — keep in sync with the :root.accent-* --hl values in
 // styles.css.
@@ -212,6 +214,7 @@ export function buildSettings() {
       el('label', { class: 'field-label', text: t('settings.autoRefresh') }),
       segmented(autoRefreshOptions(), cfg.autoRefreshMs, (v) => setConfig({ autoRefreshMs: v })),
     ]),
+    settingsSection(t('drafts.settingsTitle'), t('drafts.settingsHint'), [buildDraftSyncControls(state.ownUserId)]),
     settingsSection(t('settings.grades'), t('settings.grades.hint'), [
       el('label', { class: 'field-label', text: t('grade.scale') }),
       segmented(GRADING_SCALES.map((scale) => [scale, t(`grade.scale.${scale}`)]), cfg.gradingScale, (v) => setConfig({ gradingScale: v })),
@@ -253,10 +256,13 @@ function resetButton() {
         return;
       }
       clearTimeout(armTimer);
+      const userId = state.ownUserId;
+      const previousDraftSync = draftSyncPreferences(userId);
+      setDraftSyncPreferences(userId, DEFAULT_DRAFT_SYNC);
       const previous = resetConfig();
       showToast(t('settings.resetDone'), 'ok', {
         label: t('action.undo'),
-        onClick: () => restoreConfig(previous),
+        onClick: () => { setDraftSyncPreferences(userId, previousDraftSync); restoreConfig(previous); },
       }, { duration: 6900 });
     },
     text: t('settings.resetDefaults'),
