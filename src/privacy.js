@@ -42,7 +42,8 @@ WRITES (real rows, visible to staff exactly like the website)
                     assignment_submissions row: the same writes the site
                     makes when you turn work in or save progress.
   Log in         -> inserts a login_events row, exactly as the site does
-                    every time you sign in.
+                    every time you sign in, unless "Invisible session"
+                    is ticked on the login page.
 
 Transparency goes both ways: staff also keep records about you that the \
 official site doesn't put front and center. This client surfaces the ones \

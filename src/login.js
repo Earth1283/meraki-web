@@ -4,6 +4,7 @@
 import { el, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
+import { buildInvisibleControls } from './invisible-controls.js';
 import { t, LOCALES, getLocale, setLocale } from './i18n.js';
 
 /** Shared language <select> — used on the (pre-auth) login screen and in
@@ -53,6 +54,7 @@ export function mountLogin(root, onLoggedIn) {
       revealButton.replaceChildren(svgIcon(iconPaths(reveal ? 'eyeOff' : 'eye')));
     },
   }, [svgIcon(iconPaths('eye'))]);
+  const invisible = buildInvisibleControls();
   const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: true });
   const submitBtn = el('button', { class: 'btn btn-primary btn-block', type: 'submit', text: t('login.submit') });
 
@@ -66,7 +68,7 @@ export function mountLogin(root, onLoggedIn) {
         submitBtn.disabled = true;
         submitBtn.textContent = t('login.loggingIn');
         try {
-          await api.login(emailInput.value.trim(), passwordInput.value);
+          await api.login(emailInput.value.trim(), passwordInput.value, { invisible: invisible.commit() });
           onLoggedIn();
         } catch (err) {
           errorLine.textContent = /login failed/i.test(err.message)
@@ -83,6 +85,7 @@ export function mountLogin(root, onLoggedIn) {
       emailInput,
       el('label', { class: 'field-label', for: 'login-password', text: t('login.password') }),
       el('div', { class: 'password-field' }, [passwordInput, revealButton]),
+      invisible.node,
       errorLine,
       submitBtn,
       el('p', { class: 'login-help' }, [

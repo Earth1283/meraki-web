@@ -65,6 +65,12 @@ test('login leaves a full email address untouched', async (t) => {
   assert.equal(calls[0].body.email, 'teacher@otherdomain.org');
 });
 
+test('an invisible login skips the login_events row', async (t) => {
+  const calls = mockFetch(t);
+  await login('jstudent', 'hunter2', { invisible: true });
+  assert.equal(calls.some((c) => c.url.endsWith('/rest/v1/login_events')), false);
+});
+
 test('login records a login_events row, as the official site does', async (t) => {
   const calls = mockFetch(t);
   await login('jstudent', 'hunter2');

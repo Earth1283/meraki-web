@@ -1,0 +1,9 @@
+.invisible-for { margin: 6px 0 0 24px; display: grid; gap: 6px; }
+.invisible-for[hidden] { display: none; }
+.invisible-for-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.invisible-for .field-label { margin: 0; }
+.invisible-readout { font-size: .875rem; font-weight: 600; color: var(--text-primary); }
+.invisible-slider { width: 100%; margin: 0; accent-color: var(--accent-solid); }
+.invisible-hint { margin: 0; font-size: .8125rem; line-height: 1.45; color: var(--text-secondary); }
+.invisible-disable { margin: 10px 0 0 24px; }
+.invisible-disable[hidden] { display: none; }

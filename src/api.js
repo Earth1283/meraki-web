@@ -57,7 +57,7 @@ function normalizeEmail(input) {
   return trimmed.includes('@') ? trimmed : `${trimmed}@meraki.local`;
 }
 
-export async function login(email, password) {
+export async function login(email, password, { invisible = false } = {}) {
   const normalizedEmail = normalizeEmail(email);
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -80,7 +80,7 @@ export async function login(email, password) {
   // The official site records every password sign-in in login_events, which
   // staff can see; doing the same keeps a student who uses this client from
   // looking like they never log in. Best-effort: it mustn't block signing in.
-  if (session.user_id) insertRow('login_events', { user_id: session.user_id }).catch(() => {});
+  if (session.user_id && !invisible) insertRow('login_events', { user_id: session.user_id }).catch(() => {});
   return session;
 }
 
