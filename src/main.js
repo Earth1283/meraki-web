@@ -15,6 +15,7 @@ import { renderChat } from './chat.js';
 import { renderLoadMore, disconnectLoadMore } from './loadmore.js';
 import { renderLoadingTray } from './loadingtray.js';
 import { renderCachedNote } from './cachednote.js';
+import { errorInfoButton } from './errordetail.js';
 import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js';
 import { installGlobalKeyboard } from './keyboard.js';
 import { enterView } from './motion.js';
@@ -399,6 +400,7 @@ function renderBody() {
             onclick: () => { restoreError(message); refresh(); },
             text: t('state.retry'),
           }),
+          errorInfoButton(state.errorFailures),
           dismissButton(message, render),
         ]),
       ]),

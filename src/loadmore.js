@@ -4,6 +4,7 @@
 import { el } from './dom.js';
 import { state, loadMore, notify } from './state.js';
 import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js';
+import { errorInfoButton } from './errordetail.js';
 import { hasMoreRows } from './paging.js';
 import { t } from './i18n.js';
 
@@ -34,7 +35,8 @@ export function renderLoadMore(tab, { refocus = false } = {}) {
   if (fields.length === 0) return null;
   const pages = fields.map((f) => state.pages[f]);
   const loading = pages.some((p) => p.loading);
-  const error = pages.find((p) => p.error)?.error ?? null;
+  const failed = pages.find((p) => p.error);
+  const error = failed?.error ?? null;
   const loadAll = () => {
     if (error) restoreError(error);
     fields.forEach((f) => loadMore(f));
@@ -45,7 +47,7 @@ export function renderLoadMore(tab, { refocus = false } = {}) {
   const button = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', disabled: loading, onclick: loadAll, text: label });
   const node = el('div', { class: 'load-more' }, [
     error && !isErrorDismissed(error)
-      ? el('div', { class: 'load-more-error', role: 'alert' }, [el('span', { text: error }), dismissButton(error, notify)])
+      ? el('div', { class: 'load-more-error', role: 'alert' }, [el('span', { text: error }), errorInfoButton([failed.failure]), dismissButton(error, notify)])
       : null,
     count ? el('span', { class: 'load-more-count', text: count }) : null,
     button,

@@ -374,13 +374,31 @@ export async function notifyMessageRecipient(messageId) {
   return result?.sent === true;
 }
 
-export function friendlyLoadError(label, err) {
+const TECHNICAL_MAX = 300;
+
+export function classifyLoadError(err) {
   const msg = String(err?.message ?? err ?? '');
-  if (msg.includes('token refresh failed') || msg.includes('not logged in')) {
-    return 'Your session expired. Please log in again.';
-  }
-  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
-    return "Couldn't reach Meraki. Check your connection, then retry.";
-  }
+  if (msg.includes('token refresh failed') || msg.includes('not logged in')) return { kind: 'session', status: null };
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) return { kind: 'network', status: null };
+  const status = Number(/\((\d{3})\)/.exec(msg)?.[1]) || null;
+  if (status === 401 || status === 403) return { kind: 'denied', status };
+  if (status === 404) return { kind: 'missing', status };
+  if (status === 429) return { kind: 'throttled', status };
+  if (status >= 500) return { kind: 'server', status };
+  return { kind: status ? 'http' : 'unknown', status };
+}
+
+export function friendlyLoadError(label, err) {
+  const { kind } = classifyLoadError(err);
+  if (kind === 'session') return 'Your session expired. Please log in again.';
+  if (kind === 'network') return "Couldn't reach Meraki. Check your connection, then retry.";
   return `Couldn't load ${label}. Try refreshing.`;
+}
+
+/** A failed load with enough left over for the error's info popover: the
+ * friendly message the banner shows, what kind of failure it was, and the raw
+ * error text behind it. */
+export function loadFailure(label, err) {
+  const technical = String(err?.message ?? err ?? '').replace(/\s+/g, ' ').trim().slice(0, TECHNICAL_MAX);
+  return { label, message: friendlyLoadError(label, err), ...classifyLoadError(err), technical };
 }

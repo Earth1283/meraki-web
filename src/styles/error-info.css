@@ -1,0 +1,58 @@
+/* The (i) button and popover on load errors (src/errordetail.js). */
+.error-info { position: relative; display: inline-grid; }
+.error-info-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: help;
+  opacity: 0.7;
+}
+.error-info-button:hover, .error-info.is-pinned .error-info-button { opacity: 1; background: rgba(0, 0, 0, 0.08); }
+.error-info-button svg { width: 16px; height: 16px; }
+
+.error-info-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  display: none;
+  width: min(340px, calc(100vw - 16px));
+  padding-top: 6px;
+  text-align: left;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.error-info:hover .error-info-popover,
+.error-info:focus-within .error-info-popover,
+.error-info.is-pinned .error-info-popover { display: block; }
+.error-info-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  max-height: min(320px, 60vh);
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+.error-info-item { display: grid; gap: 2px; }
+.error-info-source { font-weight: 600; }
+.error-info-technical {
+  margin-top: 2px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}

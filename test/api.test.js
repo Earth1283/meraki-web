@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { friendlyLoadError, login, insertRow, deleteRow, updateRow, updateDraftSubmission, uploadFile, getSubmissionAnnotations, getAssessmentQuestions, submitAssessmentAnswers, notifyMessageRecipient, getTablePage, parseContentRangeTotal, APP_URL } from '../src/api.js';
+import { friendlyLoadError, classifyLoadError, loadFailure, login, insertRow, deleteRow, updateRow, updateDraftSubmission, uploadFile, getSubmissionAnnotations, getAssessmentQuestions, submitAssessmentAnswers, notifyMessageRecipient, getTablePage, parseContentRangeTotal, APP_URL } from '../src/api.js';
 import { decodeSeroval } from '../src/serverfn.js';
 
 const TOKENS = { access_token: 'a', refresh_token: 'r', user: { id: 'u1' } };
@@ -51,6 +51,27 @@ test('a browser network failure maps to a connectivity message', () => {
 test('anything else maps to a generic retry message naming the label', () => {
   const msg = friendlyLoadError('your portfolio', new Error('GET portfolio_items failed (500): oops'));
   assert.match(msg, /couldn't load your portfolio/i);
+});
+
+test('load errors are classified by what actually went wrong', () => {
+  const kind = (message) => classifyLoadError(new Error(message));
+  assert.deepEqual(kind('token refresh failed (400): {}'), { kind: 'session', status: null });
+  assert.deepEqual(kind('Failed to fetch'), { kind: 'network', status: null });
+  assert.deepEqual(kind('GET grades failed (403): nope'), { kind: 'denied', status: 403 });
+  assert.deepEqual(kind('GET grades failed (404): nope'), { kind: 'missing', status: 404 });
+  assert.deepEqual(kind('GET grades failed (429): slow down'), { kind: 'throttled', status: 429 });
+  assert.deepEqual(kind('GET grades failed (503): down'), { kind: 'server', status: 503 });
+  assert.deepEqual(kind('GET grades failed (400): bad'), { kind: 'http', status: 400 });
+  assert.deepEqual(kind('boom'), { kind: 'unknown', status: null });
+});
+
+test('a load failure keeps the friendly message and a trimmed copy of the raw error', () => {
+  const failure = loadFailure('grades', new Error(`GET grades failed (500):\n${'x'.repeat(500)}`));
+  assert.equal(failure.label, 'grades');
+  assert.equal(failure.message, friendlyLoadError('grades', new Error('GET grades failed (500)')));
+  assert.equal(failure.kind, 'server');
+  assert.ok(failure.technical.length <= 300);
+  assert.ok(!failure.technical.includes('\n'));
 });
 
 test('login assumes @meraki.local when the input has no domain', async (t) => {

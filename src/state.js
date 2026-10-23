@@ -156,6 +156,8 @@ export const state = {
   // Only populated during the first load (see STEP_GROUPS); empty otherwise.
   loadingSteps: [],
   error: null,
+  // One entry per failed source behind `error`; see loadFailure in api.js.
+  errorFailures: [],
   selectedIndex: -1,
   // 'palette' | 'compose' | 'checkin' | 'reminder' | 'portfolio' | 'turnin' | 'quiz' | 'help' | 'resources' | 'settings' | 'detail' | null
   activeOverlay: null,
@@ -263,7 +265,7 @@ export function doLogout() {
   autoRefreshTimer = null;
   Object.assign(state, {
     tab: 'overview', data: emptyData(), ownUserId: '', ownStudentId: null, ownStudentName: '',
-    loading: true, backgroundLoading: false, hasLoadedOnce: false, cachedAt: null, status: 'Loading…', error: null, selectedIndex: -1,
+    loading: true, backgroundLoading: false, hasLoadedOnce: false, cachedAt: null, status: 'Loading…', error: null, errorFailures: [], selectedIndex: -1,
     activeOverlay: null, detailTarget: null, detailBackStack: [], whatIf: {}, pages: {},
   });
   notify();
@@ -357,10 +359,8 @@ export async function refresh() {
   }
   notify();
 
-  const errors = [];
-  const record = (msg) => {
-    if (!errors.includes(msg)) errors.push(msg);
-  };
+  const failures = [];
+  const record = (failure) => failures.push(failure);
   const tableByField = new Map(TABLES.map((t) => [t[0], t]));
 
   for (const group of STEP_GROUPS) {
@@ -381,7 +381,7 @@ export async function refresh() {
       const [, , , label] = tableByField.get(field);
       if (r.status !== 'fulfilled') {
         if (field === 'checkins') state.data.checkinsUnavailable = true;
-        record(api.friendlyLoadError(label, r.reason));
+        record(api.loadFailure(label, r.reason));
       } else if (PAGED_FIELDS.includes(field)) {
         const full = r.value.rows.length >= pagedLimit(field);
         state.data[field] = r.value.rows;
@@ -404,15 +404,15 @@ export async function refresh() {
       ]);
       state.data.activity = activityRes.status === 'fulfilled' ? activityRes.value : [];
       if (loginsRes.status === 'fulfilled') state.data.loginEvents = loginsRes.value;
-      else record(api.friendlyLoadError('your sign-in history', loginsRes.reason));
+      else record(api.loadFailure('your sign-in history', loginsRes.reason));
       if (heroRes.status === 'fulfilled') state.data.hero = heroRes.value[0] ?? null;
-      else record(api.friendlyLoadError('your hero profile', heroRes.reason));
+      else record(api.loadFailure('your hero profile', heroRes.reason));
       if (studentsRes.status === 'fulfilled') {
         const student = studentsRes.value[0];
         state.ownStudentId = student?.id ?? null;
         state.ownStudentName = [student?.first_name, student?.last_name].filter(Boolean).join(' ');
       }
-      else record(api.friendlyLoadError('your student record', studentsRes.reason));
+      else record(api.loadFailure('your student record', studentsRes.reason));
     }
 
     if (isFirstLoad) {
@@ -436,12 +436,14 @@ export async function refresh() {
   state.backgroundLoading = false;
   state.status = 'Ready.';
   state.loadingSteps = [];
+  const errors = [...new Set(failures.map((f) => f.message))];
   state.error = errors.length === 0
     ? null
     : errors.length === 1
       ? errors[0]
       : t('state.partialLoadError', { n: errors.length });
-  const expired = errors.some((e) => e.toLowerCase().includes('log in again'));
+  state.errorFailures = failures;
+  const expired = failures.some((f) => f.kind === 'session');
   if (errors.length === 0) {
     state.cachedAt = null;
     saveSnapshot(buildSnapshot({ userId: state.ownUserId, data: state.data, ownStudentId: state.ownStudentId, ownStudentName: state.ownStudentName }));
@@ -469,7 +471,7 @@ export async function loadMore(field) {
     state.data[field] = [...state.data[field], ...added];
     state.pages[field] = { total, full: rows.length >= PAGE_SIZE, exhausted: added.length === 0, loading: false, error: null };
   } catch (err) {
-    state.pages[field] = { ...state.pages[field], loading: false, error: api.friendlyLoadError(label, err) };
+    state.pages[field] = { ...state.pages[field], loading: false, error: api.friendlyLoadError(label, err), failure: api.loadFailure(label, err) };
   }
   notify();
 }
