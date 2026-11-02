@@ -5,9 +5,8 @@ import { buildSnapshot, usableSnapshot, mergeSnapshotData, snapshotAge, SNAPSHOT
 const base = { userId: 'u1', ownStudentId: 's1', ownStudentName: 'A B', now: 1000 };
 
 test('buildSnapshot drops optimistic temp rows but keeps real ones', () => {
-  const snap = buildSnapshot({ ...base, data: { messages: [{ id: 'temp-1-1' }, { id: 'm1' }], hero: null } });
+  const snap = buildSnapshot({ ...base, data: { messages: [{ id: 'temp-1-1' }, { id: 'm1' }] } });
   assert.deepEqual(snap.data.messages, [{ id: 'm1' }]);
-  assert.equal(snap.data.hero, null);
   assert.equal(snap.savedAt, 1000);
 });
 
@@ -21,9 +20,9 @@ test('usableSnapshot rejects other users, other versions and junk', () => {
 });
 
 test('mergeSnapshotData fills fields the snapshot lacks and ignores unknown or mistyped ones', () => {
-  const empty = { classes: [], hero: null, checkinsUnavailable: false };
-  const merged = mergeSnapshotData(empty, { classes: [{ id: 1 }], hero: { x: 1 }, gone: [1], checkinsUnavailable: [] });
-  assert.deepEqual(merged, { classes: [{ id: 1 }], hero: { x: 1 }, checkinsUnavailable: false });
+  const empty = { classes: [], checkinsUnavailable: false };
+  const merged = mergeSnapshotData(empty, { classes: [{ id: 1 }], gone: [1], checkinsUnavailable: [] });
+  assert.deepEqual(merged, { classes: [{ id: 1 }], checkinsUnavailable: false });
 });
 
 test('snapshotAge picks the coarsest whole unit', () => {

@@ -217,8 +217,8 @@ export const state = {
 function emptyData() {
   return {
     classes: [], assignments: [], grades: [], attendance: [], calendar: [],
-    announcements: [], messages: [], portfolio: [], checkins: [], checkinsUnavailable: false,
-    hero: null, behaviorNotes: [], detentions: [], reportCards: [],
+    announcements: [], messages: [], messageContacts: [], messageNames: [], portfolio: [], checkins: [], checkinsUnavailable: false,
+    behaviorNotes: [], detentions: [], reportCards: [],
     assessments: [], discussions: [], fileUploads: [], enrollments: [],
     assignmentSubmissions: [], assessmentSubmissions: [],
     standards: [], assignmentStandards: [], loginEvents: [], activity: [],
@@ -306,14 +306,29 @@ export function restoreConfig(config) {
 // scrolling don't vanish on the next auto-refresh.
 const PAGED_FIELDS = ['grades', 'attendance', 'assignmentSubmissions', 'assessmentSubmissions'];
 
+// What the official site adds to these queries: your own student id (and no
+// drafts, for grades). Without it Postgres can't use the student_id index and
+// has to filter every row through the row-level policy, which is what the
+// statement timeouts on grades and submissions came from.
+const STUDENT_SCOPE = {
+  grades: 'student_id=eq.{id}&is_draft=eq.false',
+  attendance: 'student_id=eq.{id}',
+  assignmentSubmissions: 'student_id=eq.{id}',
+};
+
+function scopedQuery(field, query) {
+  const scope = STUDENT_SCOPE[field];
+  return scope && state.ownStudentId ? `${query}&${scope.replace('{id}', encodeURIComponent(state.ownStudentId))}` : query;
+}
+
 const TABLES = [
   ['classes', 'classes', 'select=id,name,subject,period,room,term,teacher_id,teacher_name,weights,grade_level,timezone&order=period.asc', 'your classes'],
-  ['assignments', 'assignments', 'select=id,title,category,due_date,points_possible,description,submission_mode,rubric_id,created_at,class_id,classes(name)&order=due_date.asc', 'assignments'],
+  ['assignments', 'assignments', 'select=id,title,category,due_date,points_possible,description,submission_mode,rubric_id,created_at,class_id&status=eq.published&order=due_date.asc', 'assignments'],
   ['grades', 'grades', 'select=id,points_earned,comment,updated_at,assignment_id,assignments(title,points_possible,due_date,class_id)&order=updated_at.desc', 'grades'],
   ['attendance', 'attendance', 'select=id,date,status,note,class_id&order=date.desc', 'attendance'],
   ['calendar', 'calendar_events', 'select=id,title,description,event_date,start_time,end_time,location,category,color,audience,audiences,class_id,class_ids,grade_level&order=event_date.asc&limit=69', 'the calendar'],
   ['announcements', 'announcements', 'select=id,title,body,created_at,audience,author_id&order=created_at.desc&limit=69', 'announcements'],
-  ['messages', 'messages', 'select=id,subject,body,created_at,read,sender_id,recipient_id&order=created_at.desc&limit=69', 'messages'],
+  ['messages', 'messages', 'select=id,subject,body,created_at,read,read_at,sender_id,recipient_id&order=created_at.desc&limit=150', 'messages'],
   ['portfolio', 'portfolio_items', 'select=id,title,description,link,kind,created_at&order=created_at.desc', 'your portfolio'],
   ['checkins', 'checkins', 'select=id,mood,note,date,created_at&order=date.desc&limit=69', 'check-ins'],
   ['behaviorNotes', 'behavior_notes', 'select=id,kind,reason,notes,date,scored_zero,assignment_id,assignments(title),students(first_name,last_name)&order=date.desc&limit=69', 'behavior notes'],
@@ -350,6 +365,24 @@ function setStepStatus(id, status) {
   if (step) step.status = status;
 }
 
+// The paged tables are the ones whose queries the database cancels for
+// running long (57014), and a handful of them at once makes each slower, so
+// they go one after another while the light tables load beside them.
+async function fetchGroup(fields, tableByField, pagedLimit) {
+  const settle = (promise) => promise.then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
+  const fetchField = (field) => {
+    const [, table, query] = tableByField.get(field);
+    return PAGED_FIELDS.includes(field) ? api.getTablePage(table, scopedQuery(field, query), { limit: pagedLimit(field) }) : api.getTable(table, scopedQuery(field, query));
+  };
+  const results = new Map();
+  const light = Promise.all(fields.filter((f) => !PAGED_FIELDS.includes(f)).map(async (f) => results.set(f, await settle(fetchField(f)))));
+  const heavy = (async () => {
+    for (const f of fields.filter((f) => PAGED_FIELDS.includes(f))) results.set(f, await settle(fetchField(f)));
+  })();
+  await Promise.all([light, heavy]);
+  return fields.map((f) => results.get(f));
+}
+
 export async function refresh() {
   state.loading = true;
   state.status = 'Refreshing…';
@@ -363,6 +396,16 @@ export async function refresh() {
   const record = (failure) => failures.push(failure);
   const tableByField = new Map(TABLES.map((t) => [t[0], t]));
 
+  if (state.ownUserId) {
+    try {
+      const [student] = await api.getTable('students', `select=id,first_name,last_name,grade_level&user_id=eq.${encodeURIComponent(state.ownUserId)}`);
+      state.ownStudentId = student?.id ?? null;
+      state.ownStudentName = [student?.first_name, student?.last_name].filter(Boolean).join(' ');
+    } catch (err) {
+      record(api.loadFailure('your student record', err));
+    }
+  }
+
   for (const group of STEP_GROUPS) {
     if (group.id === 'auth') continue;
     if (isFirstLoad) {
@@ -371,11 +414,7 @@ export async function refresh() {
     }
 
     const pagedLimit = (field) => Math.max(PAGE_SIZE, state.data[field].length);
-    const results = await Promise.allSettled(group.fields.map((field) => {
-      const [, table, query] = tableByField.get(field);
-      if (!PAGED_FIELDS.includes(field)) return api.getTable(table, query);
-      return api.getTablePage(table, query, { limit: pagedLimit(field) });
-    }));
+    const results = await fetchGroup(group.fields, tableByField, pagedLimit);
     results.forEach((r, i) => {
       const field = group.fields[i];
       const [, , , label] = tableByField.get(field);
@@ -383,7 +422,7 @@ export async function refresh() {
         if (field === 'checkins') state.data.checkinsUnavailable = true;
         record(api.loadFailure(label, r.reason));
       } else if (PAGED_FIELDS.includes(field)) {
-        const full = r.value.rows.length >= pagedLimit(field);
+        const full = r.value.rows.length >= r.value.requested;
         state.data[field] = r.value.rows;
         state.pages[field] = { ...state.pages[field], total: r.value.total, full, exhausted: false, error: null };
       } else {
@@ -392,27 +431,25 @@ export async function refresh() {
       }
     });
 
+    if (group.id === 'comms') {
+      const [contactsRes, namesRes] = await Promise.allSettled([api.getMessageContacts(), api.getMessageParticipantNames()]);
+      if (contactsRes.status === 'fulfilled') state.data.messageContacts = contactsRes.value;
+      else record(api.loadFailure('who you can message', contactsRes.reason));
+      if (namesRes.status === 'fulfilled') state.data.messageNames = namesRes.value;
+      else record(api.loadFailure('message senders', namesRes.reason));
+    }
+
     if (group.id === 'extras') {
       // The activity feed comes from Meraki's own app rather than Supabase, so
       // a Meraki deploy can retire it (see api.js) — it fails to an empty feed
       // and never contributes a load error, unlike the tables beside it.
-      const [heroRes, studentsRes, activityRes, loginsRes] = await Promise.allSettled([
-        api.getTable('hero_profiles', 'select=hero_class,quest_started_at,class_changes'),
-        api.getTable('students', 'select=id,first_name,last_name,grade_level'),
+      const [activityRes, loginsRes] = await Promise.allSettled([
         api.getActivityFeed(),
         state.ownUserId ? api.getLoginHistory(state.ownUserId) : Promise.resolve([]),
       ]);
       state.data.activity = activityRes.status === 'fulfilled' ? activityRes.value : [];
       if (loginsRes.status === 'fulfilled') state.data.loginEvents = loginsRes.value;
       else record(api.loadFailure('your sign-in history', loginsRes.reason));
-      if (heroRes.status === 'fulfilled') state.data.hero = heroRes.value[0] ?? null;
-      else record(api.loadFailure('your hero profile', heroRes.reason));
-      if (studentsRes.status === 'fulfilled') {
-        const student = studentsRes.value[0];
-        state.ownStudentId = student?.id ?? null;
-        state.ownStudentName = [student?.first_name, student?.last_name].filter(Boolean).join(' ');
-      }
-      else record(api.loadFailure('your student record', studentsRes.reason));
     }
 
     if (isFirstLoad) {
@@ -465,11 +502,11 @@ export async function loadMore(field) {
   state.pages[field] = { ...page, loading: true, error: null };
   notify();
   try {
-    const { rows, total } = await api.getTablePage(table, query, { offset: state.data[field].length, limit: PAGE_SIZE });
+    const { rows, total, requested } = await api.getTablePage(table, scopedQuery(field, query), { offset: state.data[field].length, limit: PAGE_SIZE });
     const loaded = new Set(state.data[field].map((r) => r.id));
     const added = rows.filter((r) => !loaded.has(r.id));
     state.data[field] = [...state.data[field], ...added];
-    state.pages[field] = { total, full: rows.length >= PAGE_SIZE, exhausted: added.length === 0, loading: false, error: null };
+    state.pages[field] = { total, full: rows.length >= requested, exhausted: added.length === 0, loading: false, error: null };
   } catch (err) {
     state.pages[field] = { ...state.pages[field], loading: false, error: api.friendlyLoadError(label, err), failure: api.loadFailure(label, err) };
   }

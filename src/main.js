@@ -1,7 +1,7 @@
 import { el, clear, mount, svgIcon, associateFieldLabels } from './dom.js';
 import * as api from './api.js';
 import { state, subscribe, isLoggedIn, afterLogin, refresh, setTab, doLogout, openOverlay, openCompose, openDetailFor, toggleMobileNav, closeMobileNav, toggleSidebar, toggleChatMode, toggleOverviewSection, setConfig, setGradeTarget, setWhatIf, clearWhatIf, setCalendarViewMonth, setCalendarSelectedDate, setMobileCalendarView, openReminderForm, removeCalendarReminder, addCalendarReminder, rowKindsForCurrentTab } from './state.js';
-import { tabTitle, renderItemBody, renderInfoRow, overviewSummary, renderOverviewStats, visibleTabs, emptyState, renderAttendanceTally, NAV_GROUPS } from './rows.js';
+import { tabTitle, renderItemBody, overviewSummary, renderOverviewStats, visibleTabs, emptyState, renderAttendanceTally, NAV_GROUPS } from './rows.js';
 import { renderAnalyticsTab, chartModeToggle, mountAnalyticsCharts, disposeAnalyticsCharts } from './analytics.js';
 import { renderCalendarGrid, calendarViewToggle, calendarOnlyMineToggle, isoOf } from './calendar.js';
 import { seededRandom, sketchBox, sketchLine, sketchTick, sketchSvg } from './sketch.js';
@@ -542,8 +542,6 @@ function renderBody() {
           el('span', { text: kind.text }),
         ]),
       );
-    } else if (kind.type === 'info') {
-      (activeGroup ?? list).appendChild(renderInfoRow(state.data));
     } else if (kind.type === 'item') {
       itemCounter += 1;
       // Captured per row: the click handler below runs long after this loop

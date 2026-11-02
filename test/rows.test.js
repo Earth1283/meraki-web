@@ -20,7 +20,7 @@ function emptyData(overrides = {}) {
   return {
     classes: [], assignments: [], grades: [], attendance: [], calendar: [],
     announcements: [], messages: [], portfolio: [], checkins: [],
-    hero: null, behaviorNotes: [], detentions: [], reportCards: [],
+    behaviorNotes: [], detentions: [], reportCards: [],
     assessments: [], discussions: [], fileUploads: [], enrollments: [],
     assignmentSubmissions: [], assessmentSubmissions: [],
     standards: [], assignmentStandards: [], loginEvents: [], activity: [],
@@ -195,9 +195,8 @@ test('detailFields leaves blank optional fields as null/undefined rather than in
   }
 });
 
-test('me tab shows placeholders for empty portfolio and checkins, no info row without a hero', () => {
+test('me tab shows placeholders for empty portfolio and checkins', () => {
   const kinds = rowKinds('me', emptyData());
-  assert.equal(kinds.some((k) => k.type === 'info'), false);
   const placeholders = kinds.filter((k) => k.type === 'placeholder');
   assert.equal(placeholders.length, 2);
 });
@@ -207,11 +206,6 @@ test('me tab adds a discreet Meraki-side error hint only when check-ins cannot l
   const unavailable = rowKinds('me', emptyData({ checkinsUnavailable: true })).find((k) => k.type === 'header' && k.label === 'Check-ins');
   assert.equal(normal.hint, null);
   assert.match(unavailable.hint, /not a problem with this app/i);
-});
-
-test('me tab shows the info row once a hero profile exists', () => {
-  const kinds = rowKinds('me', emptyData({ hero: { hero_class: 'wizard' } }));
-  assert.equal(kinds[0].type, 'info');
 });
 
 test('myrecord lists every record type independently', () => {
@@ -387,6 +381,16 @@ test('partnerName resolves a teacher via their class, falls back for unknowns, a
   assert.equal(partnerName(data, 'me', 'me'), 'Myself');
   assert.equal(partnerName(data, 'me', 't1'), 'Dr. Alvarez');
   assert.equal(partnerName(data, 'me', 'ghost'), 'Unknown');
+});
+
+test('partnerName prefers the names the message RPCs return over a class teacher', () => {
+  const data = emptyData({
+    classes: [{ id: 'c1', teacher_id: 't1', teacher_name: 'Dr. Alvarez' }],
+    messageNames: [{ id: 't1', full_name: 'Elena Alvarez' }],
+    messageContacts: [{ id: 'a1', full_name: 'Joe Doyle', label: 'School administration' }],
+  });
+  assert.equal(partnerName(data, 'me', 't1'), 'Elena Alvarez');
+  assert.equal(partnerName(data, 'me', 'a1'), 'Joe Doyle');
 });
 
 test('initials abbreviates first+last, or the first two letters of a single word', () => {

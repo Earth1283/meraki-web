@@ -51,8 +51,6 @@
   "record.reportCards": "Le bulletin",
   "none.onFile": "(t'as échappé aux radars)",
   "none.published": "(ça mijote encore)",
-  "hero.class": "Ta classe légendaire",
-  "hero.started": "Quête lancée le {date}",
   "state.loading": "On invoque tes données…",
   "loading.step.auth": "On vérifie que t'es bien toi",
   "loading.step.core": "On déterre tes classes et ton calendrier maudit",

@@ -77,8 +77,6 @@
   "record.reportCards": "Report cards",
   "none.onFile": "(none on file)",
   "none.published": "(none published)",
-  "hero.class": "Hero class",
-  "hero.started": "Started {date}",
   "state.loading": "Loading your data…",
   "loading.step.auth": "Signing you in",
   "loading.step.core": "Loading your classes & schedule",

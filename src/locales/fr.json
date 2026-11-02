@@ -77,8 +77,6 @@
   "record.reportCards": "Bulletins",
   "none.onFile": "(aucun dossier)",
   "none.published": "(aucun publié)",
-  "hero.class": "Classe héroïque",
-  "hero.started": "Commencé le {date}",
   "state.loading": "Chargement de vos données…",
   "loading.step.auth": "Connexion en cours",
   "loading.step.core": "Chargement de vos classes et de l'emploi du temps",

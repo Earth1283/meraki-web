@@ -20,7 +20,7 @@ READS ONLY
   Calendar       -> calendar_events
   Announcements  -> announcements (title, body, timestamp)
   Messages       -> messages (subject, body, sender/recipient, read state)
-  Me             -> hero_profiles, portfolio_items, checkins
+  Me             -> portfolio_items, checkins
   Quizzes        -> question text for quizzes you've already submitted,
                     from Meraki's own app server (meraki-education.app)
   Your work      -> what you turned in, and your teacher's marks on it

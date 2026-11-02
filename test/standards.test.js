@@ -6,7 +6,7 @@ function dataWith({ classes = [], assignments = [], grades = [], standards = [],
   return {
     classes, assignments, grades, standards, assignmentStandards,
     attendance: [], calendar: [], announcements: [], messages: [], portfolio: [], checkins: [],
-    hero: null, behaviorNotes: [], detentions: [], reportCards: [], assessments: [], discussions: [],
+    behaviorNotes: [], detentions: [], reportCards: [], assessments: [], discussions: [],
     fileUploads: [], enrollments: [], assignmentSubmissions: [], assessmentSubmissions: [],
   };
 }

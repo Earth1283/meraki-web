@@ -223,8 +223,60 @@ test('getTablePage asks for one page with an exact count and returns the total',
   }));
   await login('jstudent', 'hunter2');
   const page = await getTablePage('grades', 'select=id&order=updated_at.desc', { offset: 69, limit: 69 });
-  assert.deepEqual(page, { rows: [{ id: 'g70' }], total: 70 });
+  assert.deepEqual(page, { rows: [{ id: 'g70' }], total: 70, requested: 69 });
   const call = calls.at(-1);
   assert.match(call.url, /\/rest\/v1\/grades\?select=id&order=updated_at\.desc&limit=69&offset=69$/);
   assert.equal(call.init.headers.Prefer, 'count=exact');
+});
+
+test('getTable retries a 503 and succeeds on the next attempt', async (t) => {
+  let hits = 0;
+  mockFetch(t, (url) => {
+    if (!url.includes('/rest/v1/assignments')) return {};
+    hits += 1;
+    return hits === 1 ? { ok: false, status: 503, text: async () => 'upstream' } : { json: async () => [{ id: 'a1' }] };
+  });
+  await login('jstudent', 'password');
+  const realSetTimeout = global.setTimeout;
+  global.setTimeout = (fn) => realSetTimeout(fn, 0);
+  t.after(() => { global.setTimeout = realSetTimeout; });
+  const { getTable } = await import('../src/api.js');
+  assert.deepEqual(await getTable('assignments', 'select=id'), [{ id: 'a1' }]);
+  assert.equal(hits, 2);
+});
+
+test('the message RPCs POST an empty body and return the rows', async (t) => {
+  const calls = mockFetch(t, (url) => (url.includes('/rpc/') ? { json: async () => [{ id: 'x', full_name: 'Joe Doyle', label: 'School administration' }] } : {}));
+  await login('jstudent', 'password');
+  const { getMessageContacts, getMessageParticipantNames } = await import('../src/api.js');
+  assert.equal((await getMessageContacts())[0].full_name, 'Joe Doyle');
+  await getMessageParticipantNames();
+  const rpcCalls = calls.filter((c) => c.url.includes('/rpc/'));
+  assert.match(rpcCalls[0].url, /\/rest\/v1\/rpc\/message_contacts$/);
+  assert.match(rpcCalls[1].url, /\/rest\/v1\/rpc\/message_participant_names$/);
+  assert.deepEqual(rpcCalls[0].body, {});
+});
+
+test('getTablePage drops the exact count, then shrinks the page, when the database times out', async (t) => {
+  const timeout = { ok: false, status: 500, text: async () => '{"code":"57014","message":"canceling statement due to statement timeout"}' };
+  const calls = mockFetch(t, (url, init) => {
+    if (!url.includes('/rest/v1/grades')) return {};
+    const counted = init.headers?.Prefer === 'count=exact';
+    const small = url.includes('limit=20');
+    return counted || !small ? timeout : { json: async () => [{ id: 'g1' }] };
+  });
+  await login('jstudent', 'password');
+  const page = await getTablePage('grades', 'select=id', { limit: 69 });
+  const reads = calls.filter((c) => c.url.includes('/rest/v1/grades'));
+  assert.equal(reads.length, 3);
+  assert.equal(reads[0].init.headers.Prefer, 'count=exact');
+  assert.equal(reads[1].init.headers.Prefer, undefined);
+  assert.match(reads[2].url, /limit=20/);
+  assert.deepEqual(page, { rows: [{ id: 'g1' }], total: null, requested: 20 });
+});
+
+test('a statement timeout is classified and worded as the server being slow', () => {
+  const err = new Error('GET grades failed (500): {"code":"57014","message":"canceling statement due to statement timeout"}');
+  assert.deepEqual(classifyLoadError(err), { kind: 'timeout', status: 500 });
+  assert.match(friendlyLoadError('grades', err), /took too long to load grades/);
 });

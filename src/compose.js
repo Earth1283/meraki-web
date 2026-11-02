@@ -9,6 +9,13 @@ import { sendMessage } from './messaging.js';
 function recipientOptions() {
   const seen = new Set([state.ownUserId]);
   const recipients = [{ id: state.ownUserId, name: t('field.myself') }];
+  for (const c of state.data.messageContacts) {
+    if (c.id && !seen.has(c.id)) {
+      seen.add(c.id);
+      recipients.push({ id: c.id, name: c.label ? `${c.full_name} · ${c.label}` : c.full_name });
+    }
+  }
+  if (recipients.length > 1) return recipients;
   for (const c of state.data.classes) {
     if (c.teacher_id && !seen.has(c.teacher_id)) {
       seen.add(c.teacher_id);

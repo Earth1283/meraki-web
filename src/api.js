@@ -1,4 +1,5 @@
 import { encodeServerFnBody, decodeServerFnResponse } from './serverfn.js';
+import { withRetry, fetchWithTimeout, isTransientStatus, TransientHttpError } from './retry.js';
 
 // Public Supabase anon key, same one meraki-education.app ships client-side;
 // row-level security, not key secrecy, is what scopes data per user.
@@ -118,7 +119,7 @@ async function doRefresh() {
 async function authedRequest(url, init = {}, extraHeaders = {}) {
   if (!session) throw new Error('not logged in');
   const attempt = (token) =>
-    fetch(url, {
+    fetchWithTimeout(url, {
       ...init,
       headers: { ...(init.headers || {}), ...extraHeaders, Authorization: `Bearer ${token}` },
     });
@@ -135,13 +136,50 @@ function authedFetch(path, init = {}) {
   return authedRequest(`${SUPABASE_URL}${path}`, init, { apikey: SUPABASE_ANON_KEY });
 }
 
-export async function getTable(table, query) {
-  const resp = await authedFetch(`/rest/v1/${table}?${query}`);
+export class StatementTimeoutError extends Error {}
+
+async function readRows(table, resp) {
   if (!resp.ok) {
     const body = await resp.text().catch(() => '');
-    throw new Error(`GET ${table} failed (${resp.status}): ${body}`);
+    const message = `GET ${table} failed (${resp.status}): ${body}`;
+    if (resp.status === 500 && body.includes('57014')) throw new StatementTimeoutError(message);
+    throw isTransientStatus(resp.status) ? new TransientHttpError(message, resp.status) : new Error(message);
   }
-  return resp.json();
+  return resp;
+}
+
+export function getTable(table, query) {
+  return withRetry(async () => (await readRows(table, await authedFetch(`/rest/v1/${table}?${query}`))).json());
+}
+
+async function callRpc(name, body = {}) {
+  return withRetry(async () => {
+    const resp = await authedFetch(`/rest/v1/rpc/${name}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      const message = `POST rpc/${name} failed (${resp.status}): ${text}`;
+      throw isTransientStatus(resp.status) ? new TransientHttpError(message, resp.status) : new Error(message);
+    }
+    return resp.json();
+  });
+}
+
+/** Everyone you may message, as [{ id, full_name, label }]; the label is the
+ * class or office they're reached through. */
+export async function getMessageContacts() {
+  const rows = await callRpc('message_contacts');
+  return Array.isArray(rows) ? rows : [];
+}
+
+/** The names behind the sender and recipient ids in your inbox, as
+ * [{ id, full_name }]. */
+export async function getMessageParticipantNames() {
+  const rows = await callRpc('message_participant_names');
+  return Array.isArray(rows) ? rows : [];
 }
 
 /** The total row count PostgREST puts after the slash in a Content-Range
@@ -151,15 +189,32 @@ export function parseContentRangeTotal(header) {
   return match ? Number(match[1]) : null;
 }
 
+export const DEGRADED_PAGE_LIMIT = 20;
+
 /** One page of a table query, plus how many rows the whole query matches
- * (null if the server didn't say). */
+ * (null if the server didn't say) and the limit it finally ran with. When
+ * the database cancels the query for taking too long (57014), it is asked
+ * again the cheaper way: first without the exact row count, which makes
+ * PostgREST scan everything the row-level policy lets through, then for a
+ * smaller page. */
 export async function getTablePage(table, query, { offset = 0, limit }) {
-  const resp = await authedFetch(`/rest/v1/${table}?${query}&limit=${limit}&offset=${offset}`, { headers: { Prefer: 'count=exact' } });
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
-    throw new Error(`GET ${table} failed (${resp.status}): ${body}`);
+  const ladder = [
+    { count: true, limit },
+    { count: false, limit },
+    { count: false, limit: Math.min(limit, DEGRADED_PAGE_LIMIT) },
+  ];
+  for (let i = 0; ; i++) {
+    const step = ladder[i];
+    try {
+      return await withRetry(async () => {
+        const init = step.count ? { headers: { Prefer: 'count=exact' } } : {};
+        const resp = await readRows(table, await authedFetch(`/rest/v1/${table}?${query}&limit=${step.limit}&offset=${offset}`, init));
+        return { rows: await resp.json(), total: parseContentRangeTotal(resp.headers?.get?.('content-range')), requested: step.limit };
+      });
+    } catch (err) {
+      if (!(err instanceof StatementTimeoutError) || i === ladder.length - 1) throw err;
+    }
   }
-  return { rows: await resp.json(), total: parseContentRangeTotal(resp.headers?.get?.('content-range')) };
 }
 
 /** Inserts one row. With `returnId`, has PostgREST echo the new row back (as
@@ -378,8 +433,9 @@ const TECHNICAL_MAX = 300;
 
 export function classifyLoadError(err) {
   const msg = String(err?.message ?? err ?? '');
+  if (msg.includes('57014')) return { kind: 'timeout', status: 500 };
   if (msg.includes('token refresh failed') || msg.includes('not logged in')) return { kind: 'session', status: null };
-  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) return { kind: 'network', status: null };
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed') || /timed? ?out|aborted/i.test(msg)) return { kind: 'network', status: null };
   const status = Number(/\((\d{3})\)/.exec(msg)?.[1]) || null;
   if (status === 401 || status === 403) return { kind: 'denied', status };
   if (status === 404) return { kind: 'missing', status };
@@ -392,6 +448,7 @@ export function friendlyLoadError(label, err) {
   const { kind } = classifyLoadError(err);
   if (kind === 'session') return 'Your session expired. Please log in again.';
   if (kind === 'network') return "Couldn't reach Meraki. Check your connection, then retry.";
+  if (kind === 'timeout') return `Meraki's server took too long to load ${label}. Try refreshing in a moment.`;
   return `Couldn't load ${label}. Try refreshing.`;
 }
 

@@ -119,7 +119,6 @@ export function rowKinds(tabId, data, today = new Date(), overviewCollapse = {})
       data.messages.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'message', index: i } }));
       break;
     case 'me': {
-      if (data.hero) rows.push({ type: 'info' });
       rows.push({ type: 'header', label: t('me.portfolio') });
       if (data.portfolio.length === 0) rows.push({ type: 'placeholder', text: t('none.yet') });
       else data.portfolio.forEach((_, i) => rows.push({ type: 'item', target: { kind: 'portfolio', index: i } }));
@@ -362,6 +361,8 @@ export function messageThreads(data, ownUserId) {
 
 export function partnerName(data, ownUserId, partnerId) {
   if (partnerId === ownUserId) return t('field.myself');
+  const known = data.messageNames?.find((p) => p.id === partnerId) ?? data.messageContacts?.find((c) => c.id === partnerId);
+  if (known?.full_name) return known.full_name;
   const cls = data.classes.find((c) => c.teacher_id === partnerId);
   return cls?.teacher_name || t('field.unknown');
 }
@@ -707,15 +708,6 @@ export function renderOverviewStats(summary, onNavigate, { notebook = false, dra
 
 export function fieldDisplay(value) {
   return value === '' || value == null ? t('field.noData') : String(value);
-}
-
-export function renderInfoRow(data) {
-  const hero = data.hero;
-  return el('div', { class: 'hero-card' }, [
-    el('span', { class: 'hero-label', text: t('hero.class') }),
-    el('span', { class: 'hero-value', text: hero?.hero_class ?? '—' }),
-    el('span', { class: 'hero-meta', text: hero?.quest_started_at ? t('hero.started', { date: formatDate(hero.quest_started_at) }) : '' }),
-  ]);
 }
 
 export function detailFields(target, data) {

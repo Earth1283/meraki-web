@@ -101,8 +101,7 @@
 
 :root:not(.style-notebook) .nav-item.active .nav-label,
 :root:not(.style-notebook) .stat-value.text-accent,
-:root:not(.style-notebook) .stat-value.text-bad,
-:root:not(.style-notebook) .hero-value {
+:root:not(.style-notebook) .stat-value.text-bad {
   background-image: none;
   padding-inline: 0;
   margin-inline: 0;

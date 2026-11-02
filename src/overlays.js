@@ -1,3 +1,4 @@
+import { markMessagesRead } from './messaging.js';
 import { el, clear, svgIcon, focusFirstIn } from './dom.js';
 import { iconPaths } from './icons.js';
 import { leave, clearSettled, enterView } from './motion.js';
@@ -143,6 +144,7 @@ export function renderDetailPanel() {
   const isNewTarget = targetKey !== lastDetailTargetKey;
   const savedScrollTop = isNewTarget ? 0 : detailPanel.scrollTop;
   lastDetailTargetKey = targetKey;
+  if (isNewTarget && target.kind === 'message') queueMicrotask(() => markMessagesRead([state.data.messages[target.index]]));
   clear(detailPanel);
   const { title, fields, body } = detailFields(target, state.data);
   const fieldNodes = fields.filter(([, value]) => value !== '' && value != null).map(([label, value]) => {

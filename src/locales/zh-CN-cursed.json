@@ -51,8 +51,6 @@
   "record.reportCards": "终审判决书",
   "none.onFile": "（暂时逍遥法外）",
   "none.published": "（还在憋大招）",
-  "hero.class": "转职职业",
-  "hero.started": "开服于 {date}",
   "state.loading": "正在渡劫加载数据…",
   "loading.step.auth": "正在核实你确实是你",
   "loading.step.core": "正在挖掘课程与劫难日历",

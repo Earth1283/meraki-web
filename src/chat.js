@@ -2,7 +2,7 @@ import { el, clear, svgIcon } from './dom.js';
 import { state, setActiveThread } from './state.js';
 import { messageThreads, partnerName, initials, dayKey, formatDaySeparator, formatTime12 } from './rows.js';
 import { iconPaths } from './icons.js';
-import { sendMessage } from './messaging.js';
+import { sendMessage, markThreadRead } from './messaging.js';
 import { t } from './i18n.js';
 
 // Module-level, not per-call: lets us tell "new message arrived" apart from
@@ -53,6 +53,7 @@ export function renderChat(container) {
   container.appendChild(el('div', { class: 'chat-shell' }, [threadList, threadView]));
 
   if (thread) {
+    queueMicrotask(() => markThreadRead(thread.partnerId));
     const shouldScroll = thread.partnerId !== lastThreadId || thread.indices.length !== lastMessageCount;
     lastThreadId = thread.partnerId;
     lastMessageCount = thread.indices.length;

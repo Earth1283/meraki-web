@@ -290,7 +290,6 @@ p { margin: 0 0 0.6em; line-height: 1.6; color: var(--text-secondary); }
 .style-notebook .hl-swipe,
 .stat-value.text-accent,
 .stat-value.text-bad,
-.hero-value,
 .brand {
   background-image: linear-gradient(98deg, transparent 0.06em, var(--mark-color, var(--mark)) 0.2em, var(--mark-color, var(--mark)) calc(100% - 0.28em), transparent calc(100% - 0.04em));
   background-repeat: no-repeat;
