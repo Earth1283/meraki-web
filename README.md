@@ -1,5 +1,37 @@
 # meraki-web
 
+## Project status
+
+This project is meant to be temporary. Its end goal is to be discarded: this
+repository and the GitHub Pages site are a stopgap, and I plan to archive them
+once they're no longer needed. I may be getting the chance to contribute
+directly upstream, with PR access to the official codebase. If that happens,
+the point of this fork is to land its work in the real client: a better,
+faster UI, plus features like draft recovery and what-if grades. At that point
+this fork has no reason to exist.
+
+Privacy and transparency come with it. This client has no backend. Your
+credentials and tokens stay in your own browser and go only to Meraki's
+servers, and the app's "Data & Privacy" tab lists exactly what it reads and
+writes. I want upstream to hold to the same standard, so the aim is to carry
+that over too, not just the look.
+
+I also want to see whether an official, documented, read-only API can be made
+available. Everything here is built on a reverse-engineered picture of the
+backend, which I've written up in two reference documents:
+[v1](https://github.com/Earth1283/meraki-web/releases/tag/api-pdf-docs) and the
+[11/2 update](https://github.com/Earth1283/meraki-web/releases/tag/api-docs-2026-11-2).
+An official API would make that guesswork unnecessary and keep third-party
+clients from breaking whenever the backend changes. I can't promise it will
+happen soon.
+
+Until then, treat this as a working prototype and don't build anything
+long-term on it. Expect the hosted copies to disappear and the repo to be
+archived rather than maintained. I can't promise a date, because it depends on
+that access coming through.
+
+## About
+
 A self-hosted browser client for Meraki. There is no backend: this is a
 static HTML/CSS/JS bundle, and every logged-in browser talks to Meraki's
 Supabase project directly over HTTPS. The server that serves these files
