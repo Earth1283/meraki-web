@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyWhatIf, whatIfCandidates, hasWhatIfScores } from '../src/whatif.js';
+import { applyWhatIf, whatIfCandidates, hasWhatIfScores, adjustableGrades } from '../src/whatif.js';
 import { classGradeStats } from '../src/analytics.js';
 import { i18nReady } from '../src/i18n.js';
 
@@ -71,4 +71,38 @@ test('another assignment in a weighted class goes in the chosen category, or the
   const chosen = applyWhatIf(data, { c1: { extra: { earned: 0, possible: 100, category: 'Tests' } } });
   // Tests drop to (70 + 0) / 200 = 35%; Homework stays at 90%.
   assert.ok(Math.abs(classGradeStats(chosen, 'c1').currentPct - (90 * 0.4 + 35 * 0.6)) < 1e-9);
+});
+
+test('applyWhatIf can adjust a score already earned, leaving the real data alone', () => {
+  const data = dataWith(ASSIGNMENTS, GRADES);
+  const projected = applyWhatIf(data, { c1: { adjusted: { a1: 100 } } });
+  assert.equal(classGradeStats(projected, 'c1').currentPct, ((100 + 70) / 200) * 100);
+  assert.equal(data.grades[0].points_earned, 90);
+});
+
+test('an adjusted score of zero counts, and a blank one is ignored', () => {
+  const projected = applyWhatIf(dataWith(ASSIGNMENTS, GRADES), { c1: { adjusted: { a1: 0, a2: null } } });
+  assert.equal(classGradeStats(projected, 'c1').currentPct, ((0 + 70) / 200) * 100);
+});
+
+test('hasWhatIfScores is true for an adjusted score alone', () => {
+  assert.equal(hasWhatIfScores({ adjusted: { a1: 80 } }), true);
+  assert.equal(hasWhatIfScores({ adjusted: { a1: null } }), false);
+});
+
+test('adjustableGrades lists scored work newest first, capped, skipping ungraded and other classes', () => {
+  const assignments = [
+    { id: 'a1', class_id: 'c1', points_possible: 100, due_date: '2026-01-01' },
+    { id: 'a2', class_id: 'c1', points_possible: 100, due_date: '2026-03-01' },
+    { id: 'a3', class_id: 'c1', points_possible: 100, due_date: '2026-04-01' },
+    { id: 'a4', class_id: 'c2', points_possible: 100, due_date: '2026-05-01' },
+  ];
+  const grades = [
+    { assignment_id: 'a1', points_earned: 90 },
+    { assignment_id: 'a2', points_earned: 70 },
+    { assignment_id: 'a4', points_earned: 50 },
+  ];
+  const data = dataWith(assignments, grades);
+  assert.deepEqual(adjustableGrades(data, 'c1').map((e) => e.assignment.id), ['a2', 'a1']);
+  assert.deepEqual(adjustableGrades(data, 'c1', 1).map((e) => e.assignment.id), ['a2']);
 });

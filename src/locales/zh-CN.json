@@ -422,6 +422,8 @@
   "analytics.whatIfCategory": "另一项作业的类别",
   "analytics.whatIfEmpty": "输入分数，看看这门课的成绩会变成多少。",
   "analytics.whatIfClear": "清除",
+  "analytics.whatIfAdjust": "修改 {title} 的分数",
+  "analytics.whatIfAdjustHeading": "或修改过去的分数",
   "analytics.whatIfGpa": "按你的假设：GPA {from} → {to}",
   "calendar.switchToGrid": "切换到日历视图",
   "calendar.switchToList": "切换到列表视图",

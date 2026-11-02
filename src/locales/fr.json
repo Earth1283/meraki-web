@@ -422,6 +422,8 @@
   "analytics.whatIfCategory": "Catégorie de l'autre devoir",
   "analytics.whatIfEmpty": "Saisissez une note pour voir où en serait ce cours.",
   "analytics.whatIfClear": "Effacer",
+  "analytics.whatIfAdjust": "Modifier la note de {title}",
+  "analytics.whatIfAdjustHeading": "Ou modifier une note passée",
   "analytics.whatIfGpa": "Avec vos hypothèses : GPA {from} → {to}",
   "calendar.switchToGrid": "Passer à la vue calendrier",
   "calendar.switchToList": "Passer à la vue liste",

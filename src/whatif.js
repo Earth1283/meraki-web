@@ -17,6 +17,20 @@ export function whatIfCandidates(data, classId) {
   );
 }
 
+export const ADJUSTABLE_LIMIT = 8;
+
+/** A class's most recent scored assignments, newest first: the past scores a
+ * What if can change to see whether a different result would have helped. */
+export function adjustableGrades(data, classId, limit = ADJUSTABLE_LIMIT) {
+  const dueOf = (a) => a.due_date ?? a.created_at ?? '';
+  return data.assignments
+    .filter((a) => a.class_id === classId && a.points_possible != null)
+    .map((assignment) => ({ assignment, grade: data.grades.find((g) => g.assignment_id === assignment.id && g.points_earned != null) }))
+    .filter((entry) => entry.grade)
+    .sort((x, y) => dueOf(y.assignment).localeCompare(dueOf(x.assignment)))
+    .slice(0, limit);
+}
+
 /** The category another assignment goes in when none was picked. In a
  * weighted class, work outside the setup's categories only shares the weight
  * they leave over (often none), so it's the first real category there. */
@@ -26,8 +40,9 @@ export function defaultExtraCategory(data, classId) {
 }
 
 /** `data` as if every What if score were a real grade: scores fill in
- * ungraded assignments (a real grade always wins), and a class's `extra`
- * adds one more graded assignment. Feed the result to classGradeStats or
+ * ungraded assignments (a real grade always wins), a class's `adjusted`
+ * scores replace the real grade for assignments already scored, and its
+ * `extra` adds one more graded assignment. Feed the result to classGradeStats or
  * overallGrade to see where things would land. */
 export function applyWhatIf(data, whatIf = {}) {
   const assignments = [...data.assignments];
@@ -35,6 +50,11 @@ export function applyWhatIf(data, whatIf = {}) {
   for (const [classId, entry] of Object.entries(whatIf)) {
     for (const [assignmentId, points] of Object.entries(entry?.scores ?? {})) {
       if (Number.isFinite(points)) grades.push({ id: `what-if:${assignmentId}`, assignment_id: assignmentId, points_earned: points, updated_at: null });
+    }
+    for (const [assignmentId, points] of Object.entries(entry?.adjusted ?? {})) {
+      if (!Number.isFinite(points)) continue;
+      for (let i = grades.length - 1; i >= 0; i--) if (grades[i].assignment_id === assignmentId) grades.splice(i, 1);
+      grades.push({ id: `what-if-adjusted:${assignmentId}`, assignment_id: assignmentId, points_earned: points, updated_at: null });
     }
     const extra = entry?.extra;
     if (Number.isFinite(extra?.earned) && Number.isFinite(extra?.possible) && extra.possible > 0) {
@@ -47,7 +67,7 @@ export function applyWhatIf(data, whatIf = {}) {
 }
 
 export function hasWhatIfScores(entry) {
-  return Object.values(entry?.scores ?? {}).some(Number.isFinite) || (Number.isFinite(entry?.extra?.earned) && entry.extra.possible > 0);
+  return Object.values(entry?.scores ?? {}).some(Number.isFinite) || Object.values(entry?.adjusted ?? {}).some(Number.isFinite) || (Number.isFinite(entry?.extra?.earned) && entry.extra.possible > 0);
 }
 
 function whatIfInput(value, onInput, attrs = {}) {
@@ -108,6 +128,16 @@ export function renderWhatIf(cls, data, config, whatIf, updaters) {
       el('span', { class: 'whatif-of', text: `/ ${a.points_possible}` }),
     ]),
   );
+  const adjustRows = adjustableGrades(data, cls.id).map(({ assignment, grade }) =>
+    el('label', { class: 'whatif-row' }, [
+      el('span', { class: 'whatif-row-label', text: assignment.title, title: assignment.title }),
+      whatIfInput(entryNow().adjusted?.[assignment.id], (points) => update((e) => ({ adjusted: { ...e.adjusted, [assignment.id]: points } })), {
+        'aria-label': t('analytics.whatIfAdjust', { title: assignment.title }),
+        placeholder: String(grade.points_earned),
+      }),
+      el('span', { class: 'whatif-of', text: `/ ${assignment.points_possible}` }),
+    ]),
+  );
   // A weighted class needs to know which category another assignment is in.
   const setup = gradeSetup(cls.weights);
   const categoryPicker =
@@ -136,6 +166,8 @@ export function renderWhatIf(cls, data, config, whatIf, updaters) {
   const details = el('details', { class: 'whatif', open: entry.open || hasWhatIfScores(entry) || undefined }, [
     el('summary', { class: 'field-label', text: t('analytics.whatIf') }),
     el('div', { class: 'whatif-list' }, rows),
+    adjustRows.length ? el('div', { class: 'field-label whatif-subhead', text: t('analytics.whatIfAdjustHeading') }) : null,
+    adjustRows.length ? el('div', { class: 'whatif-list' }, adjustRows) : null,
     el('div', { class: 'whatif-footer' }, [
       result,
       el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => whatIf.clear(cls.id), text: t('analytics.whatIfClear') }),

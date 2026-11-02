@@ -436,6 +436,8 @@
   "analytics.whatIfCategory": "Category for another assignment",
   "analytics.whatIfEmpty": "Type a score to see where this class would land.",
   "analytics.whatIfClear": "Clear",
+  "analytics.whatIfAdjust": "Change the score on {title}",
+  "analytics.whatIfAdjustHeading": "Or change a past score",
   "analytics.whatIfGpa": "With your what-ifs: GPA {from} → {to}",
   "calendar.switchToGrid": "Switch to calendar view",
   "calendar.switchToList": "Switch to list view",
