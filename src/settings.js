@@ -9,6 +9,7 @@ import { t } from './i18n.js';
 import { showToast } from './toast.js';
 import { backdrop, closeButton } from './panels.js';
 import { buildInvisibleSettings } from './invisible-controls.js';
+import { buildMfaSettings } from './mfa-settings.js';
 import { buildDraftSyncControls } from './draft-controls.js';
 import { DEFAULT_DRAFT_SYNC, draftSyncPreferences, setDraftSyncPreferences } from './drafts.js';
 
@@ -216,6 +217,7 @@ export function buildSettings() {
       segmented(autoRefreshOptions(), cfg.autoRefreshMs, (v) => setConfig({ autoRefreshMs: v })),
     ]),
     settingsSection(t('drafts.settingsTitle'), t('drafts.settingsHint'), [buildDraftSyncControls(state.ownUserId)]),
+    settingsSection(t('mfa.title'), null, [buildMfaSettings()]),
     settingsSection(t('settings.invisibleTitle'), t('settings.invisibleHint'), [buildInvisibleSettings()]),
     settingsSection(t('settings.grades'), t('settings.grades.hint'), [
       el('label', { class: 'field-label', text: t('grade.scale') }),

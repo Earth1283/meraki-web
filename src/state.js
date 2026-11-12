@@ -258,8 +258,12 @@ async function showSnapshot() {
   notify();
 }
 
-export function doLogout() {
-  api.logout();
+/** The sign-out button: a global sign-out, then everything in localStorage
+ * goes. A session that merely expired (`wipe: false`) only drops the tokens,
+ * so unfinished drafts survive for the next login. */
+export function doLogout({ wipe = true } = {}) {
+  if (wipe) api.signOut();
+  else api.logout();
   clearSnapshot();
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   autoRefreshTimer = null;
@@ -487,7 +491,7 @@ export async function refresh() {
   }
   clampSelection();
   notify();
-  if (expired) doLogout();
+  if (expired) doLogout({ wipe: false });
 }
 
 /** Fetches the next page of a paged field and appends it. Rows already

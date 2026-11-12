@@ -44,6 +44,11 @@ WRITES (real rows, visible to staff exactly like the website)
   Log in         -> inserts a login_events row, exactly as the site does
                     every time you sign in, unless "Invisible session"
                     is ticked on the login page.
+  Two-step       -> with an authenticator on your account, signing in asks
+                    for its code: a challenge and a verify call to the
+                    sign-in service, plus Meraki's app for backup and
+                    email codes. Settings can set it up (a new factor
+                    and a set of backup codes) or turn it off.
 
 Transparency goes both ways: staff also keep records about you that the \
 official site doesn't put front and center. This client surfaces the ones \
@@ -89,12 +94,14 @@ site calls it.
 
 To open instantly, this client keeps a copy of what it last loaded (your \
 classes, grades, messages and so on) in your browser's own storage, and \
-shows it while the fresh data loads. It never leaves your device, and it is \
-deleted when you log out. On a shared computer, log out when you're done.
+shows it while the fresh data loads. It never leaves your device. Logging \
+out signs you out of Meraki everywhere and clears this site's local \
+storage: your settings and draft text go with it. A session that simply \
+expires keeps them. On a shared computer, log out when you're done.
 
 Draft recovery keeps your unfinished assignment text, attachments, quiz \
 answers and quiz timers on this device, separately for each account. Drafts \
-remain after logout so the same account can recover them next time. Cloud \
+survive a reload or an expired session, but not logging out. Cloud \
 sync is off by default. Choose manual sync, a pause after editing, or a \
 regular interval in Settings or the assignment editor. Synced assignment \
 drafts go to Meraki and may be visible to teachers, but are not turned in. \

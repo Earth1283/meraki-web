@@ -1,0 +1,17 @@
+.mfa-step { display: grid; gap: 6px; }
+.mfa-form { display: flex; flex-direction: column; gap: 6px; }
+.mfa-title { margin: 0 0 2px; font-size: 1.125rem; font-weight: 650; color: var(--text-primary); }
+.mfa-prompt { margin: 0 0 8px; font-size: 0.875rem; line-height: 1.45; color: var(--text-secondary); }
+.mfa-lost { margin: 12px 0 0; font-size: 0.8125rem; line-height: 1.45; color: var(--text-muted); }
+.mfa-lost a { color: var(--info-text); font-weight: 650; }
+.mfa-code { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1.25rem; letter-spacing: .3em; text-align: center; color: var(--text-primary); background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px; }
+.mfa-code:focus { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
+.mfa-links { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 14px; }
+.mfa-link { padding: 2px 0; font: inherit; font-size: 0.8125rem; color: var(--info-text); background: none; border: 0; cursor: pointer; }
+.mfa-link:hover:not(:disabled) { text-decoration: underline; }
+.mfa-link:disabled { color: var(--text-muted); cursor: default; }
+.mfa-settings { display: grid; gap: 10px; }
+.mfa-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mfa-qr { width: 176px; height: 176px; padding: 8px; box-sizing: border-box; background: #fff; border-radius: 8px; }
+.mfa-secret { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.875rem; overflow-wrap: anywhere; color: var(--text-primary); }
+.mfa-codes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 0; padding: 12px; list-style: none; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.875rem; color: var(--text-primary); background: var(--bg-subtle); border-radius: 8px; }

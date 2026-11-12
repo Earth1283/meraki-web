@@ -20,6 +20,7 @@ import { isErrorDismissed, restoreError, dismissButton } from './dismissible.js'
 import { installGlobalKeyboard } from './keyboard.js';
 import { enterView } from './motion.js';
 import { installRouter } from './router.js';
+import { keepSessionAlive } from './sessionkeeper.js';
 import { hashFor } from './route.js';
 import { openContextMenu, menuItemsFor } from './contextmenu.js';
 import { i18nReady, t, onChange as onLocaleChange } from './i18n.js';
@@ -642,6 +643,7 @@ installRouter();
 subscribe(render);
 onLocaleChange(render);
 installGlobalKeyboard();
+keepSessionAlive();
 window.matchMedia('(max-width: 640px)').addEventListener('change', render);
 
 if (isLoggedIn()) {

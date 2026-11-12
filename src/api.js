@@ -50,6 +50,25 @@ export function logout() {
   persist();
 }
 
+/** Signs out the way the official site does (a global sign-out, which revokes
+ * the refresh token on every device) and wipes everything this origin keeps in
+ * localStorage. The local half happens immediately; the server call is best
+ * effort and its promise resolves either way. */
+export function signOut() {
+  const token = session?.access_token;
+  session = null;
+  try {
+    localStorage.clear();
+  } catch {
+    // localStorage unavailable — there is nothing stored to wipe.
+  }
+  if (!token) return Promise.resolve();
+  return fetchWithTimeout(`${SUPABASE_URL}/auth/v1/logout?scope=global`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+  }).then(() => {}, () => {});
+}
+
 // Most accounts (especially students) are provisioned as bare usernames on
 // the school's own domain — nobody types "@meraki.local" from muscle memory,
 // so a plain "something" is assumed to mean "something@meraki.local".
@@ -71,11 +90,22 @@ export async function login(email, password, { invisible = false } = {}) {
   }
   const v = await resp.json();
   if (!v.access_token || !v.refresh_token) throw new Error('no tokens in login response');
+  const factor = (v.user?.factors ?? []).find((f) => f.factor_type === 'totp' && f.status === 'verified');
+  // A password grant is always aal1. With a verified authenticator on the
+  // account that session is only half signed in, so it's handed back
+  // un-stored for the code step (see mfa.js) instead of becoming the session.
+  if (factor) return { mfaRequired: true, pending: { factorId: factor.id, tokens: v, email: normalizedEmail, invisible } };
+  return startSession(v, normalizedEmail, invisible);
+}
+
+/** Makes a token response the signed-in session. */
+export function startSession(v, email, invisible) {
   session = {
     access_token: v.access_token,
     refresh_token: v.refresh_token,
+    expires_at: expiryOf(v),
     user_id: v.user?.id ?? '',
-    email: normalizedEmail,
+    email,
   };
   persist();
   // The official site records every password sign-in in login_events, which
@@ -83,6 +113,20 @@ export async function login(email, password, { invisible = false } = {}) {
   // looking like they never log in. Best-effort: it mustn't block signing in.
   if (session.user_id && !invisible) insertRow('login_events', { user_id: session.user_id }).catch(() => {});
   return session;
+}
+
+/** Swaps in the tokens from a verify or refresh response for the current
+ * session, which keeps its user and email. */
+export function updateTokens(v) {
+  if (!session) throw new Error('not logged in');
+  session = { ...session, access_token: v.access_token, refresh_token: v.refresh_token, expires_at: expiryOf(v) };
+  persist();
+}
+
+// Unix seconds, from the token response's own `expires_at` or its lifetime.
+function expiryOf(v) {
+  if (typeof v.expires_at === 'number') return v.expires_at;
+  return typeof v.expires_in === 'number' ? Math.floor(Date.now() / 1000) + v.expires_in : null;
 }
 
 // Single-flight: concurrent 401s from a tab-switch's parallel fetches must
@@ -93,26 +137,53 @@ async function ensureFreshToken(staleToken) {
   if (!session) throw new Error('not logged in');
   if (session.access_token !== staleToken) return session.access_token;
   if (!refreshPromise) {
-    refreshPromise = doRefresh().finally(() => {
+    refreshPromise = withRefreshLock(() => doRefresh(staleToken)).finally(() => {
       refreshPromise = null;
     });
   }
   return refreshPromise;
 }
 
-async function doRefresh() {
+// Tabs share one stored session and each refresh rotates its token, so two
+// tabs refreshing at once would have the second one spend a dead token and
+// lose the session. The lock makes them take turns; doRefresh then sees what
+// the first one stored.
+function withRefreshLock(task) {
+  return globalThis.navigator?.locks ? navigator.locks.request('meraki-web.refresh', task) : task();
+}
+
+export function refreshSession() {
+  return ensureFreshToken(session?.access_token);
+}
+
+/** Refreshes the session now if its access token runs out within `marginSec`.
+ * Run on a timer and on coming back to the tab, it keeps the session alive
+ * for as long as the refresh token is, instead of waiting for a 401. */
+export async function refreshSessionIfDue(marginSec = 300, nowMs = Date.now()) {
+  if (!session?.expires_at || session.expires_at * 1000 - nowMs > marginSec * 1000) return false;
+  await ensureFreshToken(session.access_token);
+  return true;
+}
+
+async function doRefresh(staleToken) {
+  const stored = loadSession();
+  if (stored && stored.refresh_token !== session.refresh_token && stored.access_token !== staleToken) {
+    session = stored;
+    return session.access_token;
+  }
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
     body: JSON.stringify({ refresh_token: session.refresh_token }),
   });
   if (!resp.ok) {
+    // A busy or down auth server says nothing about the refresh token, so it
+    // must not read as an expired session (which signs the user out).
+    if (resp.status === 429 || resp.status >= 500) throw new TransientHttpError(`token refresh unavailable (${resp.status})`, resp.status);
     const body = await resp.text().catch(() => '');
     throw new Error(`token refresh failed (${resp.status}): ${body}`);
   }
-  const v = await resp.json();
-  session = { ...session, access_token: v.access_token, refresh_token: v.refresh_token };
-  persist();
+  updateTokens(await resp.json());
   return session.access_token;
 }
 
@@ -132,7 +203,7 @@ async function authedRequest(url, init = {}, extraHeaders = {}) {
   return resp;
 }
 
-function authedFetch(path, init = {}) {
+export function authedFetch(path, init = {}) {
   return authedRequest(`${SUPABASE_URL}${path}`, init, { apikey: SUPABASE_ANON_KEY });
 }
 
@@ -319,12 +390,23 @@ export async function uploadFile(storagePath, file, { bucket = 'school-files' } 
 // The captured traffic had its auth headers stripped, so sending the Supabase
 // access token as a bearer token (the usual TanStack Start + Supabase setup)
 // is an assumption until a live call confirms it.
-async function callServerFn(id, data) {
-  const resp = await authedRequest(`${APP_URL}/_serverFn/${id}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-tsr-serverfn': 'true' },
-    body: JSON.stringify(encodeServerFnBody(data)),
-  });
+//
+// `token` calls as that bearer instead of the stored session: the sign-in code
+// step has only the half-signed-in tokens, which must never become the session.
+export async function callServerFn(id, data, { token } = {}) {
+  // A function that takes no argument is POSTed with no body at all, as the
+  // official site does (content-length 0, no content-type).
+  const init = data === undefined
+    ? { method: 'POST', headers: { Accept: 'application/json', 'x-tsr-serverfn': 'true' } }
+    : {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-tsr-serverfn': 'true' },
+        body: JSON.stringify(encodeServerFnBody(data)),
+      };
+  const url = `${APP_URL}/_serverFn/${id}`;
+  const resp = token
+    ? await fetchWithTimeout(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } })
+    : await authedRequest(url, init);
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
     throw new Error(`server function failed (${resp.status}): ${text.slice(0, 200)}`);

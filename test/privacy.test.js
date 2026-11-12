@@ -26,7 +26,8 @@ test('lists every table this client writes to', () => {
   }
 });
 
-test('discloses the on-device data copy and that logout deletes it', () => {
+test('discloses the on-device data copy and that logout signs out everywhere and clears local storage', () => {
   assert.match(DATA_AND_PRIVACY, /copy of what it last loaded/);
-  assert.match(DATA_AND_PRIVACY, /deleted when you log out/);
+  assert.match(DATA_AND_PRIVACY, /signs you out of Meraki everywhere/);
+  assert.match(DATA_AND_PRIVACY, /clears this site's local\s+storage/);
 });

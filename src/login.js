@@ -5,6 +5,7 @@ import { el, mount, svgIcon } from './dom.js';
 import * as api from './api.js';
 import { iconPaths } from './icons.js';
 import { buildInvisibleControls } from './invisible-controls.js';
+import { buildMfaStep } from './mfa-login.js';
 import { t, LOCALES, getLocale, setLocale } from './i18n.js';
 
 /** Shared language <select> — used on the (pre-auth) login screen and in
@@ -68,7 +69,20 @@ export function mountLogin(root, onLoggedIn) {
         submitBtn.disabled = true;
         submitBtn.textContent = t('login.loggingIn');
         try {
-          await api.login(emailInput.value.trim(), passwordInput.value, { invisible: invisible.commit() });
+          const result = await api.login(emailInput.value.trim(), passwordInput.value, { invisible: invisible.commit() });
+          if (result.mfaRequired) {
+            const step = buildMfaStep(result.pending, {
+              onDone: onLoggedIn,
+              onCancel: () => {
+                passwordInput.value = '';
+                submitBtn.disabled = false;
+                submitBtn.textContent = t('login.submit');
+                step.replaceWith(form);
+              },
+            });
+            form.replaceWith(step);
+            return;
+          }
           onLoggedIn();
         } catch (err) {
           errorLine.textContent = /login failed/i.test(err.message)
